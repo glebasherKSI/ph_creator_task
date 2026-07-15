@@ -1,5 +1,7 @@
 const REPORTS_ORIGIN = "https://reports.maxbit.private";
 const REPORTS_ENDPOINT = `${REPORTS_ORIGIN}/reports/gamification-tasks`;
+const SET_ACTIVE_PROJECT_ENDPOINT = `${REPORTS_ORIGIN}/set-active-project`;
+const REPORTS_STATE_ENDPOINT = `${REPORTS_ORIGIN}/state/0`;
 
 export const REPORTS_FETCH_ERRORS = {
   TAB_REQUIRED: "REPORTS_TAB_REQUIRED",
@@ -119,6 +121,22 @@ export function normalizeProjectId(value) {
   return String(asNumber);
 }
 
+// Разбирает ответ GET /state/0: список проектов и текущий активный проект.
+export function extractReportsProjects(data) {
+  const list = Array.isArray(data?.projects) ? data.projects : [];
+  const projects = list
+    .map((item) => ({
+      id: normalizeProjectId(item?.id),
+      name: String(item?.name ?? "").trim(),
+    }))
+    .filter((item) => item.id)
+    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  return {
+    projects,
+    activeProjectId: normalizeProjectId(data?.active_project_id),
+  };
+}
+
 export function inferProjectIdFromDomain(domain) {
   const normalizedDomain = String(domain ?? "").trim().toLowerCase();
   if (!normalizedDomain) return "";
@@ -225,4 +243,4 @@ export function formatMetricNumber(value, fractionDigits = 0) {
   }).format(value);
 }
 
-export { REPORTS_ENDPOINT, REPORTS_ORIGIN };
+export { REPORTS_ENDPOINT, REPORTS_ORIGIN, SET_ACTIVE_PROJECT_ENDPOINT, REPORTS_STATE_ENDPOINT };

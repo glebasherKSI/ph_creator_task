@@ -15,12 +15,14 @@ import {
 import {
   buildReportsPayload,
   computeMetrics,
+  extractReportsProjects,
   formatMetricNumber,
   formatReportsFetchError,
   inferProjectIdFromDomain,
   normalizeProjectId,
   normalizeReportRows,
 } from "../shared/reports.js";
+import { escapeHtml } from "../shared/format.js";
 import { getTaskChartsMarkup, groupStatsRowsByTask, mountTaskCharts } from "../shared/stats-charts.js";
 
 const state = {
@@ -41,6 +43,10 @@ const state = {
   statsTaskOnly: false,
   statsUpdatedAt: "",
   statsProjectId: "",
+  statsProjects: [],
+  statsProjectsLoading: false,
+  statsProjectsLoaded: false,
+  statsProjectsError: "",
   statsFetchSeq: 0,
   statsActiveFetchSeq: 0,
   statsFetchDebounceTimer: null,
@@ -139,6 +145,79 @@ function getFilteredStatsRows() {
   return state.statsRows.filter((row) => String(row.name || "").toLowerCase().includes(taskName));
 }
 
+function getStatsProjectFieldMarkup(inferredProjectId) {
+  if (state.statsProjectsLoading) {
+    return `
+      <label class="field">
+        <span>Проект</span>
+        <select id="stats-project-id" disabled>
+          <option>Загрузка проектов…</option>
+        </select>
+      </label>`;
+  }
+
+  if (state.statsProjects.length) {
+    const currentId = normalizeProjectId(state.statsProjectId) || normalizeProjectId(inferredProjectId);
+    const options = state.statsProjects
+      .map(
+        (project) =>
+          `<option value="${project.id}" ${project.id === currentId ? "selected" : ""}>${escapeHtml(
+            project.name
+          )} (#${project.id})</option>`
+      )
+      .join("");
+    return `
+      <label class="field">
+        <span>Проект</span>
+        <select id="stats-project-id">
+          <option value="" ${currentId ? "" : "selected"} disabled>Выберите проект…</option>
+          ${options}
+        </select>
+      </label>`;
+  }
+
+  return `
+    <label class="field">
+      <span>Project ID${state.statsProjectsError ? " (список недоступен)" : ""}</span>
+      <input
+        id="stats-project-id"
+        type="text"
+        inputmode="numeric"
+        placeholder="${inferredProjectId || "например, 13"}"
+        value="${state.statsProjectId || ""}"
+      />
+    </label>
+    <button id="btn-stats-projects-retry" class="btn" type="button">Загрузить проекты</button>`;
+}
+
+async function loadReportsProjects({ force = false } = {}) {
+  if (state.statsProjectsLoading) return;
+  if (state.statsProjectsLoaded && !force) return;
+
+  state.statsProjectsLoading = true;
+  state.statsProjectsError = "";
+  renderStatsPanel();
+
+  try {
+    const result = await chrome.runtime.sendMessage({ action: "PH_REPORTS_STATE" });
+    if (!result?.ok) {
+      throw new Error(result?.errorCode || result?.error || "REPORTS_STATE_FAILED");
+    }
+    const { projects, activeProjectId } = extractReportsProjects(result.data);
+    state.statsProjects = projects;
+    state.statsProjectsLoaded = true;
+    if (!normalizeProjectId(state.statsProjectId)) {
+      const inferred = inferProjectIdFromDomain(state.selectedDomain || $("domain-select")?.value || "");
+      state.statsProjectId = normalizeProjectId(inferred) || normalizeProjectId(activeProjectId) || "";
+    }
+  } catch (err) {
+    state.statsProjectsError = formatReportsFetchError(err);
+  } finally {
+    state.statsProjectsLoading = false;
+    renderStatsPanel();
+  }
+}
+
 function getStatsPanelMarkup() {
   const activeTask = getActiveTask();
   const activeTaskLabel = activeTask ? `#${activeTask.id} ${activeTask.name || ""}` : "не выбрана";
@@ -169,16 +248,7 @@ function getStatsPanelMarkup() {
           <span>Период до</span>
           <input id="stats-period-to" type="date" value="${payload.period?.to || ""}" />
         </label>
-        <label class="field">
-          <span>Project ID (обязательно)</span>
-          <input
-            id="stats-project-id"
-            type="text"
-            inputmode="numeric"
-            placeholder="${inferredProjectId || "например, 13"}"
-            value="${state.statsProjectId || ""}"
-          />
-        </label>
+        ${getStatsProjectFieldMarkup(inferredProjectId)}
         <button id="btn-stats-refresh" class="btn btn--primary" type="button" ${state.statsLoading ? "disabled" : ""}>Обновить</button>
         <label class="field">
           <span>Фильтр по задаче</span>
@@ -303,7 +373,13 @@ async function loadStatsReport({ force = false } = {}) {
 function bindStatsEvents() {
   $("btn-stats-refresh")?.addEventListener("click", () => {
     clearStatsFetchDebounce();
+    if (!state.statsProjectsLoaded && !state.statsProjectsLoading) {
+      void loadReportsProjects();
+    }
     void loadStatsReport({ force: true });
+  });
+  $("btn-stats-projects-retry")?.addEventListener("click", () => {
+    void loadReportsProjects({ force: true });
   });
   $("stats-period-from")?.addEventListener("change", () => {
     scheduleStatsReportReload();
@@ -430,12 +506,16 @@ function bindEvents() {
   $("tab-editor")?.addEventListener("click", () => setMainView("editor"));
   $("tab-stats")?.addEventListener("click", () => {
     setMainView("stats");
-    if (!state.statsRows.length && !state.statsLoading) {
-      void loadStatsReport();
-    } else {
-      renderStatsPanel();
-    }
+    renderStatsPanel();
+    void ensureStatsLoaded();
   });
+}
+
+async function ensureStatsLoaded() {
+  await loadReportsProjects();
+  if (!state.statsRows.length && !state.statsLoading) {
+    void loadStatsReport();
+  }
 }
 
 async function init() {

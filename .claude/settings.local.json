@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(dataviz)",
+      "Skill(dataviz:*)",
+      "Bash(node scripts/validate_palette.js \"#2a78d6,#008300,#eda100,#1baf7a,#4a3aa7\" --mode light)",
+      "Bash(node --check --input-type=module)",
+      "Bash(node -e \"try{require.resolve\\('puppeteer'\\);console.log\\('puppeteer yes'\\)}catch{try{require.resolve\\('playwright'\\);console.log\\('playwright yes'\\)}catch{console.log\\('no headless browser'\\)}}\")",
+      "Bash(node \"C:\\\\Users\\\\Gleb\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--projects-PH-CREATOR-TASK\\\\947cadce-22b6-43a3-b779-3ce44e26b755\\\\scratchpad\\\\t.mjs\")",
+      "Skill(artifact-design)",
+      "Skill(artifact-design:*)"
+    ]
+  }
+}

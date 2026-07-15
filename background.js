@@ -8,6 +8,8 @@ import {
   REPORTS_ENDPOINT,
   REPORTS_ORIGIN,
   REPORTS_FETCH_ERRORS,
+  SET_ACTIVE_PROJECT_ENDPOINT,
+  REPORTS_STATE_ENDPOINT,
 } from "./src/shared/reports.js";
 
 async function getDomains() {
@@ -63,11 +65,11 @@ async function findReportsTab() {
   return tabs.find((tab) => tab.active) || tabs[0];
 }
 
-async function fetchInReportsPageContext(tabId, body) {
+async function fetchInReportsPageContext(tabId, endpoint, body, method = "POST") {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     world: "MAIN",
-    func: async (endpoint, requestBody) => {
+    func: async (endpoint, requestBody, httpMethod) => {
       const getCookieValue = (name) => {
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
@@ -84,16 +86,22 @@ async function fetchInReportsPageContext(tabId, body) {
           };
         }
 
-        const response = await fetch(endpoint, {
-          method: "POST",
+        const method = String(httpMethod || "POST").toUpperCase();
+        const hasBody = method !== "GET" && method !== "HEAD";
+        const requestInit = {
+          method,
           credentials: "include",
           headers: {
             Accept: "application/json, text/plain, */*",
-            "Content-Type": "application/json",
             "X-XSRF-TOKEN": xsrfToken,
           },
-          body: JSON.stringify(requestBody || {}),
-        });
+        };
+        if (hasBody) {
+          requestInit.headers["Content-Type"] = "application/json";
+          requestInit.body = JSON.stringify(requestBody || {});
+        }
+
+        const response = await fetch(endpoint, requestInit);
 
         const text = await response.text();
         let data = text;
@@ -126,10 +134,30 @@ async function fetchInReportsPageContext(tabId, body) {
         };
       }
     },
-    args: [REPORTS_ENDPOINT, body],
+    args: [endpoint, body, method],
   });
 
   return result;
+}
+
+// Reports фильтрует данные по «активному проекту», который хранится в серверной
+// сессии, а не берётся из тела запроса отчёта. UI Reports переключает его через
+// POST /set-active-project { project_id: <number> }. Повторяем этот вызов, чтобы
+// выбирать проект целиком из расширения (иначе отчёт возвращает агрегат --ALL--).
+async function setActiveReportsProject(tabId, projectId) {
+  const numericId = Number(String(projectId ?? "").trim());
+  if (!Number.isInteger(numericId) || numericId <= 0) return;
+
+  const result = await fetchInReportsPageContext(tabId, SET_ACTIVE_PROJECT_ENDPOINT, {
+    project_id: numericId,
+  });
+  if (!result) {
+    throw new Error(REPORTS_FETCH_ERRORS.SCRIPT_FAILED);
+  }
+  if (!result.ok) {
+    if (result.errorCode) throw new Error(result.errorCode);
+    throw new Error(REPORTS_FETCH_ERRORS.SCRIPT_FAILED);
+  }
 }
 
 async function handleReportsFetch(payload) {
@@ -143,7 +171,8 @@ async function handleReportsFetch(payload) {
   const reportsTab = await findReportsTab();
   if (reportsTab?.id) {
     try {
-      const result = await fetchInReportsPageContext(reportsTab.id, body);
+      await setActiveReportsProject(reportsTab.id, body.project_id);
+      const result = await fetchInReportsPageContext(reportsTab.id, REPORTS_ENDPOINT, body);
       if (!result) {
         throw new Error(REPORTS_FETCH_ERRORS.SCRIPT_FAILED);
       }
@@ -160,6 +189,44 @@ async function handleReportsFetch(payload) {
   }
 
   throw new Error(REPORTS_FETCH_ERRORS.TAB_REQUIRED);
+}
+
+// Список проектов и активный проект: GET /state/0 в контексте вкладки Reports.
+async function handleReportsState() {
+  const { sessionCookie } = await resolveReportsAuthCookies();
+  if (!sessionCookie?.value) {
+    throw new Error(REPORTS_FETCH_ERRORS.SESSION_MISSING);
+  }
+
+  const reportsTab = await findReportsTab();
+  if (!reportsTab?.id) {
+    throw new Error(REPORTS_FETCH_ERRORS.TAB_REQUIRED);
+  }
+
+  try {
+    const result = await fetchInReportsPageContext(reportsTab.id, REPORTS_STATE_ENDPOINT, null, "GET");
+    if (!result) {
+      throw new Error(REPORTS_FETCH_ERRORS.SCRIPT_FAILED);
+    }
+    if (!result.ok && result.errorCode) {
+      throw new Error(result.errorCode);
+    }
+    return result;
+  } catch (err) {
+    if (String(err?.message || err).startsWith("REPORTS_")) {
+      throw err;
+    }
+    throw new Error(REPORTS_FETCH_ERRORS.SCRIPT_FAILED);
+  }
+}
+
+function reportsErrorResponse(err) {
+  const message = String(err?.message || err);
+  return {
+    ok: false,
+    error: message,
+    errorCode: message.startsWith("REPORTS_") ? message : undefined,
+  };
 }
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -179,18 +246,18 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg?.action) return;
-  if (msg.action !== "PH_REPORTS_FETCH") return;
 
-  handleReportsFetch(msg.payload)
-    .then((result) => sendResponse(result))
-    .catch((err) =>
-      sendResponse({
-        ok: false,
-        error: String(err?.message || err),
-        errorCode: String(err?.message || err).startsWith("REPORTS_")
-          ? String(err?.message || err)
-          : undefined,
-      })
-    );
-  return true;
+  if (msg.action === "PH_REPORTS_FETCH") {
+    handleReportsFetch(msg.payload)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse(reportsErrorResponse(err)));
+    return true;
+  }
+
+  if (msg.action === "PH_REPORTS_STATE") {
+    handleReportsState()
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse(reportsErrorResponse(err)));
+    return true;
+  }
 });
