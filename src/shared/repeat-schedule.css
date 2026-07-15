@@ -1,0 +1,137 @@
+.repeat-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-space-2);
+}
+
+.repeat-schedule__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--form-space-2);
+  font-size: var(--form-text-base);
+  cursor: pointer;
+}
+
+.repeat-schedule__checkbox input {
+  accent-color: var(--form-primary);
+  width: 16px;
+  height: 16px;
+}
+
+.repeat-schedule__panel {
+  padding: var(--form-space-3) var(--form-space-4);
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-lg);
+  background: var(--form-surface-subtle);
+  box-shadow: var(--form-shadow-sm);
+}
+
+.repeat-schedule__panel--hidden {
+  display: none;
+}
+
+.repeat-schedule__title {
+  font-size: var(--form-text-md);
+  font-weight: var(--form-weight-semibold);
+  margin-bottom: var(--form-space-2);
+  color: var(--form-text);
+}
+
+.repeat-schedule__grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr);
+  gap: var(--form-space-2);
+  align-items: end;
+}
+
+.repeat-schedule__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-space-1);
+  min-width: 0;
+}
+
+.repeat-schedule__field--wide {
+  grid-column: 1 / -1;
+}
+
+.repeat-schedule__label {
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-medium);
+  color: var(--form-muted);
+}
+
+.repeat-schedule__select {
+  width: 100%;
+  min-height: var(--form-input-height);
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  padding: var(--form-input-padding-y) var(--form-input-padding-x);
+  background: var(--form-surface);
+  color: var(--form-text);
+  font-family: inherit;
+  font-size: var(--form-text-base);
+  box-shadow: var(--form-shadow-sm);
+  transition:
+    border-color var(--form-transition-fast),
+    box-shadow var(--form-transition-fast);
+}
+
+.repeat-schedule__select:hover:not(:disabled) {
+  border-color: var(--form-border-strong);
+}
+
+.repeat-schedule__select:focus {
+  outline: none;
+  border-color: var(--form-focus-border);
+  box-shadow: var(--form-focus-ring);
+}
+
+.repeat-schedule__combobox-mount {
+  min-width: 0;
+}
+
+.repeat-schedule__combobox-mount .multi-combobox__control {
+  min-height: var(--form-input-height);
+}
+
+.repeat-schedule__period-field--hidden {
+  display: none;
+}
+
+.repeat-schedule__fallback {
+  margin-top: var(--form-space-2);
+}
+
+.repeat-schedule__fallback--hidden {
+  display: none;
+}
+
+.repeat-schedule__fallback-input {
+  width: 100%;
+  min-height: 80px;
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  padding: var(--form-input-padding-y) var(--form-input-padding-x);
+  font-family: var(--form-font-mono);
+  font-size: var(--form-text-sm);
+  background: var(--form-code-bg);
+  color: var(--form-code-text);
+  resize: vertical;
+  box-shadow: var(--form-shadow-sm);
+  transition:
+    border-color var(--form-transition-fast),
+    box-shadow var(--form-transition-fast);
+}
+
+.repeat-schedule__fallback-input:focus {
+  outline: none;
+  border-color: var(--form-focus-border);
+  box-shadow: var(--form-focus-ring);
+}
+
+@media (max-width: 720px) {
+  .repeat-schedule__grid {
+    grid-template-columns: 1fr;
+  }
+}

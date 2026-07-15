@@ -1,0 +1,1163 @@
+{
+  "extractedAt": "2026-06-18T10:03:20.176Z",
+  "source": {
+    "panel_backend_js": {
+      "path": "exports/panel_backend.js",
+      "sizeBytes": 4407586,
+      "lines": 129245,
+      "bundler": "Vite (not Webpack)",
+      "framework": "Vue 3 + Pinia + Vue Router + Ant Design Vue",
+      "note": "Main entry chunk only; gamification form logic in lazy chunk form-Bg1PQAgX.js (not saved)"
+    },
+    "fixtures": [
+      "test_primer/conditions.json",
+      "test_primer/meta.json",
+      "exports/ph_sniffer_captures_2026-06-18.json"
+    ]
+  },
+  "bundle": {
+    "entry": "Zje() bootstrap at end of panel_backend.js",
+    "lazyChunks": {
+      "gamificationTaskForm": "form-Bg1PQAgX.js",
+      "gamificationTaskList": "index-th1QOVAJ.js",
+      "conditionsBuilder": "conditions-builder-DYRGOO_w.js",
+      "actionsBuilder": "actions-Bj31hl3s.js",
+      "formField": "form-field-BGF7NXAr.js",
+      "cronInput": "cron-input.vue_vue_type_script_setup_true_lang-DrtQ0Est.js",
+      "formSelector": "form-selector-BrvqnCvI.js",
+      "countrySelector": "form-country-selector-DFE8HqjO.js",
+      "dateTimePicker": "form-date-time-picker-D6XwLBrd.js"
+    },
+    "routes": [
+      {
+        "path": "/gamification_tasks",
+        "name": "gamification-tasks"
+      },
+      {
+        "path": "/gamification_tasks/new",
+        "name": "new-gamification-task",
+        "component": "form-Bg1PQAgX.js"
+      },
+      {
+        "path": "/gamification_tasks/:id/edit",
+        "name": "edit-gamification-task",
+        "component": "form-Bg1PQAgX.js"
+      }
+    ],
+    "stores": {
+      "auth": {
+        "loadMeta": "GET /admin/api/auth/meta"
+      },
+      "constants": {
+        "loadConstants": "GET /admin/api/constants"
+      }
+    },
+    "api": {
+      "baseURL": "/admin/api",
+      "caseTransform": "axios interceptors: request snake_case, response camelCase (lodash)",
+      "gamificationTasks": {
+        "meta": "GET /admin/api/gamification/tasks/meta?locale=ru",
+        "list": "GET /admin/api/gamification/tasks",
+        "show": "GET /admin/api/gamification/tasks/:id",
+        "create": "POST /admin/api/gamification/tasks",
+        "update": "PATCH /admin/api/gamification/tasks/:id",
+        "payloadWrapper": "gamification_task"
+      }
+    },
+    "formMechanism": {
+      "type": "component-driven (not JSON Schema)",
+      "pattern": "Vue SFC sections + FormField wrapper + specialized builders (conditions-builder, actions)",
+      "i18nSections": "gamification_tasks.form.sections (7 keys)",
+      "conditionWidgets": "Server-driven definitions (name, type, collection, availableTypes, value template)",
+      "actionBuilder": "Hardcoded action types + per-action requirement fields from i18n target_actions.fields"
+    }
+  },
+  "formSections": [
+    {
+      "id": "main",
+      "titleRu": "Основное",
+      "titleEn": "General",
+      "bundleKey": "gamification_tasks.form.sections.main"
+    },
+    {
+      "id": "classification",
+      "titleRu": "Классификация",
+      "titleEn": "Classification",
+      "bundleKey": "gamification_tasks.form.sections.classification"
+    },
+    {
+      "id": "start",
+      "titleRu": "Начало работы",
+      "titleEn": "Start",
+      "bundleKey": "gamification_tasks.form.sections.start"
+    },
+    {
+      "id": "time_availability",
+      "titleRu": "Доступность по времени",
+      "titleEn": "Time availability",
+      "bundleKey": "gamification_tasks.form.sections.time_availability"
+    },
+    {
+      "id": "target_actions",
+      "titleRu": "Целевые действия",
+      "titleEn": "Target Actions",
+      "bundleKey": "gamification_tasks.form.sections.target_actions"
+    },
+    {
+      "id": "reward",
+      "titleRu": "Вознаграждение",
+      "titleEn": "Reward",
+      "bundleKey": "gamification_tasks.form.sections.reward"
+    },
+    {
+      "id": "notifications",
+      "titleRu": "Уведомления",
+      "titleEn": "Notifications",
+      "bundleKey": "gamification_tasks.form.sections.notifications"
+    },
+    {
+      "id": "targeting",
+      "titleRu": "Таргетинг",
+      "titleEn": "Targeting",
+      "bundleKey": null,
+      "note": "В copy-panel отдельная секция; в i18n bundle нет отдельного ключа — conditions рендерятся через conditions-builder (lazy chunk)"
+    }
+  ],
+  "gamificationTaskFields": [
+    {
+      "key": "name",
+      "ui": "text",
+      "section": "main",
+      "meta": null
+    },
+    {
+      "key": "frontend_identifier",
+      "ui": "text",
+      "section": "main",
+      "meta": null
+    },
+    {
+      "key": "hidden",
+      "ui": "checkbox",
+      "section": "main",
+      "meta": null
+    },
+    {
+      "key": "state",
+      "ui": "select",
+      "section": "main",
+      "options": [
+        "draft",
+        "active",
+        "disabled",
+        "archived"
+      ],
+      "meta": null
+    },
+    {
+      "key": "type",
+      "ui": "select",
+      "section": "main",
+      "options": [
+        "interactive",
+        "informational",
+        "achievement"
+      ],
+      "meta": null
+    },
+    {
+      "key": "filter_id",
+      "ui": "select",
+      "section": "main",
+      "meta": "filters"
+    },
+    {
+      "key": "countries_matching_type",
+      "ui": "radio",
+      "section": "main",
+      "options": [
+        "countries",
+        "countries_lists"
+      ],
+      "meta": null
+    },
+    {
+      "key": "countries",
+      "ui": "country_selector",
+      "section": "main",
+      "meta": null
+    },
+    {
+      "key": "countries_lists",
+      "ui": "multi_select",
+      "section": "main",
+      "meta": "countries_lists (constants)"
+    },
+    {
+      "key": "player_consent_required",
+      "ui": "checkbox",
+      "section": "main",
+      "meta": null
+    },
+    {
+      "key": "category",
+      "ui": "select",
+      "section": "classification",
+      "options": [
+        "basic",
+        "beginning",
+        "passive",
+        "progressive",
+        "sequence"
+      ],
+      "meta": null
+    },
+    {
+      "key": "tag_id",
+      "ui": "tag_selector",
+      "section": "classification",
+      "meta": "tags"
+    },
+    {
+      "key": "tag",
+      "ui": "object",
+      "section": "classification",
+      "readOnlyOnSubmit": true,
+      "meta": "tags"
+    },
+    {
+      "key": "priority",
+      "ui": "select",
+      "section": "classification",
+      "options": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "meta": null
+    },
+    {
+      "key": "events",
+      "ui": "multi_select",
+      "section": "start",
+      "meta": "events"
+    },
+    {
+      "key": "conditions",
+      "ui": "conditions_builder",
+      "section": "targeting",
+      "meta": "conditions schema from API/fixture",
+      "payloadShape": "[{ conditionName: { type, list?, ... } }]"
+    },
+    {
+      "key": "condition_groups",
+      "ui": "readonly",
+      "section": "targeting",
+      "sendOnCreate": false
+    },
+    {
+      "key": "repeatable",
+      "ui": "checkbox",
+      "section": "time_availability",
+      "meta": null
+    },
+    {
+      "key": "cron",
+      "ui": "cron_input",
+      "section": "time_availability",
+      "meta": null
+    },
+    {
+      "key": "available_from",
+      "ui": "datetime",
+      "section": "time_availability",
+      "meta": null
+    },
+    {
+      "key": "available_till",
+      "ui": "datetime",
+      "section": "time_availability",
+      "meta": null
+    },
+    {
+      "key": "max_repetitions",
+      "ui": "number",
+      "section": "time_availability",
+      "meta": null
+    },
+    {
+      "key": "duration",
+      "ui": "number_minutes",
+      "section": "time_availability",
+      "meta": null
+    },
+    {
+      "key": "infinite",
+      "ui": "checkbox",
+      "section": "time_availability",
+      "meta": null
+    },
+    {
+      "key": "serialized_main_actions",
+      "ui": "actions_builder",
+      "section": "target_actions",
+      "meta": "target_actions.fields i18n",
+      "itemShape": {
+        "action": "string (one of action types)",
+        "requirements": "object (action-specific fields)",
+        "conditions": "object (nested targeting on action)"
+      }
+    },
+    {
+      "key": "serialized_secondary_actions",
+      "ui": "actions_builder",
+      "section": "target_actions",
+      "meta": "target_actions.fields i18n",
+      "itemShape": {
+        "action": "string (one of action types)",
+        "requirements": "object (action-specific fields)",
+        "conditions": "object (nested targeting on action)"
+      }
+    },
+    {
+      "key": "main_actions_sequential",
+      "ui": "checkbox",
+      "section": "target_actions",
+      "meta": null
+    },
+    {
+      "key": "secondary_actions_sequential",
+      "ui": "checkbox",
+      "section": "target_actions",
+      "meta": null
+    },
+    {
+      "key": "main_bonus_group_id",
+      "ui": "select",
+      "section": "reward",
+      "meta": "bonuses"
+    },
+    {
+      "key": "secondary_bonus_group_id",
+      "ui": "select",
+      "section": "reward",
+      "meta": "bonuses"
+    },
+    {
+      "key": "notification_events",
+      "ui": "multi_select",
+      "section": "notifications",
+      "meta": "notification_events"
+    },
+    {
+      "key": "locales",
+      "ui": "locale_map",
+      "section": "extra",
+      "meta": null
+    }
+  ],
+  "conditionWidgets": {
+    "count": 111,
+    "uniqueWidgetTypes": 52,
+    "widgetTypes": [
+      {
+        "widgetType": "aggregated_comp_points",
+        "exampleName": "aggregated_comp_points",
+        "exampleLabel": "Баллы за 30",
+        "props": [
+          "availableTypes",
+          "compPointTypes"
+        ]
+      },
+      {
+        "widgetType": "auto_issue_bonuses",
+        "exampleName": "auto_issue_bonuses",
+        "exampleLabel": "Проверка автоначисления бонусов игроку",
+        "props": [
+          "types"
+        ]
+      },
+      {
+        "widgetType": "average_deposit",
+        "exampleName": "average_deposit",
+        "exampleLabel": "Средний депозит",
+        "props": [
+          "availableTypes",
+          "currency",
+          "availablePeriods"
+        ]
+      },
+      {
+        "widgetType": "average_drop",
+        "exampleName": "average_drop",
+        "exampleLabel": "Средний дроп",
+        "props": [
+          "availableTypes",
+          "availablePeriods",
+          "availableCurrencies"
+        ]
+      },
+      {
+        "widgetType": "avg_number_deposits_period",
+        "exampleName": "avg_number_deposits_period",
+        "exampleLabel": "Среднее количество депозитов за период",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies",
+          "availablePaymentStatuses",
+          "availableDepth"
+        ]
+      },
+      {
+        "widgetType": "bet",
+        "exampleName": "bets_count",
+        "exampleLabel": "Количество ставок по категории игры",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies",
+          "availableBetTypes",
+          "availableGameCategories"
+        ]
+      },
+      {
+        "widgetType": "bet_amount",
+        "exampleName": "categories_bets_amount",
+        "exampleLabel": "Размеры ставок по категориям игр",
+        "props": [
+          "availableBetTypes",
+          "availableTypes",
+          "availablePeriods",
+          "availableCurrencies",
+          "availableGameCategories"
+        ]
+      },
+      {
+        "widgetType": "bet_bonus_ratio",
+        "exampleName": "bet_bonus_ratio",
+        "exampleLabel": "% бонусных ставок",
+        "props": [
+          "availableBonusTypes",
+          "availableCurrencies",
+          "availablePeriodTypes",
+          "availableTypes"
+        ]
+      },
+      {
+        "widgetType": "bonus_issue_percentage",
+        "exampleName": "bonus_issue_percentage",
+        "exampleLabel": "% выданных бонусов",
+        "props": [
+          "availableBonusTypes",
+          "availableConditionTypes",
+          "availablePeriodTypes",
+          "currency"
+        ]
+      },
+      {
+        "widgetType": "bonus_period",
+        "exampleName": "issued_bonus",
+        "exampleLabel": "Выданный бонус",
+        "props": [
+          "availablePeriods",
+          "availableStages"
+        ]
+      },
+      {
+        "widgetType": "boolean",
+        "exampleName": "confirmed",
+        "exampleLabel": "Подтвержден",
+        "props": []
+      },
+      {
+        "widgetType": "boolean_checkboxes",
+        "exampleName": "access_limit",
+        "exampleLabel": "Ограничение доступа",
+        "props": [
+          "availableTypes",
+          "collection"
+        ]
+      },
+      {
+        "widgetType": "boolean_tags",
+        "exampleName": "affiliates_user",
+        "exampleLabel": "Партнёрский пользователь",
+        "props": [
+          "availableTypes"
+        ]
+      },
+      {
+        "widgetType": "category_period_money",
+        "exampleName": "average_bet",
+        "exampleLabel": "Средняя ставка игрока",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies",
+          "availableBetTypes",
+          "availableGameCategories"
+        ]
+      },
+      {
+        "widgetType": "checkboxes",
+        "exampleName": "currencies",
+        "exampleLabel": "Валюты",
+        "props": [
+          "collection",
+          "includeBlank",
+          "multiple"
+        ]
+      },
+      {
+        "widgetType": "comp_points",
+        "exampleName": "comp_points_sum",
+        "exampleLabel": "Операции с баллами",
+        "props": [
+          "availableTypes",
+          "availablePeriods",
+          "availableAccountTypes",
+          "availableSumTypes"
+        ]
+      },
+      {
+        "widgetType": "countries_with_lists",
+        "exampleName": "profile_country",
+        "exampleLabel": "Страна в профиле",
+        "props": [
+          "availableTypes",
+          "collection",
+          "countriesLists"
+        ]
+      },
+      {
+        "widgetType": "date_of_birth",
+        "exampleName": "date_of_birth",
+        "exampleLabel": "Дата рождения",
+        "props": [
+          "availableTypes"
+        ]
+      },
+      {
+        "widgetType": "deposits_count",
+        "exampleName": "deposits_count",
+        "exampleLabel": "Количество депозитов",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies",
+          "availablePaymentStatuses"
+        ]
+      },
+      {
+        "widgetType": "deposits_sum",
+        "exampleName": "deposits_sum",
+        "exampleLabel": "Сумма депозитов",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies",
+          "excludedPaymentMethods",
+          "fromAvailablePeriods"
+        ]
+      },
+      {
+        "widgetType": "extended_period",
+        "exampleName": "registered",
+        "exampleLabel": "Зарегистрирован",
+        "props": [
+          "availablePeriods",
+          "availableAdditionalPeriods"
+        ]
+      },
+      {
+        "widgetType": "favorite_sport",
+        "exampleName": "favorite_sport",
+        "exampleLabel": "Любимый вид спорта",
+        "props": [
+          "availableTypes"
+        ]
+      },
+      {
+        "widgetType": "gamification_task",
+        "exampleName": "gamification_tasks",
+        "exampleLabel": "Полученные задания геймификации",
+        "props": [
+          "availableTypes",
+          "collection",
+          "availableExtraTypes"
+        ]
+      },
+      {
+        "widgetType": "group_immunity",
+        "exampleName": "group_immunity",
+        "exampleLabel": "Иммунитет",
+        "props": [
+          "availableTypes",
+          "availableGroups"
+        ]
+      },
+      {
+        "widgetType": "groups",
+        "exampleName": "groups",
+        "exampleLabel": "Группы",
+        "props": [
+          "availableTypes",
+          "collection",
+          "availableExtraTypes"
+        ]
+      },
+      {
+        "widgetType": "issued_bonuses_by_dsl_tag",
+        "exampleName": "issued_bonus_by_dsl_tag",
+        "exampleLabel": "DSL тег",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "collection"
+        ]
+      },
+      {
+        "widgetType": "issued_rewards",
+        "exampleName": "issued_rewards",
+        "exampleLabel": "Выданные иные вознаграждения",
+        "props": [
+          "availablePeriods",
+          "availableTypes"
+        ]
+      },
+      {
+        "widgetType": "money_extended",
+        "exampleName": "balance",
+        "exampleLabel": "Баланс",
+        "props": [
+          "availableTypes",
+          "availableCurrencies"
+        ]
+      },
+      {
+        "widgetType": "number",
+        "exampleName": "chargeable_comp_points",
+        "exampleLabel": "Расходуемые баллы",
+        "props": [
+          "availableTypes"
+        ]
+      },
+      {
+        "widgetType": "payment",
+        "exampleName": "cashout",
+        "exampleLabel": "Наличие выплаты",
+        "props": [
+          "availableExistenceTypes",
+          "availablePaymentStatuses",
+          "depositPaymentSystems",
+          "availableConditionTypes",
+          "availablePeriodTypes",
+          "availableCurrencies"
+        ]
+      },
+      {
+        "widgetType": "payment_system",
+        "exampleName": "cashout_payment_systems",
+        "exampleLabel": "Наличие выплаты в ПС",
+        "props": [
+          "availablePaymentStatuses",
+          "availableFilterModes",
+          "paymentSystems",
+          "fromAvailablePeriods"
+        ]
+      },
+      {
+        "widgetType": "period",
+        "exampleName": "lack_of_bets",
+        "exampleLabel": "Отсутствие ставок",
+        "props": [
+          "availablePeriods"
+        ]
+      },
+      {
+        "widgetType": "period_money",
+        "exampleName": "cashouts_count",
+        "exampleLabel": "Количество выплат",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies"
+        ]
+      },
+      {
+        "widgetType": "period_number",
+        "exampleName": "hold_period",
+        "exampleLabel": "Холд за период",
+        "props": [
+          "availableTypes",
+          "availablePeriods"
+        ]
+      },
+      {
+        "widgetType": "personal_manager",
+        "exampleName": "personal_manager",
+        "exampleLabel": "Персональный менеджер",
+        "props": [
+          "availableTypes"
+        ]
+      },
+      {
+        "widgetType": "rakeback_amount",
+        "exampleName": "rakeback_amount",
+        "exampleLabel": "Рейкбек за период",
+        "props": [
+          "available_rakeback_types",
+          "available_rakeback_account_types",
+          "availableTypes",
+          "availableCurrencies"
+        ]
+      },
+      {
+        "widgetType": "scratch_cards",
+        "exampleName": "scratch_cards",
+        "exampleLabel": "Количество купленных scratch cards",
+        "props": [
+          "availableTypes",
+          "availablePeriods",
+          "scratchCards"
+        ]
+      },
+      {
+        "widgetType": "select",
+        "exampleName": "active_phones",
+        "exampleLabel": "Активный номер телефона",
+        "props": [
+          "collection",
+          "includeBlank",
+          "multiple"
+        ]
+      },
+      {
+        "widgetType": "sport_bet",
+        "exampleName": "sport_loss_sum",
+        "exampleLabel": "Сумма проигрыша - Спорт",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies",
+          "availableDenseTypes"
+        ]
+      },
+      {
+        "widgetType": "sport_bet_period_money",
+        "exampleName": "sport_bet_sum",
+        "exampleLabel": "Сумма всех ставок на спорт",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies",
+          "availableBetTypes"
+        ]
+      },
+      {
+        "widgetType": "sport_bets_criteria",
+        "exampleName": "sport_bets_criteria",
+        "exampleLabel": "Критерии ставок на спорт",
+        "props": [
+          "availablePeriodTypes",
+          "availableCurrencies",
+          "rangesTypes"
+        ]
+      },
+      {
+        "widgetType": "sport_provider",
+        "exampleName": "sport_provider",
+        "exampleLabel": "Спортивный провайдер",
+        "props": [
+          "availableProviders"
+        ]
+      },
+      {
+        "widgetType": "string",
+        "exampleName": "address",
+        "exampleLabel": "Адрес",
+        "props": []
+      },
+      {
+        "widgetType": "subscriptions",
+        "exampleName": "subscriptions",
+        "exampleLabel": "Подписки",
+        "props": [
+          "availableTypes",
+          "collection",
+          "availableExtraTypes"
+        ]
+      },
+      {
+        "widgetType": "tags_autocomplete_extended",
+        "exampleName": "comp_points_boosters",
+        "exampleLabel": "Ускорители баллов",
+        "props": [
+          "availableTypes",
+          "collection"
+        ]
+      },
+      {
+        "widgetType": "tags_extended",
+        "exampleName": "account_id",
+        "exampleLabel": "ID Счета",
+        "props": [
+          "availableTypes"
+        ]
+      },
+      {
+        "widgetType": "total_deposits",
+        "exampleName": "total_deposits",
+        "exampleLabel": "Общее количество депозитов",
+        "props": [
+          "availableTypes",
+          "availablePeriods",
+          "availableExistenceTypes"
+        ]
+      },
+      {
+        "widgetType": "tournament_period_money",
+        "exampleName": "tournament_bet_sum",
+        "exampleLabel": "Сумма ставок по турниру",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies",
+          "availableTournaments"
+        ]
+      },
+      {
+        "widgetType": "tournament_points",
+        "exampleName": "tournament_points",
+        "exampleLabel": "Очки в турнире",
+        "props": [
+          "availableTypes",
+          "availablePeriods",
+          "availableTournaments"
+        ]
+      },
+      {
+        "widgetType": "trtc_sum",
+        "exampleName": "trtc_sum",
+        "exampleLabel": "Сумма отчислений tRTC",
+        "props": [
+          "availablePeriods",
+          "availableTypes",
+          "availableCurrencies"
+        ]
+      },
+      {
+        "widgetType": "user_id_parity",
+        "exampleName": "user_id_parity",
+        "exampleLabel": "Четность ID пользователя",
+        "props": [
+          "availableParityTypes"
+        ]
+      },
+      {
+        "widgetType": "user_session",
+        "exampleName": "user_session",
+        "exampleLabel": "Пользовательские сессии",
+        "props": [
+          "availableDeviceTypes",
+          "availableOsTypes",
+          "availableExistenceTypes",
+          "availablePeriods"
+        ]
+      }
+    ],
+    "conditionNames": [
+      "access_limit",
+      "account_id",
+      "active_phones",
+      "address",
+      "affiliates_user",
+      "aggregated_comp_points",
+      "application_id",
+      "auto_issue_bonuses",
+      "average_bet",
+      "average_deposit",
+      "average_drop",
+      "avg_number_deposits_period",
+      "balance",
+      "bet_bonus_ratio",
+      "bets_count",
+      "bonus_issue_percentage",
+      "bonus_ratio",
+      "card_mask",
+      "cashout",
+      "cashout_payment_systems",
+      "cashouts_count",
+      "cashouts_sum",
+      "categories_bets_amount",
+      "category_bet_sum",
+      "chargeable_comp_points",
+      "comp_points_boosters",
+      "comp_points_sum",
+      "confirmed",
+      "currencies",
+      "current_login_ip",
+      "customerio_presence",
+      "date_of_birth",
+      "deposit",
+      "deposit_payment_systems",
+      "deposits_count",
+      "deposits_sum",
+      "email_recheck",
+      "emails",
+      "enabled_user",
+      "favorite_sport",
+      "first_login_country",
+      "fraud",
+      "gambling_addict",
+      "gamification_tasks",
+      "gender",
+      "group_immunity",
+      "groups",
+      "hold",
+      "hold_period",
+      "interest_category",
+      "issued_bonus",
+      "issued_bonus_betby",
+      "issued_bonus_by_dsl_tag",
+      "issued_bonus_digitain",
+      "issued_freespin_bonus",
+      "issued_rewards",
+      "lack_of_bets",
+      "last_login_country",
+      "lifetime",
+      "locale",
+      "loss_sum",
+      "median_bet",
+      "ngr",
+      "no_bonus",
+      "no_bonus_sport",
+      "online_user",
+      "partner_id",
+      "persistent_comp_points",
+      "personal_manager",
+      "phone_number",
+      "private",
+      "profile_country",
+      "profile_state",
+      "rakeback_amount",
+      "real_email",
+      "receive_newsletters_casino",
+      "receive_newsletters_sport",
+      "receive_promocasino",
+      "receive_promosport",
+      "receive_sms_promos",
+      "registered",
+      "scratch_cards",
+      "sign_up_source",
+      "social_networks",
+      "spend_sum",
+      "sport_bet_sum",
+      "sport_bets_count",
+      "sport_bets_criteria",
+      "sport_forbidden",
+      "sport_lack_of_bets",
+      "sport_loss_sum",
+      "sport_provider",
+      "sport_suspect",
+      "stag",
+      "stag_available",
+      "subscriptions",
+      "tags",
+      "total_deposits",
+      "tournament_bet_sum",
+      "tournament_points",
+      "trtc_sum",
+      "two_factor",
+      "user_duplicate",
+      "user_id",
+      "user_id_parity",
+      "user_session",
+      "user_verified",
+      "user_visits",
+      "wager_sum",
+      "welcome_hold",
+      "win_sum"
+    ],
+    "payloadExample": [
+      {
+        "user_id": {
+          "type": "enabled",
+          "list": [
+            "1847"
+          ]
+        }
+      }
+    ]
+  },
+  "actionBuilder": {
+    "actionTypes": [
+      "achievement",
+      "app_login",
+      "bet",
+      "bonus_issue",
+      "cashout",
+      "deposit",
+      "email_confirmation",
+      "gamification_task",
+      "groups_update",
+      "leaderboard",
+      "phone_confirmation",
+      "scratch_card",
+      "sport_bet",
+      "tournament",
+      "two_factor",
+      "user_update"
+    ],
+    "itemShape": {
+      "action": "string (one of action types)",
+      "requirements": "object (action-specific fields)",
+      "conditions": "object (nested targeting on action)"
+    },
+    "blocks": [
+      "main_block",
+      "secondary_block"
+    ],
+    "requirementFieldsByAction": {
+      "bet": [
+        "bets_count",
+        "bet_points_sum",
+        "bet_type",
+        "games",
+        "game_categories",
+        "min_bet_amount",
+        "result",
+        "win_coefficient",
+        "in_sequence"
+      ],
+      "deposit": [
+        "payments_count",
+        "points_sum",
+        "min_points",
+        "max_points",
+        "payment_systems",
+        "child_systems"
+      ],
+      "cashout": [
+        "payments_count",
+        "points_sum",
+        "min_points",
+        "max_points",
+        "payment_systems",
+        "child_systems"
+      ],
+      "bonus_issue": [
+        "bonuses_count",
+        "bonuses_points_sum",
+        "name",
+        "dsl_tag"
+      ],
+      "gamification_task": [
+        "tasks_count",
+        "statuses"
+      ],
+      "sport_bet": [
+        "sport_bets_count",
+        "sport_bet_points_sum",
+        "min_bet_amount",
+        "odd",
+        "result",
+        "sport_bet_types",
+        "sport_types"
+      ],
+      "user_update": [
+        "required_attributes",
+        "avatar",
+        "city",
+        "country",
+        "date_of_birth",
+        "full_name",
+        "gender",
+        "nickname",
+        "state"
+      ],
+      "tournament": [
+        "tournaments_count",
+        "tournament_ids",
+        "games_taken_min",
+        "place_min",
+        "place_max"
+      ]
+    }
+  },
+  "metaEndpoints": {
+    "tasksMeta": {
+      "url": "/admin/api/gamification/tasks/meta?locale=ru",
+      "keys": [
+        "filters",
+        "tags",
+        "events",
+        "bonuses",
+        "notification_events",
+        "dsl_tags"
+      ],
+      "events": [
+        "deposit",
+        "cashout",
+        "email_confirmation",
+        "scheduler",
+        "registration",
+        "task_completed",
+        "groups_updated",
+        "bonus_issued",
+        "sport_bonus_issued"
+      ],
+      "notificationEvents": [
+        "main_bonus_issue",
+        "secondary_bonus_issue",
+        "secondary_actions_done",
+        "issue",
+        "expire",
+        "start"
+      ],
+      "bonusesSample": [
+        {
+          "title": "GAMIFICATION BONUS POINTS",
+          "id": "gamification_award:GAMIFICATION BONUS POINTS:GAMIFICATION BONUS POINTS"
+        }
+      ],
+      "filtersCount": 531,
+      "tagsCount": 355,
+      "dslTagsCount": 147
+    },
+    "authMeta": "GET /admin/api/auth/meta",
+    "constants": "GET /admin/api/constants",
+    "abilitiesCheck": "POST /admin/api/abilities/check"
+  },
+  "copyPanelComparison": {
+    "sectionsAligned": true,
+    "extraCopyPanelSections": [
+      "targeting (explicit)",
+      "extra (locales)"
+    ],
+    "gaps": [
+      "select fields are plain text inputs (filter_id, category, events, bonuses, tags)",
+      "conditions and actions are JSON textareas instead of builders",
+      "cron is text instead of cron-input widget",
+      "countries use JSON instead of country_selector"
+    ]
+  },
+  "recommendations": {
+    "extractSchemaWithoutBundle": "Yes — meta API + conditions.json + i18n keys from bundle suffice; lazy form chunks not required",
+    "doNotEmbedBundle": "Bundle is ~4.4MB Vue app with auth/session/CSP deps",
+    "priorityPlan": [
+      "1. Meta selects: fetch tasks/meta, replace text inputs with selects (events, filters, tags, bonuses, notification_events, category, priority, type)",
+      "2. Condition widgets: map conditions.json widget types to lightweight HTML widgets; serialize to API payload shape",
+      "3. Action builder: action type picker + dynamic requirement fields from extracted actionBuilder.requirementFieldsByAction"
+    ],
+    "patternsToCopy": [
+      "FormField label/control/errors wrapper (form-field-BGF7NXAr.js pattern)",
+      "conditions-builder: iterate condition definitions, render by type",
+      "actions builder: main/secondary blocks, add_action, execute_in_order",
+      "Axios snake_case payload convention (already in extension tasks.js)"
+    ]
+  }
+}

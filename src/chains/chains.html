@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PromoHub — Конструктор связей</title>
+    <link rel="stylesheet" href="../shared/form-tokens.css" />
+    <link rel="stylesheet" href="../shared/country-selector.css" />
+    <link rel="stylesheet" href="../shared/multi-combobox.css" />
+    <link rel="stylesheet" href="../shared/repeat-schedule.css" />
+    <link rel="stylesheet" href="../shared/copy-panel.css" />
+    <link rel="stylesheet" href="../shared/conditions-builder.css" />
+    <link rel="stylesheet" href="../shared/actions-builder.css" />
+    <link rel="stylesheet" href="chains.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar__lead">
+        <h1>Конструктор задач PromoHub</h1>
+        <nav class="main-tabs" role="tablist" aria-label="Режим панели">
+          <button
+            id="tab-canvas"
+            class="main-tabs__btn main-tabs__btn--active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+          >
+            Канва
+          </button>
+          <button id="tab-stats" class="main-tabs__btn" type="button" role="tab" aria-selected="false">
+            Статистика
+          </button>
+        </nav>
+      </div>
+      <div id="status" class="status">Выберите домен и загрузите задачи</div>
+    </header>
+
+    <div id="view-canvas" class="main-view main-view--active">
+    <div class="toolbar">
+      <div class="toolbar__card">
+        <div class="toolbar__row toolbar__row--top">
+          <div class="toolbar__group" role="group" aria-label="Список и загрузка">
+            <button
+              id="btn-toggle-catalog"
+              class="btn btn--icon btn--ghost toolbar__catalog-toggle"
+              type="button"
+              disabled
+              title="Свернуть / развернуть список задач"
+              aria-label="Свернуть список задач"
+              aria-expanded="true"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">view_sidebar</span>
+            </button>
+
+            <div class="toolbar__domain">
+              <span class="toolbar__domain-label">
+                <span class="material-symbols-outlined" aria-hidden="true">database</span>
+                Домен
+              </span>
+              <select id="domain-select" class="toolbar__domain-select" aria-label="Домен"></select>
+            </div>
+
+            <div class="toolbar__load-group">
+              <button
+                id="btn-load-tasks"
+                class="btn btn--primary btn--icon"
+                type="button"
+                title="Загрузить задачи"
+                aria-label="Загрузить задачи"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">cloud_download</span>
+              </button>
+              <button
+                id="btn-load-more"
+                class="btn btn--icon btn--soft"
+                type="button"
+                disabled
+                title="Загрузить ещё"
+                aria-label="Загрузить ещё"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">add_circle</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="toolbar__stats" aria-live="polite">
+            <span class="toolbar__stats-segment">
+              <span class="material-symbols-outlined toolbar__stats-icon" aria-hidden="true">grid_view</span>
+              <span id="tasks-count" class="toolbar__stats-text">0 задач</span>
+            </span>
+            <span class="toolbar__stats-divider" aria-hidden="true"></span>
+            <span class="toolbar__stats-segment">
+              <span class="material-symbols-outlined toolbar__stats-icon" aria-hidden="true">visibility</span>
+              <span id="tasks-filter-hint" class="toolbar__stats-text meta--hidden">Активно и Черновик</span>
+            </span>
+            <span class="toolbar__stats-divider" aria-hidden="true"></span>
+            <span class="toolbar__stats-segment toolbar__stats-segment--accent">
+              <span class="material-symbols-outlined toolbar__stats-icon" aria-hidden="true">layers</span>
+              <span id="canvas-counter" class="toolbar__stats-text">0 из 0</span>
+            </span>
+          </div>
+
+          <div class="toolbar__selection" role="group" aria-label="Выделение на канве">
+            <span id="canvas-selection-counter" class="toolbar__selection-count" title="Выбрано на канве">0</span>
+            <span class="toolbar__selection-divider" aria-hidden="true"></span>
+            <button
+              id="btn-select-all-canvas"
+              class="btn btn--icon btn--ghost"
+              type="button"
+              disabled
+              title="Выделить все карточки на канве"
+              aria-label="Выделить все"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">select_all</span>
+            </button>
+            <button
+              id="btn-clear-canvas-selection"
+              class="btn btn--icon btn--ghost"
+              type="button"
+              disabled
+              title="Снять выделение с карточек"
+              aria-label="Снять выделение"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">deselect</span>
+            </button>
+            <span class="toolbar__selection-divider" aria-hidden="true"></span>
+            <button
+              id="btn-remove-selected-canvas"
+              class="btn btn--icon btn--ghost btn--danger-icon"
+              type="button"
+              disabled
+              title="Убрать выделенные карточки с канвы (Delete)"
+              aria-label="Убрать с канвы (0)"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">layers_clear</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="toolbar__row toolbar__row--bottom">
+          <div class="toolbar__zoom" role="group" aria-label="Масштаб и раскладка">
+            <button
+              id="btn-zoom-out"
+              class="btn btn--icon btn--ghost"
+              type="button"
+              title="Уменьшить масштаб"
+              aria-label="Уменьшить масштаб"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">remove</span>
+            </button>
+            <button
+              id="zoom-indicator"
+              class="toolbar__zoom-value"
+              type="button"
+              title="Сбросить масштаб к 100%"
+              aria-label="Масштаб канвы, сбросить к 100%"
+            >
+              100%
+            </button>
+            <button
+              id="btn-zoom-in"
+              class="btn btn--icon btn--ghost"
+              type="button"
+              title="Увеличить масштаб"
+              aria-label="Увеличить масштаб"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">add</span>
+            </button>
+            <span class="toolbar__zoom-divider" aria-hidden="true"></span>
+            <button
+              id="btn-zoom-fit"
+              class="btn btn--icon btn--ghost"
+              type="button"
+              disabled
+              title="Показать все задачи (по размеру окна)"
+              aria-label="Показать все задачи"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">restart_alt</span>
+            </button>
+            <button
+              id="btn-align"
+              class="btn btn--icon btn--ghost"
+              type="button"
+              disabled
+              title="Пересчитать раскладку всех задач на канве"
+              aria-label="Выровнять раскладку"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">grid_view</span>
+            </button>
+            <span class="toolbar__zoom-divider" aria-hidden="true"></span>
+            <button
+              id="btn-add-label"
+              class="btn btn--icon btn--ghost"
+              type="button"
+              title="Добавить подпись на канву"
+              aria-label="Добавить подпись"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">label</span>
+            </button>
+          </div>
+
+          <div class="toolbar__modes" role="group" aria-label="Режимы">
+            <label
+              class="toggle"
+              title="Подсветить параллельные задачи с кнопкой «Согласие игрока» и одинаковым целевым действием"
+            >
+              <input id="check-blocks" type="checkbox" />
+              <span class="toggle__track" aria-hidden="true"></span>
+              <span class="toggle__label">Проверить блоки</span>
+            </label>
+            <span
+              id="block-conflicts-counter"
+              class="toolbar__conflicts meta--hidden"
+              title="Число групп с блокирующим конфликтом на канве"
+            ></span>
+            <label class="toggle" title="Режим связи: клик по источнику, затем по цели">
+              <input id="link-mode" type="checkbox" />
+              <span class="toggle__track" aria-hidden="true"></span>
+              <span class="toggle__label">Режим связи</span>
+            </label>
+          </div>
+
+          <div class="toolbar__spacer"></div>
+
+          <div class="toolbar__templates" role="group" aria-label="Шаблоны канвы">
+            <button
+              id="btn-save-template"
+              class="btn btn--soft btn--template"
+              type="button"
+              disabled
+              title="Сохранить раскладку канвы как шаблон"
+              aria-label="Сохранить шаблон"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">bookmark_add</span>
+              Сохранить шаблон
+            </button>
+            <button
+              id="btn-load-template"
+              class="btn btn--soft btn--template"
+              type="button"
+              title="Загрузить сохранённый шаблон канвы"
+              aria-label="Загрузить шаблон"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
+              Загрузить шаблон
+            </button>
+          </div>
+
+          <div class="toolbar__actions" role="group" aria-label="Действия">
+            <button
+              id="btn-clear-canvas"
+              class="btn btn--icon btn--soft"
+              type="button"
+              disabled
+              title="Убрать все карточки с канвы"
+              aria-label="Очистить канву"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+            </button>
+            <button id="btn-save" class="btn btn--primary btn--save" type="button" disabled>
+              <span class="material-symbols-outlined" aria-hidden="true">check</span>
+              Сохранить
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main class="workspace">
+      <aside id="catalog-panel" class="catalog-panel catalog-panel--hidden">
+        <div class="catalog-panel__head">
+          <h2>Список задач</h2>
+          <button
+            id="btn-collapse-catalog"
+            class="btn btn--icon btn--ghost"
+            type="button"
+            title="Свернуть список задач"
+            aria-label="Свернуть список задач"
+          >
+            <span class="icon-collapse" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="catalog-panel__tools">
+          <div id="catalog-search" class="catalog-search" role="search">
+            <input
+              id="catalog-search-input"
+              class="catalog-search__input"
+              type="text"
+              placeholder="Поиск: name, id, frontend_identifier (можно вставить список из таблицы)"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div id="catalog-status-filter" class="catalog-status-filter" role="group" aria-label="Фильтр по статусу">
+            <button type="button" class="catalog-status-filter__btn catalog-status-filter__btn--active" data-status="all">
+              Все
+            </button>
+            <button type="button" class="catalog-status-filter__btn" data-status="active">Активные</button>
+            <button type="button" class="catalog-status-filter__btn" data-status="draft">Черновик</button>
+          </div>
+          <div class="catalog-panel__actions">
+            <button id="btn-add-to-canvas" class="btn btn--primary" type="button" disabled>
+              Добавить выбранные на канву
+            </button>
+            <button id="btn-remove-from-canvas" class="btn btn--danger" type="button" disabled>
+              Убрать выбранные с канвы
+            </button>
+            <button id="btn-clear-all-from-catalog" class="btn" type="button" disabled title="Убрать все задачи с канвы">
+              Снять все с канвы
+            </button>
+            <button id="btn-select-all" class="btn" type="button">Выбрать все</button>
+            <button id="btn-select-none" class="btn" type="button">Снять выбор</button>
+          </div>
+        </div>
+        <ul id="catalog-list" class="catalog-list"></ul>
+      </aside>
+
+      <button
+        id="btn-expand-catalog"
+        class="catalog-rail"
+        type="button"
+        title="Развернуть список задач"
+        aria-label="Развернуть список задач"
+      >
+        <span class="icon-sidebar" aria-hidden="true"></span>
+        <span class="catalog-rail__text">Список задач</span>
+      </button>
+
+      <div class="workspace__main">
+        <div id="canvas-wrap" class="canvas-wrap">
+          <div id="selection-marquee" class="selection-marquee selection-marquee--hidden" aria-hidden="true"></div>
+          <div id="canvas-viewport" class="canvas-viewport">
+            <svg id="edges-svg" class="edges-svg" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker
+                  id="arrowhead"
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="7"
+                  refY="4"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 8 4, 0 8" fill="#64748b" />
+                </marker>
+                <marker
+                  id="arrowhead-selected"
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="7"
+                  refY="4"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 8 4, 0 8" fill="#2563eb" />
+                </marker>
+              </defs>
+            </svg>
+            <div id="cards-layer" class="cards-layer"></div>
+            <div id="labels-layer" class="labels-layer"></div>
+          </div>
+          <div id="canvas-empty" class="canvas-empty">
+            <div class="canvas-empty__icon" aria-hidden="true"></div>
+            <p class="canvas-empty__title">Канва пуста</p>
+            <p class="canvas-empty__hint">Загрузите задачи и выберите нужные в списке слева</p>
+            <p class="canvas-empty__hint canvas-empty__hint--keys">
+              <span>Колёсико — масштаб</span>
+              <span>ЛКМ на поле — перемещение</span>
+              <span>Shift+drag — выделение</span>
+              <span>Ctrl+клик — в выделение</span>
+            </p>
+          </div>
+          <div id="canvas-loading" class="canvas-loading canvas-loading--hidden" aria-hidden="true">
+            <div class="canvas-loading__card">
+              <span class="spinner spinner--lg" aria-hidden="true"></span>
+              <span id="canvas-loading-text" class="canvas-loading__text">Загрузка…</span>
+            </div>
+          </div>
+        </div>
+
+        <aside id="side-panel" class="side-panel side-panel--hidden">
+          <div class="side-panel__head">
+            <h2 id="panel-title">Настройки</h2>
+            <button id="btn-close-panel" class="btn btn--icon" type="button" title="Закрыть">×</button>
+          </div>
+          <div id="panel-body" class="side-panel__body"></div>
+        </aside>
+      </div>
+    </main>
+
+    <section id="save-log" class="save-log save-log--hidden">
+      <div class="save-log__head">
+        <h3>Прогресс сохранения</h3>
+        <button id="btn-close-log" class="btn btn--icon" type="button">×</button>
+      </div>
+      <ul id="save-log-list" class="save-log__list"></ul>
+    </section>
+    </div>
+
+    <section id="view-stats" class="main-view" aria-hidden="true">
+      <div id="stats-panel-mount"></div>
+    </section>
+
+    <div id="copy-panel-overlay" class="copy-panel-overlay copy-panel-overlay--hidden" aria-hidden="true">
+      <div id="copy-panel-backdrop" class="copy-panel-overlay__backdrop"></div>
+      <aside class="copy-panel-slide">
+        <div class="copy-panel-slide__head">
+          <h2 id="copy-panel-overlay-title">Скопировать задачу</h2>
+          <button id="btn-close-copy-panel" class="btn btn--icon" type="button" title="Закрыть">×</button>
+        </div>
+        <div id="copy-panel-mount" class="copy-panel-slide__body"></div>
+      </aside>
+    </div>
+
+    <div id="chains-toast-host" class="chains-toast-host" aria-live="polite"></div>
+
+    <div
+      id="template-save-overlay"
+      class="chains-modal-overlay chains-modal-overlay--hidden"
+      aria-hidden="true"
+    >
+      <div class="chains-modal" role="dialog" aria-labelledby="template-save-title" aria-modal="true">
+        <div class="chains-modal__head">
+          <h2 id="template-save-title">Сохранить шаблон</h2>
+          <button id="btn-close-save-template" class="btn btn--icon" type="button" title="Закрыть">×</button>
+        </div>
+        <div class="chains-modal__body">
+          <div id="template-save-mode-wrap" class="meta--hidden">
+            <span class="chains-modal__label">Режим сохранения</span>
+            <div
+              id="template-save-mode"
+              class="template-save-mode"
+              role="group"
+              aria-label="Режим сохранения"
+            >
+              <button
+                type="button"
+                class="template-save-mode__btn template-save-mode__btn--active"
+                data-mode="new"
+              >
+                Новый шаблон
+              </button>
+              <button type="button" class="template-save-mode__btn" data-mode="overwrite">
+                Перезаписать существующий
+              </button>
+            </div>
+          </div>
+
+          <div id="template-save-new-section">
+            <label class="chains-modal__label" for="template-save-name">Название шаблона</label>
+            <input
+              id="template-save-name"
+              class="chains-modal__input"
+              type="text"
+              placeholder="Например: Сезон 3"
+              maxlength="80"
+              autocomplete="off"
+            />
+          </div>
+
+          <div id="template-save-overwrite-section" class="meta--hidden">
+            <label class="chains-modal__label" for="template-save-existing">Выберите шаблон</label>
+            <select id="template-save-existing" class="chains-modal__input chains-modal__select">
+              <option value="">— Выберите шаблон —</option>
+            </select>
+          </div>
+
+          <p id="template-save-hint" class="chains-modal__hint meta--hidden"></p>
+        </div>
+        <div class="chains-modal__foot">
+          <button id="btn-cancel-save-template" class="btn" type="button">Отмена</button>
+          <button id="btn-confirm-save-template" class="btn btn--primary" type="button">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="template-load-overlay"
+      class="chains-modal-overlay chains-modal-overlay--hidden"
+      aria-hidden="true"
+    >
+      <div
+        class="chains-modal chains-modal--wide"
+        role="dialog"
+        aria-labelledby="template-load-title"
+        aria-modal="true"
+      >
+        <div class="chains-modal__head">
+          <h2 id="template-load-title">Загрузить шаблон</h2>
+          <button id="btn-close-load-template" class="btn btn--icon" type="button" title="Закрыть">×</button>
+        </div>
+        <div class="chains-modal__body">
+          <p id="template-load-domain" class="chains-modal__meta"></p>
+          <p id="template-load-empty" class="chains-modal__empty meta--hidden">
+            Нет сохранённых шаблонов для этого домена
+          </p>
+          <ul id="template-load-list" class="template-list"></ul>
+        </div>
+        <div class="chains-modal__foot">
+          <button id="btn-cancel-load-template" class="btn" type="button">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="canvas-context-menu" class="card-context-menu card-context-menu--hidden" role="menu">
+      <button type="button" class="card-context-menu__item" data-action="add-label" role="menuitem">
+        Добавить подпись
+      </button>
+    </div>
+
+    <div id="card-context-menu" class="card-context-menu card-context-menu--hidden" role="menu">
+      <button type="button" class="card-context-menu__item" data-action="edit" role="menuitem">Изменить</button>
+      <button type="button" class="card-context-menu__item" data-action="copy" role="menuitem">Скопировать задачу</button>
+      <button
+        type="button"
+        id="card-context-menu-backend"
+        class="card-context-menu__item"
+        data-action="toggle-backend"
+        role="menuitemcheckbox"
+      >
+        Настроена на бэке
+      </button>
+      <div class="card-context-menu__divider" role="separator"></div>
+      <div class="card-context-menu__colors-section">
+        <span class="card-context-menu__colors-label">Цвет карточки</span>
+        <div id="card-context-menu-colors" class="card-context-menu__colors" role="group" aria-label="Цвет карточки"></div>
+      </div>
+    </div>
+
+    <script type="module" src="chains.js"></script>
+  </body>
+</html>

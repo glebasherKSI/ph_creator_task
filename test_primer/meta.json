@@ -1,0 +1,3724 @@
+{
+    "filters": [
+        {
+            "id": 1240,
+            "name": "Общий сегмент депозитных инфо"
+        },
+        {
+            "id": 1233,
+            "name": "av_dep_react_light"
+        },
+        {
+            "id": 1219,
+            "name": "[buyer] Phone Number Filter"
+        },
+        {
+            "id": 835,
+            "name": "Only one dep"
+        },
+        {
+            "id": 1184,
+            "name": "RUB_Stag"
+        },
+        {
+            "id": 1142,
+            "name": "Общий сегмент депозитных рассылок с прагматиком"
+        },
+        {
+            "id": 1218,
+            "name": "Общий сегмент депозитных инфо с прагматиком"
+        },
+        {
+            "id": 1241,
+            "name": "sport_task_3_start"
+        },
+        {
+            "id": 1232,
+            "name": "Second dep Betapay"
+        },
+        {
+            "id": 1128,
+            "name": "test_booster"
+        },
+        {
+            "id": 330,
+            "name": "trusted"
+        },
+        {
+            "id": 1188,
+            "name": "light_new"
+        },
+        {
+            "id": 1133,
+            "name": "group B react old"
+        },
+        {
+            "id": 907,
+            "name": "Stag 223042 V1"
+        },
+        {
+            "id": 1189,
+            "name": "mid_new"
+        },
+        {
+            "id": 1220,
+            "name": "DRAGON AGEPM"
+        },
+        {
+            "id": 2,
+            "name": "STAFF"
+        },
+        {
+            "id": 1234,
+            "name": "av_dep_react_mid"
+        },
+        {
+            "id": 666,
+            "name": "Segment A"
+        },
+        {
+            "id": 942,
+            "name": "CORE 7-30 BONUS BUY"
+        },
+        {
+            "id": 3,
+            "name": "AUTOTEST"
+        },
+        {
+            "id": 4,
+            "name": "PHONE"
+        },
+        {
+            "id": 5,
+            "name": "mail_confirmed"
+        },
+        {
+            "id": 946,
+            "name": "CORE 7-30 MEN"
+        },
+        {
+            "id": 900,
+            "name": "ANY GAMEBONUS ACTIVATED"
+        },
+        {
+            "id": 1109,
+            "name": "SPORT CASHBACK AVAILABLE"
+        },
+        {
+            "id": 1044,
+            "name": "sport_activation_2_start"
+        },
+        {
+            "id": 1091,
+            "name": "SPORT PERSONAL FB START"
+        },
+        {
+            "id": 1131,
+            "name": "SMM Bonus Segment"
+        },
+        {
+            "id": 1122,
+            "name": "bonus_shop_reminder_2000"
+        },
+        {
+            "id": 1190,
+            "name": "vip_new"
+        },
+        {
+            "id": 1235,
+            "name": "av_dep_react_vip"
+        },
+        {
+            "id": 545,
+            "name": "no_bonus"
+        },
+        {
+            "id": 1195,
+            "name": "phone number spam"
+        },
+        {
+            "id": 1116,
+            "name": "First dep MSP"
+        },
+        {
+            "id": 1082,
+            "name": "sport_reactivation_1_and_2_bonus"
+        },
+        {
+            "id": 1242,
+            "name": "sport_task_3_end"
+        },
+        {
+            "id": 1046,
+            "name": "sport_activation_2_2"
+        },
+        {
+            "id": 1250,
+            "name": "s1_high_h"
+        },
+        {
+            "id": 613,
+            "name": "selflimit"
+        },
+        {
+            "id": 1196,
+            "name": "First dep UAH"
+        },
+        {
+            "id": 1047,
+            "name": "sport_activation_2_3"
+        },
+        {
+            "id": 1053,
+            "name": "sport_activation_2_9"
+        },
+        {
+            "id": 1198,
+            "name": "brazil welcome sport bonus abuse"
+        },
+        {
+            "id": 1221,
+            "name": "HedgeHog QR"
+        },
+        {
+            "id": 1113,
+            "name": "MSP dep\u003e25k"
+        },
+        {
+            "id": 1243,
+            "name": "sport_task_3_prize"
+        },
+        {
+            "id": 752,
+            "name": "Removal writable public group"
+        },
+        {
+            "id": 758,
+            "name": "PHONE CONFIRMATION CP AWARD"
+        },
+        {
+            "id": 1200,
+            "name": "dep_fs_light_pragmat"
+        },
+        {
+            "id": 1174,
+            "name": "dep_fs_mid"
+        },
+        {
+            "id": 234,
+            "name": "[buyer] Card Mask Filter"
+        },
+        {
+            "id": 1050,
+            "name": "sport_activation_2_6"
+        },
+        {
+            "id": 1222,
+            "name": "HedggeHog QR"
+        },
+        {
+            "id": 703,
+            "name": "Noda_stag"
+        },
+        {
+            "id": 984,
+            "name": "WELCOME ABUSE"
+        },
+        {
+            "id": 1173,
+            "name": "dep_fs_light"
+        },
+        {
+            "id": 1201,
+            "name": "dep_fs_mid_pragmat"
+        },
+        {
+            "id": 1205,
+            "name": "ESPORTS TRAIN 1st"
+        },
+        {
+            "id": 1207,
+            "name": "новорег+спорт+крипта"
+        },
+        {
+            "id": 1096,
+            "name": "VIP Personal FB Candidate"
+        },
+        {
+            "id": 1237,
+            "name": "[buyer] All groups"
+        },
+        {
+            "id": 1244,
+            "name": "sport_task_4_start"
+        },
+        {
+            "id": 966,
+            "name": "tournamenttasktest_1_1_rate"
+        },
+        {
+            "id": 1208,
+            "name": "multiplier_bonus"
+        },
+        {
+            "id": 1206,
+            "name": "ESPORTS TRAIN 2nd"
+        },
+        {
+            "id": 1202,
+            "name": "dep_fs_mid_bps_pragmat"
+        },
+        {
+            "id": 1236,
+            "name": "5 dep 2 cashout"
+        },
+        {
+            "id": 1223,
+            "name": "HeddgeHog QR"
+        },
+        {
+            "id": 1182,
+            "name": "dep_fs_vip_bps"
+        },
+        {
+            "id": 788,
+            "name": "APP NO SIGN OTHER"
+        },
+        {
+            "id": 861,
+            "name": "Royal Cash Part 7"
+        },
+        {
+            "id": 816,
+            "name": "ANY CHATBONUS ACTIVATED"
+        },
+        {
+            "id": 1203,
+            "name": "dep_fs_vip_pragmat"
+        },
+        {
+            "id": 808,
+            "name": "Unsuccessful deposit (REM)"
+        },
+        {
+            "id": 1238,
+            "name": "Trusted_users_redirector"
+        },
+        {
+            "id": 1209,
+            "name": "wa_vip"
+        },
+        {
+            "id": 1181,
+            "name": "dep_fs_mid_bps"
+        },
+        {
+            "id": 1199,
+            "name": "dep_fs_light_bps_pragmat"
+        },
+        {
+            "id": 1245,
+            "name": "sport_task_4_end"
+        },
+        {
+            "id": 1191,
+            "name": "Empty User FIAT"
+        },
+        {
+            "id": 1175,
+            "name": "dep_fs_vip"
+        },
+        {
+            "id": 1197,
+            "name": "AffiliateSTAG"
+        },
+        {
+            "id": 551,
+            "name": "FIXED FS MARKETING 100"
+        },
+        {
+            "id": 1246,
+            "name": "sport_task_4_prize"
+        },
+        {
+            "id": 1192,
+            "name": "BEZDEP FIAT"
+        },
+        {
+            "id": 863,
+            "name": "Royal Cash Part 5"
+        },
+        {
+            "id": 866,
+            "name": "Royal Cash Part 2"
+        },
+        {
+            "id": 1147,
+            "name": "sport_personal_manual"
+        },
+        {
+            "id": 814,
+            "name": "Ограничение доступа"
+        },
+        {
+            "id": 1210,
+            "name": "crypto without casino"
+        },
+        {
+            "id": 1204,
+            "name": "dep_fs_vip_bps_pragmat"
+        },
+        {
+            "id": 864,
+            "name": "Royal Cash Part 4"
+        },
+        {
+            "id": 1193,
+            "name": "PLAY BONUS FIAT"
+        },
+        {
+            "id": 1229,
+            "name": "sport_task_2_start"
+        },
+        {
+            "id": 1211,
+            "name": "sport_task_1_start"
+        },
+        {
+            "id": 1239,
+            "name": "multiplier_bonus_may"
+        },
+        {
+            "id": 867,
+            "name": "Royal Cash Part 1"
+        },
+        {
+            "id": 770,
+            "name": "REGISTRATION TMA AWARD"
+        },
+        {
+            "id": 805,
+            "name": "CRYPTO_LIMITS"
+        },
+        {
+            "id": 806,
+            "name": "Игроки с тегом money_laundry"
+        },
+        {
+            "id": 812,
+            "name": "Ludoman users"
+        },
+        {
+            "id": 813,
+            "name": "Fraud users"
+        },
+        {
+            "id": 1126,
+            "name": "Without_Autocashout"
+        },
+        {
+            "id": 738,
+            "name": "ДП_2dep"
+        },
+        {
+            "id": 1212,
+            "name": "sport_task_1_end"
+        },
+        {
+            "id": 1224,
+            "name": "ESPORTS PARTY1"
+        },
+        {
+            "id": 1230,
+            "name": "sport_task_2_end"
+        },
+        {
+            "id": 728,
+            "name": "Группы доверенные по действию и по тегу"
+        },
+        {
+            "id": 1127,
+            "name": "messenger_test"
+        },
+        {
+            "id": 968,
+            "name": "trnt_task_test_1_1_win"
+        },
+        {
+            "id": 1032,
+            "name": "sport_reactivation_2_bonus"
+        },
+        {
+            "id": 820,
+            "name": "Пользователи mail.ru"
+        },
+        {
+            "id": 1213,
+            "name": "sport_task_1_prize"
+        },
+        {
+            "id": 823,
+            "name": "BIRTHDAY BONUS 1 MONTH"
+        },
+        {
+            "id": 1225,
+            "name": "ESPORTS PARTY2"
+        },
+        {
+            "id": 1231,
+            "name": "sport_task_2_prize"
+        },
+        {
+            "id": 784,
+            "name": "trusted_users_partners"
+        },
+        {
+            "id": 1214,
+            "name": "sport_task_all_start"
+        },
+        {
+            "id": 1247,
+            "name": "techinfoemail"
+        },
+        {
+            "id": 1226,
+            "name": "ESPORTS PARTY3"
+        },
+        {
+            "id": 890,
+            "name": "GERMANY BEZDEP"
+        },
+        {
+            "id": 1141,
+            "name": "Общий сегмент депозитных рассылок"
+        },
+        {
+            "id": 850,
+            "name": "WA REM IRWIN"
+        },
+        {
+            "id": 1215,
+            "name": "WELCOME ABUSE+SPORT"
+        },
+        {
+            "id": 1227,
+            "name": "ESPORTS PARTY4"
+        },
+        {
+            "id": 1256,
+            "name": "s3_high_h"
+        },
+        {
+            "id": 1259,
+            "name": "all_segments"
+        },
+        {
+            "id": 1260,
+            "name": "active_react_dep"
+        },
+        {
+            "id": 1013,
+            "name": "sport_reactivation_1_2"
+        },
+        {
+            "id": 1216,
+            "name": "sport_task_all_end"
+        },
+        {
+            "id": 1228,
+            "name": "ESPORTS PARTY5"
+        },
+        {
+            "id": 1255,
+            "name": "s3_low_h"
+        },
+        {
+            "id": 1257,
+            "name": "dep_segm2"
+        },
+        {
+            "id": 1258,
+            "name": "active_react_bezdep"
+        },
+        {
+            "id": 1217,
+            "name": "sport_task_all_done"
+        },
+        {
+            "id": 1069,
+            "name": "Blik_FTD"
+        },
+        {
+            "id": 1249,
+            "name": "s1_low_h"
+        },
+        {
+            "id": 1022,
+            "name": "sport_reactivation_2_start"
+        },
+        {
+            "id": 865,
+            "name": "Royal Cash Part 3"
+        },
+        {
+            "id": 822,
+            "name": "HAPPY BIRTHDAY (NO BONUS)"
+        },
+        {
+            "id": 1150,
+            "name": "bonushunter"
+        },
+        {
+            "id": 1251,
+            "name": "s2_low_h"
+        },
+        {
+            "id": 615,
+            "name": "spoynt trusted"
+        },
+        {
+            "id": 969,
+            "name": "trnt_task_test_1_1_bet"
+        },
+        {
+            "id": 1252,
+            "name": "s2_high_h"
+        },
+        {
+            "id": 710,
+            "name": "SPARK"
+        },
+        {
+            "id": 970,
+            "name": "trnt_task_test_1_1_series"
+        },
+        {
+            "id": 1254,
+            "name": "s4_all_h"
+        },
+        {
+            "id": 971,
+            "name": "trnt_task_test_1_1_points"
+        },
+        {
+            "id": 919,
+            "name": "Test Writable Dynamic"
+        },
+        {
+            "id": 1114,
+            "name": "Unsuccessful deposit (VIP SEGMENT)"
+        },
+        {
+            "id": 331,
+            "name": "trusted_plus"
+        },
+        {
+            "id": 235,
+            "name": "[UnderAge] Card Mask Filter"
+        },
+        {
+            "id": 915,
+            "name": "S-tag для отдельного Candidate"
+        },
+        {
+            "id": 278,
+            "name": "5 успешных депозитов в uah"
+        },
+        {
+            "id": 1010,
+            "name": "Operation Welcome Bonus"
+        },
+        {
+            "id": 518,
+            "name": "Дп add filter"
+        },
+        {
+            "id": 954,
+            "name": "tournament_task_test_1_1_rate"
+        },
+        {
+            "id": 602,
+            "name": "DE"
+        },
+        {
+            "id": 936,
+            "name": "CORE 7-30"
+        },
+        {
+            "id": 647,
+            "name": "Доверенные по ставкам и депозитам +tag"
+        },
+        {
+            "id": 1140,
+            "name": "Second dep KZT"
+        },
+        {
+            "id": 945,
+            "name": "CORE 7-30 WOMEN"
+        },
+        {
+            "id": 1071,
+            "name": "completed data"
+        },
+        {
+            "id": 965,
+            "name": "tournamenttasktest_1_1_points"
+        },
+        {
+            "id": 1176,
+            "name": "SuperSTAG"
+        },
+        {
+            "id": 1106,
+            "name": "test_promohub"
+        },
+        {
+            "id": 233,
+            "name": "[buyer] Email Filter"
+        },
+        {
+            "id": 1130,
+            "name": "SMM Moderator Alert"
+        },
+        {
+            "id": 1138,
+            "name": "test_user_online"
+        },
+        {
+            "id": 1164,
+            "name": "[MBSS] VIP+"
+        },
+        {
+            "id": 882,
+            "name": "BRAZIL USERS"
+        },
+        {
+            "id": 525,
+            "name": "Тег Premium"
+        },
+        {
+            "id": 528,
+            "name": "Тег Vip"
+        },
+        {
+            "id": 1,
+            "name": "ALL STAFF"
+        },
+        {
+            "id": 711,
+            "name": "FLASH"
+        },
+        {
+            "id": 6,
+            "name": "Real"
+        },
+        {
+            "id": 709,
+            "name": "LIGHT"
+        },
+        {
+            "id": 550,
+            "name": "FIXED FS MARKETING 50"
+        },
+        {
+            "id": 712,
+            "name": "VOLT"
+        },
+        {
+            "id": 713,
+            "name": "SPARK + FLASH + VOLT"
+        },
+        {
+            "id": 530,
+            "name": "V3 (баллы за 90)"
+        },
+        {
+            "id": 529,
+            "name": "V2 (баллы за 30)"
+        },
+        {
+            "id": 811,
+            "name": "Deposited 31+ days"
+        },
+        {
+            "id": 824,
+            "name": "BIRTHDAY BONUS"
+        },
+        {
+            "id": 877,
+            "name": "GERMANY USERS"
+        },
+        {
+            "id": 1158,
+            "name": "Super trust KZ"
+        },
+        {
+            "id": 329,
+            "name": "traf_level_tags"
+        },
+        {
+            "id": 596,
+            "name": "CANDIDATE LIVECHAT"
+        },
+        {
+            "id": 1159,
+            "name": "Четные ID"
+        },
+        {
+            "id": 1009,
+            "name": "Bova Plus trusted"
+        },
+        {
+            "id": 600,
+            "name": "ANY BONUS ACTIVATED"
+        },
+        {
+            "id": 527,
+            "name": "P3 (баллы за 90)"
+        },
+        {
+            "id": 532,
+            "name": "TOURNAMENT GROUP"
+        },
+        {
+            "id": 665,
+            "name": "Segment B"
+        },
+        {
+            "id": 664,
+            "name": "Segment C"
+        },
+        {
+            "id": 619,
+            "name": "VIP СЕГМЕНТ"
+        },
+        {
+            "id": 857,
+            "name": "Для письма-напоминания о выданных ФС"
+        },
+        {
+            "id": 1059,
+            "name": "group A no_dep new"
+        },
+        {
+            "id": 872,
+            "name": "Paygo_stag"
+        },
+        {
+            "id": 1123,
+            "name": "Users matching group"
+        },
+        {
+            "id": 782,
+            "name": "FLASH TMA AWARD"
+        },
+        {
+            "id": 1006,
+            "name": "DEAT USERS LIGHT"
+        },
+        {
+            "id": 894,
+            "name": "INDIA ACTIVE USERS"
+        },
+        {
+            "id": 726,
+            "name": "Не менее двух успешных депозитов UAH"
+        },
+        {
+            "id": 1160,
+            "name": "Нечетные ID"
+        },
+        {
+            "id": 868,
+            "name": "CANADA USERS"
+        },
+        {
+            "id": 290,
+            "name": "Payment_300_RUB"
+        },
+        {
+            "id": 1134,
+            "name": "group A react new"
+        },
+        {
+            "id": 1090,
+            "name": "PERSONAL FREEBET"
+        },
+        {
+            "id": 920,
+            "name": "LATVIA USERS"
+        },
+        {
+            "id": 916,
+            "name": "POLAND USERS"
+        },
+        {
+            "id": 1139,
+            "name": "test_user_ofline"
+        },
+        {
+            "id": 769,
+            "name": "RU_eng_fraud"
+        },
+        {
+            "id": 232,
+            "name": "[buyer] IP Filter"
+        },
+        {
+            "id": 869,
+            "name": "Promo_fraud"
+        },
+        {
+            "id": 809,
+            "name": "Unsuccessful cashout (A/B SEGMENT)"
+        },
+        {
+            "id": 548,
+            "name": "REGISTRATION RBEZDEP"
+        },
+        {
+            "id": 781,
+            "name": "SPARK TMA AWARD"
+        },
+        {
+            "id": 949,
+            "name": "Third dep Only"
+        },
+        {
+            "id": 1083,
+            "name": "MAXIMZOCKTSLOTS ACCESS"
+        },
+        {
+            "id": 1098,
+            "name": "core 30-60 UF50TLK39V"
+        },
+        {
+            "id": 1115,
+            "name": "LT IT LV EE Stag"
+        },
+        {
+            "id": 1102,
+            "name": "REG SPORT BONUS"
+        },
+        {
+            "id": 1101,
+            "name": "core 30-60 BB60DGMBBF"
+        },
+        {
+            "id": 1014,
+            "name": "sport_reactivation_1_3"
+        },
+        {
+            "id": 1054,
+            "name": "ISSUED WELCOME SPORT"
+        },
+        {
+            "id": 958,
+            "name": "tournament_task_test_1_1_win"
+        },
+        {
+            "id": 1007,
+            "name": "DEAT USERS MID"
+        },
+        {
+            "id": 526,
+            "name": "P2 (баллы за 30)"
+        },
+        {
+            "id": 750,
+            "name": "ДП3dep+вывод"
+        },
+        {
+            "id": 952,
+            "name": "Customer active dep"
+        },
+        {
+            "id": 751,
+            "name": "ANY RAFFLEPRIZES ACTIVATED"
+        },
+        {
+            "id": 755,
+            "name": "FIRST DEP 1 CP AWARD"
+        },
+        {
+            "id": 753,
+            "name": "REGISTRATION CP AWARD"
+        },
+        {
+            "id": 754,
+            "name": "VERIFICATION CP AWARD"
+        },
+        {
+            "id": 1092,
+            "name": "sport_personal_1"
+        },
+        {
+            "id": 889,
+            "name": "ДП Cauri EUR"
+        },
+        {
+            "id": 327,
+            "name": "traf_level_2"
+        },
+        {
+            "id": 783,
+            "name": "VOLT TMA AWARD"
+        },
+        {
+            "id": 859,
+            "name": "Royal Cash Part 9"
+        },
+        {
+            "id": 862,
+            "name": "Royal Cash Part 6"
+        },
+        {
+            "id": 988,
+            "name": "sport_suspect"
+        },
+        {
+            "id": 760,
+            "name": "welcome8d"
+        },
+        {
+            "id": 1124,
+            "name": "Remove tag no_msp"
+        },
+        {
+            "id": 881,
+            "name": "BRAZIL ACTIVE USERS"
+        },
+        {
+            "id": 1135,
+            "name": "group A react new light"
+        },
+        {
+            "id": 763,
+            "name": "welcome_2days"
+        },
+        {
+            "id": 764,
+            "name": "welcome_5days"
+        },
+        {
+            "id": 765,
+            "name": "welcome_7days"
+        },
+        {
+            "id": 766,
+            "name": "welcome_3days"
+        },
+        {
+            "id": 767,
+            "name": "welcome_8days"
+        },
+        {
+            "id": 959,
+            "name": "tournament_task_test_1_1_factor"
+        },
+        {
+            "id": 1153,
+            "name": "sport money laundry suspicion"
+        },
+        {
+            "id": 839,
+            "name": "SportActive"
+        },
+        {
+            "id": 768,
+            "name": "reactivation_lottery"
+        },
+        {
+            "id": 1093,
+            "name": "Бездеп Customer - Mail.ru"
+        },
+        {
+            "id": 1132,
+            "name": "COUPON_ABUSE"
+        },
+        {
+            "id": 1136,
+            "name": "group A react new mid"
+        },
+        {
+            "id": 771,
+            "name": "VERIFICATION TMA AWARD"
+        },
+        {
+            "id": 772,
+            "name": "FIRST DEP TMA AWARD"
+        },
+        {
+            "id": 957,
+            "name": "tournament_task_test_1_1_bet"
+        },
+        {
+            "id": 1143,
+            "name": "BillBlend KZT ДП"
+        },
+        {
+            "id": 775,
+            "name": "10 BET TMA AWARD (REBUILD)"
+        },
+        {
+            "id": 776,
+            "name": "10 WINBET TMA AWARD (REBUILD)"
+        },
+        {
+            "id": 777,
+            "name": "100 BET TMA AWARD (REBUILD)"
+        },
+        {
+            "id": 778,
+            "name": "20 X TMA AWARD (REBUILD)"
+        },
+        {
+            "id": 779,
+            "name": "30 X TMA AWARD (REBUILD)"
+        },
+        {
+            "id": 780,
+            "name": "50 X TMA AWARD (REBUILD)"
+        },
+        {
+            "id": 1060,
+            "name": "group B no_dep old"
+        },
+        {
+            "id": 791,
+            "name": "APP NO SIGN ACTIVE"
+        },
+        {
+            "id": 860,
+            "name": "Royal Cash Part 8"
+        },
+        {
+            "id": 815,
+            "name": "ACTIVE+BLOCKED USERS"
+        },
+        {
+            "id": 1008,
+            "name": "DEAT USERS VIP"
+        },
+        {
+            "id": 1137,
+            "name": "group A react new vip"
+        },
+        {
+            "id": 786,
+            "name": "APP SIGN BEFORE RELEASE"
+        },
+        {
+            "id": 1125,
+            "name": "test online trigger"
+        },
+        {
+            "id": 787,
+            "name": "APP SIGN BONUS"
+        },
+        {
+            "id": 785,
+            "name": "Trusted_ECOM"
+        },
+        {
+            "id": 962,
+            "name": "tournamenttasktest_1_1_win"
+        },
+        {
+            "id": 967,
+            "name": "trnt_task_test_1_1_factor"
+        },
+        {
+            "id": 981,
+            "name": "SMM DRAW SEGMENT 2"
+        },
+        {
+            "id": 1154,
+            "name": "sport turkish accounts risk"
+        },
+        {
+            "id": 1005,
+            "name": "NEW ZEALAND BEZDEP"
+        },
+        {
+            "id": 794,
+            "name": "APP SIGN BEFORE RELEASE NEW"
+        },
+        {
+            "id": 897,
+            "name": "CHILE ACTIVE USERS"
+        },
+        {
+            "id": 1012,
+            "name": "sport_reactivation_1_1"
+        },
+        {
+            "id": 1027,
+            "name": "sport_reactivation_2_5"
+        },
+        {
+            "id": 1084,
+            "name": "VIP VTB"
+        },
+        {
+            "id": 790,
+            "name": "APP NO SIGN NEW"
+        },
+        {
+            "id": 789,
+            "name": "APP NO SIGN ZERO"
+        },
+        {
+            "id": 793,
+            "name": "APP SIGN BEFORE RELEASE ZERO"
+        },
+        {
+            "id": 1146,
+            "name": "manual_points_shop_2"
+        },
+        {
+            "id": 1105,
+            "name": "ESPORTS INSURANCEX OCT25"
+        },
+        {
+            "id": 1037,
+            "name": "sport_activation_1_4"
+        },
+        {
+            "id": 807,
+            "name": "Limit access(vip+prem)"
+        },
+        {
+            "id": 1015,
+            "name": "sport_reactivation_1_4"
+        },
+        {
+            "id": 833,
+            "name": "sport wel_chain final"
+        },
+        {
+            "id": 825,
+            "name": "sport wel_chain start"
+        },
+        {
+            "id": 827,
+            "name": "sport wel_chain msg 3d"
+        },
+        {
+            "id": 844,
+            "name": "Доверенные пользователи по ставкам и депозитам"
+        },
+        {
+            "id": 1016,
+            "name": "sport_reactivation_1_5"
+        },
+        {
+            "id": 826,
+            "name": "sport wel_chain msg 0d"
+        },
+        {
+            "id": 1031,
+            "name": "sport_reactivation_2_9"
+        },
+        {
+            "id": 828,
+            "name": "sport wel_chain msg 5d"
+        },
+        {
+            "id": 893,
+            "name": "Affiliate sport filter"
+        },
+        {
+            "id": 908,
+            "name": "Stag 223042 V2"
+        },
+        {
+            "id": 1165,
+            "name": "ref_info_active"
+        },
+        {
+            "id": 977,
+            "name": "HUNGARY ACTIVE USERS"
+        },
+        {
+            "id": 929,
+            "name": "core_bonuses"
+        },
+        {
+            "id": 1148,
+            "name": "WELCOME_HOLD_TEST"
+        },
+        {
+            "id": 871,
+            "name": "A+PLAYER"
+        },
+        {
+            "id": 831,
+            "name": "sport wel_chain msg 15d"
+        },
+        {
+            "id": 830,
+            "name": "sport wel_chain msg 11d"
+        },
+        {
+            "id": 956,
+            "name": "tournament_task_test_1_1_series"
+        },
+        {
+            "id": 1017,
+            "name": "sport_reactivation_1_6"
+        },
+        {
+            "id": 834,
+            "name": "sport wel_chain done"
+        },
+        {
+            "id": 1018,
+            "name": "sport_reactivation_1_7"
+        },
+        {
+            "id": 985,
+            "name": "Promo SG (geo PL)"
+        },
+        {
+            "id": 520,
+            "name": "ДП Noda"
+        },
+        {
+            "id": 549,
+            "name": "REGISTRATION RBONUS"
+        },
+        {
+            "id": 841,
+            "name": "Без стримеров"
+        },
+        {
+            "id": 842,
+            "name": "Exclude some s-tag users"
+        },
+        {
+            "id": 843,
+            "name": "Доверенные пользователи по тегу"
+        },
+        {
+            "id": 993,
+            "name": "core 7-30 megaways_B_4"
+        },
+        {
+            "id": 909,
+            "name": "Stag 223042 V3"
+        },
+        {
+            "id": 888,
+            "name": "Promo SG (dep segment CASINO)"
+        },
+        {
+            "id": 829,
+            "name": "sport wel_chain msg 9d"
+        },
+        {
+            "id": 552,
+            "name": "DEFAULT FS MARKETING 50"
+        },
+        {
+            "id": 989,
+            "name": "lottery test"
+        },
+        {
+            "id": 992,
+            "name": "core 7-30 megaways_A_7"
+        },
+        {
+            "id": 1108,
+            "name": "sport_cashback"
+        },
+        {
+            "id": 531,
+            "name": "ДП UAH/KZ/AZN/TRY"
+        },
+        {
+            "id": 553,
+            "name": "DEFAULT FS MARKETING 100"
+        },
+        {
+            "id": 1019,
+            "name": "sport_reactivation_1_8"
+        },
+        {
+            "id": 1167,
+            "name": "notref_info_email_push"
+        },
+        {
+            "id": 795,
+            "name": "APP SIGN BEFORE RELEASE ACTIVE"
+        },
+        {
+            "id": 1020,
+            "name": "sport_reactivation_1_9"
+        },
+        {
+            "id": 1186,
+            "name": "TURKEY ACTIVE USERS"
+        },
+        {
+            "id": 1170,
+            "name": "PL AB FREESPINS PLACE A"
+        },
+        {
+            "id": 1187,
+            "name": "Alikassa QR"
+        },
+        {
+            "id": 994,
+            "name": "core 7-30 megaways_C_1"
+        },
+        {
+            "id": 973,
+            "name": "test fail groups update dynamic"
+        },
+        {
+            "id": 595,
+            "name": "CANDIDATE"
+        },
+        {
+            "id": 1001,
+            "name": "AB test lottery"
+        },
+        {
+            "id": 1024,
+            "name": "sport_reactivation_2_2"
+        },
+        {
+            "id": 899,
+            "name": "INSURANCE BETT"
+        },
+        {
+            "id": 558,
+            "name": "DP INR"
+        },
+        {
+            "id": 840,
+            "name": "BASIC SPORT FILTER"
+        },
+        {
+            "id": 1058,
+            "name": "Second Dep no stag"
+        },
+        {
+            "id": 1021,
+            "name": "sport_reactivation_1_bonus"
+        },
+        {
+            "id": 910,
+            "name": "Stag 223042 V4"
+        },
+        {
+            "id": 1129,
+            "name": "Marketing stat"
+        },
+        {
+            "id": 911,
+            "name": "Stag 223042 V5"
+        },
+        {
+            "id": 912,
+            "name": "Stag 223042 V6"
+        },
+        {
+            "id": 913,
+            "name": "Stag 223042 V7"
+        },
+        {
+            "id": 1023,
+            "name": "sport_reactivation_2_1"
+        },
+        {
+            "id": 901,
+            "name": "Promo SG (warmy1)"
+        },
+        {
+            "id": 1030,
+            "name": "sport_reactivation_2_8"
+        },
+        {
+            "id": 1172,
+            "name": "POLAND INSTANT 90"
+        },
+        {
+            "id": 924,
+            "name": "Promo SG (geo AT/DE)"
+        },
+        {
+            "id": 1171,
+            "name": "PL AB FREESPINS PLACE B"
+        },
+        {
+            "id": 950,
+            "name": "Четный ID RU"
+        },
+        {
+            "id": 1025,
+            "name": "sport_reactivation_2_3"
+        },
+        {
+            "id": 961,
+            "name": "tournamenttasktest_1_1_factor"
+        },
+        {
+            "id": 996,
+            "name": "core 7-30 jackpot_B_5"
+        },
+        {
+            "id": 972,
+            "name": "trnt_task_test_1_1_rate"
+        },
+        {
+            "id": 974,
+            "name": "test fail groups update public"
+        },
+        {
+            "id": 975,
+            "name": "Bad players"
+        },
+        {
+            "id": 979,
+            "name": "HOLD15 TEST"
+        },
+        {
+            "id": 930,
+            "name": "Доверенные пользователи по ставкам и депозитам(ставки по спорту)"
+        },
+        {
+            "id": 903,
+            "name": "ESPORTS TRAIN 072"
+        },
+        {
+            "id": 1026,
+            "name": "sport_reactivation_2_4"
+        },
+        {
+            "id": 951,
+            "name": "Customer user Inactive"
+        },
+        {
+            "id": 963,
+            "name": "tournamenttasktest_1_1_bet"
+        },
+        {
+            "id": 1068,
+            "name": "Appex_stag"
+        },
+        {
+            "id": 1028,
+            "name": "sport_reactivation_2_6"
+        },
+        {
+            "id": 955,
+            "name": "tournament_task_test_1_1_points"
+        },
+        {
+            "id": 964,
+            "name": "tournamenttasktest_1_1_series"
+        },
+        {
+            "id": 836,
+            "name": "SPORT RELOAD NOTIFICATION"
+        },
+        {
+            "id": 960,
+            "name": "tournament_task_test_all_done"
+        },
+        {
+            "id": 944,
+            "name": "CORE 7-30 MEGAWAYS"
+        },
+        {
+            "id": 1155,
+            "name": "sport big bets"
+        },
+        {
+            "id": 878,
+            "name": "GERMANY ACTIVE USERS"
+        },
+        {
+            "id": 852,
+            "name": "KAZAKHSTAN USERS"
+        },
+        {
+            "id": 943,
+            "name": "CORE 7-30 JACKPOT"
+        },
+        {
+            "id": 1029,
+            "name": "sport_reactivation_2_7"
+        },
+        {
+            "id": 849,
+            "name": "CANADA ACTIVE USERS"
+        },
+        {
+            "id": 761,
+            "name": "welcome-chainlet"
+        },
+        {
+            "id": 934,
+            "name": "WA APP SIGN IN"
+        },
+        {
+            "id": 880,
+            "name": "AUSTRIA ACTIVE USERS"
+        },
+        {
+            "id": 998,
+            "name": "core 7-30 bonus buy_A_9"
+        },
+        {
+            "id": 1111,
+            "name": "test online"
+        },
+        {
+            "id": 731,
+            "name": "REGISTRATION RSMM"
+        },
+        {
+            "id": 1000,
+            "name": "core 7-30 bonus buy_C_3"
+        },
+        {
+            "id": 1156,
+            "name": "Billine KZT"
+        },
+        {
+            "id": 328,
+            "name": "traf_level_1"
+        },
+        {
+            "id": 987,
+            "name": "no_bonus SPORT"
+        },
+        {
+            "id": 1112,
+            "name": "test retention points"
+        },
+        {
+            "id": 1033,
+            "name": "sport_activation_1_start"
+        },
+        {
+            "id": 1149,
+            "name": "WH no_bonus"
+        },
+        {
+            "id": 879,
+            "name": "AUSTRIA USERS"
+        },
+        {
+            "id": 986,
+            "name": "Promo SG (geo LV)"
+        },
+        {
+            "id": 953,
+            "name": "Customer active nodep"
+        },
+        {
+            "id": 886,
+            "name": "PORTUGAL ACTIVE USERS"
+        },
+        {
+            "id": 1004,
+            "name": "test_filter"
+        },
+        {
+            "id": 917,
+            "name": "NEW ZEALAND ACTIVE USERS"
+        },
+        {
+            "id": 999,
+            "name": "core 7-30 bonus buy_B_6"
+        },
+        {
+            "id": 937,
+            "name": "CORE 7-30 MSGR PUSH"
+        },
+        {
+            "id": 870,
+            "name": "paysage multibanco/mbway"
+        },
+        {
+            "id": 759,
+            "name": "FINLAND USERS"
+        },
+        {
+            "id": 845,
+            "name": "POLAND ACTIVE USERS"
+        },
+        {
+            "id": 1178,
+            "name": "ACTIVE 90 DAYS"
+        },
+        {
+            "id": 1118,
+            "name": "bonus_shop_reminder_89"
+        },
+        {
+            "id": 1119,
+            "name": "bonus_shop_reminder_200"
+        },
+        {
+            "id": 896,
+            "name": "ARGENTINA ACTIVE USERS"
+        },
+        {
+            "id": 887,
+            "name": "PORTUGAL USERS"
+        },
+        {
+            "id": 923,
+            "name": "CRICKET TO FREEBET"
+        },
+        {
+            "id": 892,
+            "name": "Mc_kzt"
+        },
+        {
+            "id": 976,
+            "name": "LATVIA ACTIVE USERS"
+        },
+        {
+            "id": 898,
+            "name": "MEXICO ACTIVE USERS"
+        },
+        {
+            "id": 1056,
+            "name": "ISSUED THIRD SPORT"
+        },
+        {
+            "id": 838,
+            "name": "SPORT RELOAD MOTIVATION 2.0"
+        },
+        {
+            "id": 1055,
+            "name": "ISSUED SECOND SPORT"
+        },
+        {
+            "id": 947,
+            "name": "CORE 7-30 LOW"
+        },
+        {
+            "id": 774,
+            "name": "THIRD DEP TMA AWARD"
+        },
+        {
+            "id": 873,
+            "name": "NY_Cryptobonus"
+        },
+        {
+            "id": 1166,
+            "name": "ref_info_active_email_push"
+        },
+        {
+            "id": 851,
+            "name": "UKRAINE USERS"
+        },
+        {
+            "id": 762,
+            "name": "welcome_1day"
+        },
+        {
+            "id": 904,
+            "name": "SPORT QUEST 3"
+        },
+        {
+            "id": 1086,
+            "name": "ESPORTS CARNIVAL21"
+        },
+        {
+            "id": 1003,
+            "name": "no_rambler"
+        },
+        {
+            "id": 714,
+            "name": "First dep ru"
+        },
+        {
+            "id": 997,
+            "name": "core 7-30 jackpot_C_2"
+        },
+        {
+            "id": 1057,
+            "name": "Second dep Only"
+        },
+        {
+            "id": 918,
+            "name": "AUSTRALIA ACTIVE USERS"
+        },
+        {
+            "id": 931,
+            "name": "Promo SG (SNG TG)"
+        },
+        {
+            "id": 905,
+            "name": "SPORT QUEST 4"
+        },
+        {
+            "id": 978,
+            "name": "LITHUANIA USERS"
+        },
+        {
+            "id": 990,
+            "name": "Third dep 300 EUR"
+        },
+        {
+            "id": 983,
+            "name": "LITHUANIA ACTIVE USERS"
+        },
+        {
+            "id": 858,
+            "name": "Exactly_stag PT"
+        },
+        {
+            "id": 1043,
+            "name": "sport_activation_1_bonus"
+        },
+        {
+            "id": 995,
+            "name": "core 7-30 jackpot_A_8"
+        },
+        {
+            "id": 1095,
+            "name": "Personal FB Candidate"
+        },
+        {
+            "id": 773,
+            "name": "SECOND DEP TMA AWARD"
+        },
+        {
+            "id": 902,
+            "name": "ESPORTS TRAIN 07"
+        },
+        {
+            "id": 932,
+            "name": "Promo SG (GEO TG)"
+        },
+        {
+            "id": 757,
+            "name": "FIRST DEP 3 CP AWARD"
+        },
+        {
+            "id": 1120,
+            "name": "bonus_shop_reminder_699"
+        },
+        {
+            "id": 1087,
+            "name": "ESPORTS CARNIVAL22"
+        },
+        {
+            "id": 792,
+            "name": "APP SIGN BEFORE RELEASE OTHER"
+        },
+        {
+            "id": 948,
+            "name": "CORE 7-30 HIGH"
+        },
+        {
+            "id": 1097,
+            "name": "core 30-60 D39C40PDBK"
+        },
+        {
+            "id": 756,
+            "name": "FIRST DEP 2 CP AWARD"
+        },
+        {
+            "id": 1088,
+            "name": "ESPORTS CARNIVAL23"
+        },
+        {
+            "id": 925,
+            "name": "Vip Segment(no activity 3 days)"
+        },
+        {
+            "id": 1100,
+            "name": "core 30-60 SAFE52BINS"
+        },
+        {
+            "id": 1099,
+            "name": "SportActive Restrict"
+        },
+        {
+            "id": 935,
+            "name": "ABASIC SPORT FILTER"
+        },
+        {
+            "id": 593,
+            "name": "Candidate 1 dep from 20K rub"
+        },
+        {
+            "id": 1052,
+            "name": "sport_activation_2_8"
+        },
+        {
+            "id": 1104,
+            "name": "ESPORTS INSURANCE OCT25"
+        },
+        {
+            "id": 1011,
+            "name": "sport_reactivation_1_start"
+        },
+        {
+            "id": 1103,
+            "name": "test comppoint event"
+        },
+        {
+            "id": 856,
+            "name": "congratulations_reg365d"
+        },
+        {
+            "id": 1151,
+            "name": "bonus shop WA"
+        },
+        {
+            "id": 1157,
+            "name": "trusted_traffic_groups"
+        },
+        {
+            "id": 938,
+            "name": "CORE 7-30 AVERAGE DEP LIGHT"
+        },
+        {
+            "id": 853,
+            "name": "congratulations_reg30d"
+        },
+        {
+            "id": 855,
+            "name": "congratulations_reg180d"
+        },
+        {
+            "id": 940,
+            "name": "CORE 7-30 AVERAGE DEP VIP"
+        },
+        {
+            "id": 854,
+            "name": "congratulations_reg90d"
+        },
+        {
+            "id": 980,
+            "name": "SMM DRAW SEGMENT 1"
+        },
+        {
+            "id": 810,
+            "name": "Unsuccessfull deposit bezdep"
+        },
+        {
+            "id": 727,
+            "name": "Third dep ru"
+        },
+        {
+            "id": 1089,
+            "name": "Potential fraud spam"
+        },
+        {
+            "id": 914,
+            "name": "IN 1ST DEP FAIL"
+        },
+        {
+            "id": 1145,
+            "name": "Bonus shop email"
+        },
+        {
+            "id": 1121,
+            "name": "bonus_shop_reminder_1999"
+        },
+        {
+            "id": 729,
+            "name": "kzt_traf_level_2"
+        },
+        {
+            "id": 939,
+            "name": "CORE 7-30 AVERAGE DEP MID"
+        },
+        {
+            "id": 941,
+            "name": "CORE 7-30 BIG WIN"
+        },
+        {
+            "id": 1152,
+            "name": "Bonus shop MESS"
+        },
+        {
+            "id": 1085,
+            "name": "Vip_paygo"
+        },
+        {
+            "id": 1144,
+            "name": "Second dep PayGO"
+        },
+        {
+            "id": 884,
+            "name": "CANADA BEZDEP"
+        },
+        {
+            "id": 1002,
+            "name": "matching_trusted"
+        },
+        {
+            "id": 817,
+            "name": "LIGHTBEZDEP BONUS"
+        },
+        {
+            "id": 1034,
+            "name": "sport_activation_1_1"
+        },
+        {
+            "id": 874,
+            "name": "Activation Sport 1"
+        },
+        {
+            "id": 876,
+            "name": "Activation Sport 3"
+        },
+        {
+            "id": 594,
+            "name": "Candidate sum dep from 50K rub"
+        },
+        {
+            "id": 982,
+            "name": "SMM DRAW SEGMENT 3"
+        },
+        {
+            "id": 818,
+            "name": "MIDBEZDEP BONUS"
+        },
+        {
+            "id": 819,
+            "name": "VIPBEZDEP BONUS"
+        },
+        {
+            "id": 821,
+            "name": "BIRTHDAY BONUS 6 MONTH"
+        },
+        {
+            "id": 1070,
+            "name": "LATVIA BEZDEP"
+        },
+        {
+            "id": 883,
+            "name": "BRAZIL BEZDEP"
+        },
+        {
+            "id": 1107,
+            "name": "VIP+"
+        },
+        {
+            "id": 1180,
+            "name": "dep_fs_light_bps"
+        },
+        {
+            "id": 1179,
+            "name": "Marvelpay 2dep_1out"
+        },
+        {
+            "id": 601,
+            "name": "Piastrix"
+        },
+        {
+            "id": 1040,
+            "name": "sport_activation_1_7"
+        },
+        {
+            "id": 895,
+            "name": "POLAND BEZDEP"
+        },
+        {
+            "id": 1048,
+            "name": "sport_activation_2_4"
+        },
+        {
+            "id": 1038,
+            "name": "sport_activation_1_5"
+        },
+        {
+            "id": 1039,
+            "name": "sport_activation_1_6"
+        },
+        {
+            "id": 1041,
+            "name": "sport_activation_1_8"
+        },
+        {
+            "id": 1051,
+            "name": "sport_activation_2_7"
+        },
+        {
+            "id": 875,
+            "name": "Activation Sport 2"
+        },
+        {
+            "id": 1169,
+            "name": "notref_info"
+        },
+        {
+            "id": 891,
+            "name": "AUSTRIA BEZDEP"
+        },
+        {
+            "id": 1183,
+            "name": "dep_fs_old_bps"
+        },
+        {
+            "id": 1049,
+            "name": "sport_activation_2_5"
+        },
+        {
+            "id": 1066,
+            "name": "betapay VIP"
+        },
+        {
+            "id": 1177,
+            "name": "dep_fs_old"
+        },
+        {
+            "id": 1035,
+            "name": "sport_activation_1_2"
+        },
+        {
+            "id": 1036,
+            "name": "sport_activation_1_3"
+        },
+        {
+            "id": 1042,
+            "name": "sport_activation_1_9"
+        },
+        {
+            "id": 885,
+            "name": "PORTUGAL BEZDEP"
+        },
+        {
+            "id": 1161,
+            "name": "Player Records Email"
+        },
+        {
+            "id": 837,
+            "name": "SPORT RELOAD MOTIVATION"
+        },
+        {
+            "id": 1162,
+            "name": "Billine KZT выплаты"
+        },
+        {
+            "id": 1163,
+            "name": "Syncra third dep"
+        },
+        {
+            "id": 1045,
+            "name": "sport_activation_2_1"
+        },
+        {
+            "id": 928,
+            "name": "core30_fruits"
+        },
+        {
+            "id": 927,
+            "name": "core30_egypt"
+        },
+        {
+            "id": 926,
+            "name": "core30_books"
+        }
+    ],
+    "tags": [
+        {
+            "id": 10,
+            "name": "asked for selfie"
+        },
+        {
+            "id": 9,
+            "name": "asked for card"
+        },
+        {
+            "id": 8,
+            "name": "asked for docs"
+        },
+        {
+            "id": 12,
+            "name": "gambling_addict"
+        },
+        {
+            "id": 6,
+            "name": "no_status"
+        },
+        {
+            "id": 7,
+            "name": "Не выводить"
+        },
+        {
+            "id": 3,
+            "name": "test"
+        },
+        {
+            "id": 5,
+            "name": "vip"
+        },
+        {
+            "id": 4,
+            "name": "Premium"
+        },
+        {
+            "id": 2,
+            "name": "no_bonus"
+        },
+        {
+            "id": 20160,
+            "name": "no_platcore"
+        },
+        {
+            "id": 20012,
+            "name": "test_payments"
+        },
+        {
+            "id": 20782,
+            "name": "Петровская"
+        },
+        {
+            "id": 20015,
+            "name": "no_p2p_fraud"
+        },
+        {
+            "id": 20008,
+            "name": "verified"
+        },
+        {
+            "id": 20215,
+            "name": "ex_стример"
+        },
+        {
+            "id": 20216,
+            "name": "ex-candidate"
+        },
+        {
+            "id": 20218,
+            "name": "стример_демо"
+        },
+        {
+            "id": 20219,
+            "name": "стример"
+        },
+        {
+            "id": 20220,
+            "name": "стример_согласование_выплаты"
+        },
+        {
+            "id": 20223,
+            "name": "candidate"
+        },
+        {
+            "id": 20193,
+            "name": "trusted"
+        },
+        {
+            "id": 20236,
+            "name": "my_noda_footer"
+        },
+        {
+            "id": 20211,
+            "name": "cha"
+        },
+        {
+            "id": 20213,
+            "name": "test2202"
+        },
+        {
+            "id": 20156,
+            "name": "control"
+        },
+        {
+            "id": 20157,
+            "name": "sport_email"
+        },
+        {
+            "id": 20169,
+            "name": "testBRL"
+        },
+        {
+            "id": 20171,
+            "name": "nodapayout"
+        },
+        {
+            "id": 20194,
+            "name": "mercuryo_test"
+        },
+        {
+            "id": 20016,
+            "name": "test_accent"
+        },
+        {
+            "id": 20025,
+            "name": "crypto high risk"
+        },
+        {
+            "id": 20719,
+            "name": "Буркун"
+        },
+        {
+            "id": 20204,
+            "name": "test_gumball"
+        },
+        {
+            "id": 20350,
+            "name": "no_calls"
+        },
+        {
+            "id": 20467,
+            "name": "no_crypto_bonus"
+        },
+        {
+            "id": 20097,
+            "name": "kb_live"
+        },
+        {
+            "id": 20118,
+            "name": "ludo"
+        },
+        {
+            "id": 20153,
+            "name": "testINR"
+        },
+        {
+            "id": 20154,
+            "name": "accent_in"
+        },
+        {
+            "id": 20159,
+            "name": "Supreme"
+        },
+        {
+            "id": 20217,
+            "name": "money_laundry"
+        },
+        {
+            "id": 20230,
+            "name": "gremlin"
+        },
+        {
+            "id": 20691,
+            "name": "Кашевник"
+        },
+        {
+            "id": 20287,
+            "name": "no_binance"
+        },
+        {
+            "id": 20297,
+            "name": "test_MoneyGo"
+        },
+        {
+            "id": 20493,
+            "name": "sport_smm_email"
+        },
+        {
+            "id": 20310,
+            "name": "rftest"
+        },
+        {
+            "id": 20344,
+            "name": "Хамрителева"
+        },
+        {
+            "id": 20589,
+            "name": "Коррекция Профиля"
+        },
+        {
+            "id": 20508,
+            "name": "raffleprize_stats"
+        },
+        {
+            "id": 20692,
+            "name": "bezdep_verna"
+        },
+        {
+            "id": 20651,
+            "name": "Король"
+        },
+        {
+            "id": 20490,
+            "name": "Ревко"
+        },
+        {
+            "id": 20494,
+            "name": "Дошкова"
+        },
+        {
+            "id": 20601,
+            "name": "Макарчик"
+        },
+        {
+            "id": 20570,
+            "name": "Полчобот"
+        },
+        {
+            "id": 20573,
+            "name": "Романюк"
+        },
+        {
+            "id": 20574,
+            "name": "Базылевич"
+        },
+        {
+            "id": 20693,
+            "name": "NY_2026_5000"
+        },
+        {
+            "id": 20730,
+            "name": "aqa_payments"
+        },
+        {
+            "id": 20333,
+            "name": "Видеосвязь"
+        },
+        {
+            "id": 20321,
+            "name": "test_cashback"
+        },
+        {
+            "id": 20323,
+            "name": "Vip_Managers"
+        },
+        {
+            "id": 20324,
+            "name": "sleep"
+        },
+        {
+            "id": 20325,
+            "name": "cold"
+        },
+        {
+            "id": 20326,
+            "name": "blocked"
+        },
+        {
+            "id": 20327,
+            "name": "sport_suspect"
+        },
+        {
+            "id": 20328,
+            "name": "no_welcome"
+        },
+        {
+            "id": 20329,
+            "name": "тест"
+        },
+        {
+            "id": 20330,
+            "name": "tags"
+        },
+        {
+            "id": 20335,
+            "name": "Павлик"
+        },
+        {
+            "id": 20340,
+            "name": "forupdate"
+        },
+        {
+            "id": 20342,
+            "name": "Redirection"
+        },
+        {
+            "id": 20259,
+            "name": "Конон"
+        },
+        {
+            "id": 20346,
+            "name": "Малевич"
+        },
+        {
+            "id": 20347,
+            "name": "Коррекция профиля"
+        },
+        {
+            "id": 20348,
+            "name": "Коррекция баланса"
+        },
+        {
+            "id": 20351,
+            "name": "Колосовский"
+        },
+        {
+            "id": 20352,
+            "name": "Шишко"
+        },
+        {
+            "id": 20482,
+            "name": "175_REFERRAL"
+        },
+        {
+            "id": 20630,
+            "name": "msp36"
+        },
+        {
+            "id": 20558,
+            "name": "conti"
+        },
+        {
+            "id": 20495,
+            "name": "Овсейко"
+        },
+        {
+            "id": 20496,
+            "name": "no_spm"
+        },
+        {
+            "id": 20358,
+            "name": "Савеня"
+        },
+        {
+            "id": 20694,
+            "name": "NY_2026_10000"
+        },
+        {
+            "id": 20769,
+            "name": "Гонсалвеш"
+        },
+        {
+            "id": 20013,
+            "name": "закупщик"
+        },
+        {
+            "id": 20663,
+            "name": "Бангура"
+        },
+        {
+            "id": 20364,
+            "name": "Суконка"
+        },
+        {
+            "id": 20707,
+            "name": "Шлык"
+        },
+        {
+            "id": 20366,
+            "name": "Шишкатёнок"
+        },
+        {
+            "id": 20367,
+            "name": "Коновалов"
+        },
+        {
+            "id": 20742,
+            "name": "коваль"
+        },
+        {
+            "id": 20684,
+            "name": "betapay"
+        },
+        {
+            "id": 20708,
+            "name": "Сташевский"
+        },
+        {
+            "id": 20595,
+            "name": "Сергеева"
+        },
+        {
+            "id": 20372,
+            "name": "Перепич"
+        },
+        {
+            "id": 20596,
+            "name": "Ходжаев"
+        },
+        {
+            "id": 20669,
+            "name": "Харитонова"
+        },
+        {
+            "id": 20713,
+            "name": "Бойко Даниил"
+        },
+        {
+            "id": 20664,
+            "name": "Богданович"
+        },
+        {
+            "id": 20377,
+            "name": "Ярош"
+        },
+        {
+            "id": 20378,
+            "name": "Бердыева"
+        },
+        {
+            "id": 20673,
+            "name": "36"
+        },
+        {
+            "id": 20349,
+            "name": "Черношей"
+        },
+        {
+            "id": 20798,
+            "name": "Торохова"
+        },
+        {
+            "id": 20714,
+            "name": "conrol"
+        },
+        {
+            "id": 20505,
+            "name": "sport_email_fb1"
+        },
+        {
+            "id": 20506,
+            "name": "PSG (email_app)"
+        },
+        {
+            "id": 20507,
+            "name": "кол"
+        },
+        {
+            "id": 20565,
+            "name": "Бернатович"
+        },
+        {
+            "id": 20567,
+            "name": "Гончаров"
+        },
+        {
+            "id": 20543,
+            "name": "no_wgr_cashback"
+        },
+        {
+            "id": 20571,
+            "name": "Федорцова"
+        },
+        {
+            "id": 20575,
+            "name": "Расошко"
+        },
+        {
+            "id": 20393,
+            "name": "test_at"
+        },
+        {
+            "id": 20697,
+            "name": "NY_2026_30000"
+        },
+        {
+            "id": 20790,
+            "name": "33"
+        },
+        {
+            "id": 20674,
+            "name": "SMM Moderator TG"
+        },
+        {
+            "id": 20597,
+            "name": "Головин"
+        },
+        {
+            "id": 20611,
+            "name": "Test"
+        },
+        {
+            "id": 20655,
+            "name": "не вывы"
+        },
+        {
+            "id": 20612,
+            "name": "Без менеджера"
+        },
+        {
+            "id": 20400,
+            "name": "Пивень"
+        },
+        {
+            "id": 20799,
+            "name": "Воронин"
+        },
+        {
+            "id": 20625,
+            "name": "Бойко"
+        },
+        {
+            "id": 20802,
+            "name": "Акимов"
+        },
+        {
+            "id": 20632,
+            "name": "Жукович"
+        },
+        {
+            "id": 20633,
+            "name": "no_msp"
+        },
+        {
+            "id": 20685,
+            "name": "repay"
+        },
+        {
+            "id": 20677,
+            "name": "accent_limit"
+        },
+        {
+            "id": 20715,
+            "name": "Черёпко"
+        },
+        {
+            "id": 20718,
+            "name": "Малявко"
+        },
+        {
+            "id": 20805,
+            "name": "Сулейманов"
+        },
+        {
+            "id": 20417,
+            "name": "Щербаченя"
+        },
+        {
+            "id": 20425,
+            "name": "Test_cypix"
+        },
+        {
+            "id": 20426,
+            "name": "test_cypix"
+        },
+        {
+            "id": 20353,
+            "name": "Мержинский"
+        },
+        {
+            "id": 20428,
+            "name": "Первененко"
+        },
+        {
+            "id": 20429,
+            "name": "Василевская"
+        },
+        {
+            "id": 20430,
+            "name": "Невмержицкая"
+        },
+        {
+            "id": 20431,
+            "name": "Боложинская"
+        },
+        {
+            "id": 20388,
+            "name": "Якушик"
+        },
+        {
+            "id": 20384,
+            "name": "Рубченя"
+        },
+        {
+            "id": 20385,
+            "name": "Рыбков"
+        },
+        {
+            "id": 20380,
+            "name": "Кириленко"
+        },
+        {
+            "id": 20392,
+            "name": "Жих"
+        },
+        {
+            "id": 20386,
+            "name": "Балашов"
+        },
+        {
+            "id": 20387,
+            "name": "Бараховская"
+        },
+        {
+            "id": 20432,
+            "name": "Красильникова"
+        },
+        {
+            "id": 20433,
+            "name": "Телехан"
+        },
+        {
+            "id": 20394,
+            "name": "Пытляк"
+        },
+        {
+            "id": 20434,
+            "name": "Никиткова"
+        },
+        {
+            "id": 20435,
+            "name": "Мацкевич Станислав"
+        },
+        {
+            "id": 20436,
+            "name": "Кунцевич"
+        },
+        {
+            "id": 20613,
+            "name": "Тимофеева"
+        },
+        {
+            "id": 20395,
+            "name": "Савосик"
+        },
+        {
+            "id": 20396,
+            "name": "Радуто"
+        },
+        {
+            "id": 20438,
+            "name": "Благочинная"
+        },
+        {
+            "id": 20381,
+            "name": "Малевич Виктория"
+        },
+        {
+            "id": 20439,
+            "name": "Гончарова"
+        },
+        {
+            "id": 20382,
+            "name": "Алексеев"
+        },
+        {
+            "id": 20383,
+            "name": "Дмитраченко"
+        },
+        {
+            "id": 20440,
+            "name": "Рафалович"
+        },
+        {
+            "id": 20441,
+            "name": "chargeback"
+        },
+        {
+            "id": 20442,
+            "name": "binance_доп"
+        },
+        {
+            "id": 20721,
+            "name": "Ткачёв"
+        },
+        {
+            "id": 20695,
+            "name": "NY_2026_15000"
+        },
+        {
+            "id": 20637,
+            "name": "Эдуарду"
+        },
+        {
+            "id": 20666,
+            "name": "no_antifr"
+        },
+        {
+            "id": 20724,
+            "name": "Климков"
+        },
+        {
+            "id": 20670,
+            "name": "lvltstag"
+        },
+        {
+            "id": 20449,
+            "name": "Шерешик"
+        },
+        {
+            "id": 20626,
+            "name": "Маталыго"
+        },
+        {
+            "id": 20675,
+            "name": "qa_msp"
+        },
+        {
+            "id": 20624,
+            "name": "Урбан"
+        },
+        {
+            "id": 20453,
+            "name": "Неборский"
+        },
+        {
+            "id": 20454,
+            "name": "Яковчик"
+        },
+        {
+            "id": 20455,
+            "name": "Шандицева"
+        },
+        {
+            "id": 20497,
+            "name": "корр"
+        },
+        {
+            "id": 20678,
+            "name": "Тельнова"
+        },
+        {
+            "id": 20458,
+            "name": "Зябко"
+        },
+        {
+            "id": 20662,
+            "name": "spam_net"
+        },
+        {
+            "id": 20698,
+            "name": "NY_2026_40000"
+        },
+        {
+            "id": 20638,
+            "name": "Ляховский"
+        },
+        {
+            "id": 20653,
+            "name": "Дружинина"
+        },
+        {
+            "id": 20463,
+            "name": "Дубинчик"
+        },
+        {
+            "id": 20464,
+            "name": "Медведев"
+        },
+        {
+            "id": 20716,
+            "name": "Лопухов"
+        },
+        {
+            "id": 20466,
+            "name": "Бабич"
+        },
+        {
+            "id": 20783,
+            "name": "Беруашвили"
+        },
+        {
+            "id": 20485,
+            "name": "paramount_test"
+        },
+        {
+            "id": 20472,
+            "name": "paycosSBP_доп"
+        },
+        {
+            "id": 20483,
+            "name": "Жабраков"
+        },
+        {
+            "id": 20484,
+            "name": "block"
+        },
+        {
+            "id": 20513,
+            "name": "Стажок"
+        },
+        {
+            "id": 20473,
+            "name": "Карачун Екатерина"
+        },
+        {
+            "id": 20501,
+            "name": "Ярига"
+        },
+        {
+            "id": 20502,
+            "name": "Власенко"
+        },
+        {
+            "id": 20480,
+            "name": "sport_email_add"
+        },
+        {
+            "id": 20481,
+            "name": "Позняк"
+        },
+        {
+            "id": 20486,
+            "name": "bova_test"
+        },
+        {
+            "id": 20072,
+            "name": "Демидович"
+        },
+        {
+            "id": 20770,
+            "name": "Макей"
+        },
+        {
+            "id": 20510,
+            "name": "no_we"
+        },
+        {
+            "id": 20511,
+            "name": "пар"
+        },
+        {
+            "id": 20523,
+            "name": "Радзивон"
+        },
+        {
+            "id": 20515,
+            "name": "Алексеевв"
+        },
+        {
+            "id": 20580,
+            "name": "Николаевич"
+        },
+        {
+            "id": 20568,
+            "name": "Кабанцев"
+        },
+        {
+            "id": 20518,
+            "name": "prize_freebet1"
+        },
+        {
+            "id": 20749,
+            "name": "8_MARCH_2026_5000"
+        },
+        {
+            "id": 20681,
+            "name": "Соколова"
+        },
+        {
+            "id": 20602,
+            "name": "Лисицинский"
+        },
+        {
+            "id": 20572,
+            "name": "Аброскина"
+        },
+        {
+            "id": 20528,
+            "name": "Сысова"
+        },
+        {
+            "id": 20529,
+            "name": "Сабило"
+        },
+        {
+            "id": 20577,
+            "name": "sport_no_restricted"
+        },
+        {
+            "id": 20559,
+            "name": "msgr_27_04_act"
+        },
+        {
+            "id": 20639,
+            "name": "Зайко"
+        },
+        {
+            "id": 20561,
+            "name": "not_auto"
+        },
+        {
+            "id": 20616,
+            "name": "freechip_crazytime"
+        },
+        {
+            "id": 20700,
+            "name": "NY_2026_60000"
+        },
+        {
+            "id": 20703,
+            "name": "NY_2026_90000"
+        },
+        {
+            "id": 20705,
+            "name": "NY_2026_250000"
+        },
+        {
+            "id": 20537,
+            "name": "Курилина"
+        },
+        {
+            "id": 20562,
+            "name": "Дылейко"
+        },
+        {
+            "id": 20756,
+            "name": "Некрасов"
+        },
+        {
+            "id": 20800,
+            "name": "Белявская"
+        },
+        {
+            "id": 20542,
+            "name": "Драгун"
+        },
+        {
+            "id": 20671,
+            "name": "Мандрик"
+        },
+        {
+            "id": 20578,
+            "name": "no_bonus SPORT"
+        },
+        {
+            "id": 20709,
+            "name": "Грудько"
+        },
+        {
+            "id": 20784,
+            "name": "Сушко"
+        },
+        {
+            "id": 20583,
+            "name": "sport_email_info"
+        },
+        {
+            "id": 20584,
+            "name": "sport_email_info_odd"
+        },
+        {
+            "id": 20551,
+            "name": "Клещенко"
+        },
+        {
+            "id": 20552,
+            "name": "Избицкая"
+        },
+        {
+            "id": 20553,
+            "name": "Буганов"
+        },
+        {
+            "id": 20803,
+            "name": "Федоренко"
+        },
+        {
+            "id": 20696,
+            "name": "NY_2026_20000"
+        },
+        {
+            "id": 20668,
+            "name": "Расько"
+        },
+        {
+            "id": 20581,
+            "name": "Скрипоченко"
+        },
+        {
+            "id": 20586,
+            "name": "Ковальчук"
+        },
+        {
+            "id": 20640,
+            "name": "Лесков"
+        },
+        {
+            "id": 20591,
+            "name": "Киселев"
+        },
+        {
+            "id": 20672,
+            "name": "Подберёзкина"
+        },
+        {
+            "id": 20627,
+            "name": "jeton"
+        },
+        {
+            "id": 20594,
+            "name": "Яскевич"
+        },
+        {
+            "id": 20598,
+            "name": "cashback_off"
+        },
+        {
+            "id": 20634,
+            "name": "Харченко"
+        },
+        {
+            "id": 20600,
+            "name": "Малащенко"
+        },
+        {
+            "id": 20605,
+            "name": "Зубко"
+        },
+        {
+            "id": 20606,
+            "name": "Роевнева"
+        },
+        {
+            "id": 20607,
+            "name": "Александрова"
+        },
+        {
+            "id": 20608,
+            "name": "esport_email_info"
+        },
+        {
+            "id": 20609,
+            "name": "Ковалёва"
+        },
+        {
+            "id": 20615,
+            "name": "freechip_lightning_roulette"
+        },
+        {
+            "id": 20656,
+            "name": "король"
+        },
+        {
+            "id": 20657,
+            "name": "Талако"
+        },
+        {
+            "id": 20619,
+            "name": "Freechips Lightning Roulette"
+        },
+        {
+            "id": 20620,
+            "name": "Гриник"
+        },
+        {
+            "id": 20621,
+            "name": "Аль-Каиси"
+        },
+        {
+            "id": 20604,
+            "name": "MSP36"
+        },
+        {
+            "id": 20622,
+            "name": "MSP3"
+        },
+        {
+            "id": 20665,
+            "name": "without_autocashout"
+        },
+        {
+            "id": 20676,
+            "name": "expay"
+        },
+        {
+            "id": 20658,
+            "name": "тест промохаб"
+        },
+        {
+            "id": 20679,
+            "name": "Смирнова"
+        },
+        {
+            "id": 20680,
+            "name": "Дудник"
+        },
+        {
+            "id": 20644,
+            "name": "Михайлов"
+        },
+        {
+            "id": 20645,
+            "name": "solvex_test"
+        },
+        {
+            "id": 20646,
+            "name": "Рамкевич"
+        },
+        {
+            "id": 20647,
+            "name": "Бахур"
+        },
+        {
+            "id": 20648,
+            "name": "Малинин"
+        },
+        {
+            "id": 20649,
+            "name": "Рассказова"
+        },
+        {
+            "id": 20650,
+            "name": "МалининаТ"
+        },
+        {
+            "id": 20682,
+            "name": "Чумак"
+        },
+        {
+            "id": 20683,
+            "name": "Лапейко"
+        },
+        {
+            "id": 20687,
+            "name": "Лзаицкая"
+        },
+        {
+            "id": 20688,
+            "name": "bezdep_mailru"
+        },
+        {
+            "id": 20689,
+            "name": "bonushunter wlc"
+        },
+        {
+            "id": 20690,
+            "name": "Амренов"
+        },
+        {
+            "id": 20699,
+            "name": "NY_2026_50000"
+        },
+        {
+            "id": 20701,
+            "name": "NY_2026_70000"
+        },
+        {
+            "id": 20702,
+            "name": "NY_2026_80000"
+        },
+        {
+            "id": 20704,
+            "name": "NY_2026_180000"
+        },
+        {
+            "id": 20706,
+            "name": "коррек"
+        },
+        {
+            "id": 20710,
+            "name": "Dispute33"
+        },
+        {
+            "id": 20711,
+            "name": "Иванов"
+        },
+        {
+            "id": 20712,
+            "name": "Костенко"
+        },
+        {
+            "id": 20717,
+            "name": "Шкурдюк"
+        },
+        {
+            "id": 20722,
+            "name": "paytop"
+        },
+        {
+            "id": 20723,
+            "name": "Глатанков"
+        },
+        {
+            "id": 20786,
+            "name": "Гутырчик"
+        },
+        {
+            "id": 20726,
+            "name": "Жабракова"
+        },
+        {
+            "id": 20727,
+            "name": "appex"
+        },
+        {
+            "id": 20728,
+            "name": "msp_fraud"
+        },
+        {
+            "id": 20731,
+            "name": "Сташинский"
+        },
+        {
+            "id": 20732,
+            "name": "Примшиц"
+        },
+        {
+            "id": 20733,
+            "name": "Сегодник"
+        },
+        {
+            "id": 20797,
+            "name": "Коровин"
+        },
+        {
+            "id": 20754,
+            "name": "syncra_spam"
+        },
+        {
+            "id": 20736,
+            "name": "VIP+"
+        },
+        {
+            "id": 20737,
+            "name": "Лаврова"
+        },
+        {
+            "id": 20760,
+            "name": "Бондаренко"
+        },
+        {
+            "id": 20771,
+            "name": "Александрович"
+        },
+        {
+            "id": 20740,
+            "name": "Юшкевич"
+        },
+        {
+            "id": 20741,
+            "name": "Филипченко"
+        },
+        {
+            "id": 20743,
+            "name": "Козел"
+        },
+        {
+            "id": 20735,
+            "name": "Руссо"
+        },
+        {
+            "id": 20772,
+            "name": "Петрушенко"
+        },
+        {
+            "id": 20785,
+            "name": "Супрунюк"
+        },
+        {
+            "id": 20747,
+            "name": "Козубовская"
+        },
+        {
+            "id": 20748,
+            "name": "Ананько"
+        },
+        {
+            "id": 20750,
+            "name": "8_MARCH_2026_10000"
+        },
+        {
+            "id": 20751,
+            "name": "8_MARCH_2026_20000"
+        },
+        {
+            "id": 20752,
+            "name": "8_MARCH_2026_30000"
+        },
+        {
+            "id": 20753,
+            "name": "8_MARCH_2026_40000"
+        },
+        {
+            "id": 20757,
+            "name": "loonio"
+        },
+        {
+            "id": 20761,
+            "name": "Шумеев"
+        },
+        {
+            "id": 20758,
+            "name": "НовикМ"
+        },
+        {
+            "id": 20762,
+            "name": "Севастьян"
+        },
+        {
+            "id": 20764,
+            "name": "Засько"
+        },
+        {
+            "id": 20765,
+            "name": "Тишалович"
+        },
+        {
+            "id": 20773,
+            "name": "Новикова"
+        },
+        {
+            "id": 20766,
+            "name": "Гвардиян"
+        },
+        {
+            "id": 20767,
+            "name": "Лученок"
+        },
+        {
+            "id": 20768,
+            "name": "Терехов"
+        },
+        {
+            "id": 20774,
+            "name": "Безгодова"
+        },
+        {
+            "id": 20775,
+            "name": "Ярмак"
+        },
+        {
+            "id": 20776,
+            "name": "Молчанов"
+        },
+        {
+            "id": 20787,
+            "name": "Сидорова"
+        },
+        {
+            "id": 20777,
+            "name": "Борутенко"
+        },
+        {
+            "id": 20804,
+            "name": "Парагас"
+        },
+        {
+            "id": 20779,
+            "name": "Борисевич"
+        },
+        {
+            "id": 20780,
+            "name": "ver"
+        },
+        {
+            "id": 20788,
+            "name": "Дюбченко"
+        },
+        {
+            "id": 20789,
+            "name": "ЗайцевН"
+        },
+        {
+            "id": 20791,
+            "name": "Кузьменкова"
+        },
+        {
+            "id": 20792,
+            "name": "Достанко"
+        },
+        {
+            "id": 20793,
+            "name": "Ращеня"
+        },
+        {
+            "id": 20794,
+            "name": "Новицкая"
+        },
+        {
+            "id": 20795,
+            "name": "Литвинюк"
+        },
+        {
+            "id": 20796,
+            "name": "Зубчёнок"
+        },
+        {
+            "id": 20811,
+            "name": "Захарова"
+        },
+        {
+            "id": 20801,
+            "name": "Павличенко"
+        },
+        {
+            "id": 20806,
+            "name": "Симак"
+        },
+        {
+            "id": 20807,
+            "name": "Шаблыко"
+        },
+        {
+            "id": 20808,
+            "name": "Романовская"
+        },
+        {
+            "id": 20809,
+            "name": "Ольсевич"
+        },
+        {
+            "id": 20810,
+            "name": "Седак"
+        },
+        {
+            "id": 20812,
+            "name": "Дерюго"
+        }
+    ],
+    "events": [
+        "deposit",
+        "cashout",
+        "email_confirmation",
+        "scheduler",
+        "registration",
+        "task_completed",
+        "groups_updated",
+        "bonus_issued",
+        "sport_bonus_issued"
+    ],
+    "bonuses": [
+        {
+            "title": "GAMIFICATION BONUS POINTS",
+            "id": "gamification_award:GAMIFICATION BONUS POINTS:GAMIFICATION BONUS POINTS"
+        }
+    ],
+    "notification_events": [
+        "main_bonus_issue",
+        "secondary_bonus_issue",
+        "secondary_actions_done",
+        "issue",
+        "expire",
+        "start"
+    ],
+    "dsl_tags": [
+        "alternative",
+        "anniversary",
+        "bezdep_dep_main",
+        "bezdep_fs_br",
+        "bezdep_fs_ca",
+        "bezdep_fs_de",
+        "bezdep_fs_ja",
+        "bezdep_fs_main",
+        "bezdep_fs_pt",
+        "bezdep_fs_tr",
+        "birthday",
+        "cashback",
+        "collect",
+        "confirmation_chain",
+        "core_chain",
+        "coupon",
+        "crypto",
+        "depfailt_chain",
+        "exchange_fs",
+        "exchange_random_bonus",
+        "exchange_random_fs",
+        "freebet_personal",
+        "freebet_personal_test",
+        "gamification_award",
+        "holiday_bonus",
+        "holiday_fs",
+        "inout_pay",
+        "lottery_bonus_br",
+        "lottery_bonus_ca",
+        "lottery_bonus_de",
+        "lottery_bonus_ja",
+        "lottery_bonus_main",
+        "lottery_bonus_pt",
+        "lottery_bonus_tr",
+        "lottery_fs_br",
+        "lottery_fs_ca",
+        "lottery_fs_de",
+        "lottery_fs_ja",
+        "lottery_fs_main",
+        "lottery_fs_pt",
+        "lottery_fs_tr",
+        "loyalty",
+        "mailru_chain",
+        "marketing_award",
+        "marketing_bonus",
+        "marketing_cpn",
+        "marketing_dep_bonus",
+        "marketing_dep_fs",
+        "marketing_fs",
+        "mission_bonus",
+        "mission_fs",
+        "msp",
+        "msp_bonus",
+        "new_status",
+        "no_tag",
+        "nodep_chain",
+        "other_campaigns",
+        "personal_test",
+        "personalized_chain",
+        "promo_compensation",
+        "provider_bonus",
+        "rakeback",
+        "react_chain",
+        "referral",
+        "reload",
+        "remarketing",
+        "return_vip",
+        "smm_award",
+        "smm_bezdep",
+        "smm_dep",
+        "sport_activate_bonus",
+        "sport_bezdep",
+        "sport_birthday",
+        "sport_cashback",
+        "sport_collect",
+        "sport_compensation",
+        "sport_crypto",
+        "sport_cybersport",
+        "sport_lootbox",
+        "sport_marketing_bonus",
+        "sport_mission",
+        "sport_new_status",
+        "sport_no_tag",
+        "sport_other_campaigns",
+        "sport_personal",
+        "sport_react_chain",
+        "sport_reload",
+        "sport_smm_bonus",
+        "sport_test",
+        "sport_weekly_bonus",
+        "sport_welcome",
+        "sport_wlc_chain",
+        "support_activity",
+        "support_candidate",
+        "support_compensation",
+        "support_registration",
+        "support_remarketing",
+        "support_smm",
+        "support_tech",
+        "support_tele_bezdep",
+        "support_tele_dep",
+        "support_vip_compensation",
+        "support_vip_personal",
+        "support_vip_weekly_bezdep",
+        "support_vip_weekly_bonus",
+        "support_vip_weekly_fc",
+        "support_vip_weekly_fs",
+        "support_whatsapp",
+        "telegram_bezdep",
+        "telegram_dep",
+        "test",
+        "tournament_bonus_br",
+        "tournament_bonus_ca",
+        "tournament_bonus_de",
+        "tournament_bonus_ja",
+        "tournament_bonus_main",
+        "tournament_bonus_pt",
+        "tournament_bonus_tr",
+        "tournament_fs_br",
+        "tournament_fs_ca",
+        "tournament_fs_de",
+        "tournament_fs_ja",
+        "tournament_fs_main",
+        "tournament_fs_pt",
+        "tournament_fs_tr",
+        "tournament_points_main",
+        "weekly_bbuy_main",
+        "weekly_dep",
+        "weekly_fchips_main",
+        "weekly_fs_at",
+        "weekly_fs_au",
+        "weekly_fs_br",
+        "weekly_fs_ca",
+        "weekly_fs_de",
+        "weekly_fs_in",
+        "weekly_fs_ja",
+        "weekly_fs_lt",
+        "weekly_fs_lv",
+        "weekly_fs_main",
+        "weekly_fs_nz",
+        "weekly_fs_pl",
+        "weekly_fs_pt",
+        "weekly_fs_tr",
+        "welcome",
+        "welcome_increased_chain",
+        "wlc_chain",
+        "year_reg_chain"
+    ]
+}

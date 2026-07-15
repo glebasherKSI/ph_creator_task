@@ -1,0 +1,252 @@
+:root {
+  --bg: #f3f4f6;
+  --panel: #ffffff;
+  --border: #e5e7eb;
+  --text: #111827;
+  --muted: #6b7280;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --success: #22c55e;
+  --warn: #ca8a04;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 360px;
+  margin: 0;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 16px 18px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.header__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.main {
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.card__title {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.domain-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.domain-empty {
+  margin: 0;
+  padding: 6px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.domain-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.domain-item:last-child {
+  border-bottom: none;
+}
+
+.domain-item__perm {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.domain-item__perm--ok {
+  background: var(--success);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.18);
+}
+
+.domain-item__perm--warn {
+  background: var(--warn);
+  box-shadow: 0 0 0 2px rgba(202, 138, 4, 0.18);
+}
+
+.domain-item__host {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.domain-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.domain-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: #fafafa;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.domain-input:focus {
+  outline: none;
+  border-color: #93c5fd;
+  background: #fff;
+}
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn--secondary {
+  background: #f9fafb;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn--secondary:hover {
+  background: #f3f4f6;
+}
+
+.btn--outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #fff;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn--outline:hover {
+  background: #f9fafb;
+}
+
+.btn--primary {
+  background: var(--primary);
+  color: #fff;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+.btn--primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn--icon {
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 6px;
+}
+
+.btn--icon:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn__icon {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.status {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.status[hidden] {
+  display: none;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px 14px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.footer__dot {
+  opacity: 0.7;
+}

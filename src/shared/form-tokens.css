@@ -1,0 +1,94 @@
+/* Shared design tokens for copy-panel and form builders */
+
+:root {
+  /* Colors */
+  --form-bg: #f8fafc;
+  --form-surface: #ffffff;
+  --form-surface-muted: #f1f5f9;
+  --form-surface-subtle: #f8fafc;
+  --form-border: #e2e8f0;
+  --form-border-strong: #cbd5e1;
+  --form-text: #0f172a;
+  --form-text-secondary: #334155;
+  --form-muted: #64748b;
+  --form-muted-light: #94a3b8;
+
+  --form-primary: #2563eb;
+  --form-primary-hover: #1d4ed8;
+  --form-primary-subtle: #eff6ff;
+  --form-primary-border: #93c5fd;
+
+  --form-success: #16a34a;
+  --form-success-hover: #15803d;
+  --form-success-subtle: #f0fdf4;
+  --form-success-border: #86efac;
+
+  --form-danger: #dc2626;
+  --form-danger-hover: #b91c1c;
+  --form-danger-subtle: #fef2f2;
+  --form-danger-border: #fecaca;
+
+  --form-warning-subtle: #fffbeb;
+  --form-warning-border: #fde68a;
+  --form-warning-text: #b45309;
+
+  --form-code-bg: #f1f5f9;
+  --form-code-text: #1e293b;
+  --form-result-bg: #0f172a;
+  --form-result-text: #e2e8f0;
+
+  /* Typography */
+  --form-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --form-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --form-text-xs: 11px;
+  --form-text-sm: 12px;
+  --form-text-base: 13px;
+  --form-text-md: 14px;
+  --form-text-lg: 15px;
+  --form-text-xl: 16px;
+  --form-weight-medium: 500;
+  --form-weight-semibold: 600;
+  --form-line-tight: 1.35;
+  --form-line-normal: 1.5;
+
+  /* Spacing (8px grid) */
+  --form-space-1: 4px;
+  --form-space-2: 8px;
+  --form-space-3: 12px;
+  --form-space-4: 16px;
+  --form-space-5: 20px;
+  --form-space-6: 24px;
+
+  /* Radius */
+  --form-radius-sm: 6px;
+  --form-radius-md: 8px;
+  --form-radius-lg: 10px;
+  --form-radius-xl: 12px;
+
+  /* Shadows */
+  --form-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --form-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --form-shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --form-shadow-panel: -12px 0 40px rgba(15, 23, 42, 0.14);
+
+  /* Controls */
+  --form-input-height: 36px;
+  --form-input-padding-x: 12px;
+  --form-input-padding-y: 8px;
+  --form-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  --form-focus-border: var(--form-primary);
+
+  /* Transitions */
+  --form-transition-fast: 0.12s ease;
+  --form-transition-normal: 0.18s ease;
+
+  /* Legacy aliases (used across extension pages) */
+  --bg: var(--form-bg);
+  --panel: var(--form-surface);
+  --border: var(--form-border);
+  --text: var(--form-text);
+  --muted: var(--form-muted);
+  --primary: var(--form-primary);
+  --success: var(--form-success);
+  --danger: var(--form-danger);
+}

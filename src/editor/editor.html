@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PromoHub Task Creator</title>
+    <link rel="stylesheet" href="../shared/form-tokens.css" />
+    <link rel="stylesheet" href="../shared/country-selector.css" />
+    <link rel="stylesheet" href="../shared/multi-combobox.css" />
+    <link rel="stylesheet" href="../shared/repeat-schedule.css" />
+    <link rel="stylesheet" href="../shared/copy-panel.css" />
+    <link rel="stylesheet" href="../shared/conditions-builder.css" />
+    <link rel="stylesheet" href="../shared/actions-builder.css" />
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Создатель задач PromoHub</h1>
+      <div class="topbar__actions">
+        <button id="btn-open-chains" class="btn" type="button">Конструктор связей</button>
+        <div id="status" class="status">Выберите домен и загрузите задачи</div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel panel--left">
+        <div class="field">
+          <label for="domain-select">Домен админки</label>
+          <select id="domain-select"></select>
+        </div>
+
+        <div class="row">
+          <button id="btn-load-tasks" class="btn btn--primary" type="button">Загрузить задачи</button>
+          <button id="btn-load-more" class="btn" type="button" disabled>Загрузить ещё</button>
+        </div>
+
+        <div class="meta">
+          <span id="tasks-count">0 задач</span>
+          <span id="tasks-filter-hint" class="meta meta--muted meta--hidden">Показаны: Активно и Черновик</span>
+          <span id="tasks-page">offset: 0</span>
+        </div>
+
+        <div id="tasks-status-filter" class="tasks-status-filter" role="group" aria-label="Фильтр по статусу">
+          <button type="button" class="tasks-status-filter__btn tasks-status-filter__btn--active" data-status="all">
+            Все
+          </button>
+          <button type="button" class="tasks-status-filter__btn" data-status="active">Активные</button>
+          <button type="button" class="tasks-status-filter__btn" data-status="draft">Черновик</button>
+        </div>
+
+        <div id="tasks-list" class="tasks-list"></div>
+      </aside>
+
+      <section class="panel panel--main">
+        <div class="main-tabs" role="tablist" aria-label="Режим панели">
+          <button id="tab-editor" class="main-tabs__btn main-tabs__btn--active" type="button" role="tab" aria-selected="true">
+            Конструктор
+          </button>
+          <button id="tab-stats" class="main-tabs__btn" type="button" role="tab" aria-selected="false">
+            Статистика
+          </button>
+        </div>
+
+        <section id="view-editor" class="main-view main-view--active">
+          <div id="copy-panel-mount"></div>
+        </section>
+
+        <section id="view-stats" class="main-view" aria-hidden="true">
+          <div id="stats-panel-mount"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="editor.js"></script>
+  </body>
+</html>

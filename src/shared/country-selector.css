@@ -1,0 +1,340 @@
+.country-selector {
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-lg);
+  padding: var(--form-space-3) var(--form-space-4);
+  background: var(--form-surface);
+  box-shadow: var(--form-shadow-sm);
+}
+
+.country-selector--loading .country-selector__ui {
+  display: none;
+}
+
+.country-selector__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--form-space-2);
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-medium);
+  color: var(--form-muted);
+  padding: var(--form-space-2) var(--form-space-3);
+  border-radius: 999px;
+  background: var(--form-surface-muted);
+  border: 1px solid var(--form-border);
+}
+
+.country-selector__status--hidden {
+  display: none;
+}
+
+.country-selector__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--form-border-strong);
+  border-top-color: var(--form-primary);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: country-selector-spin 0.7s linear infinite;
+}
+
+@keyframes country-selector-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.country-selector__ui--hidden,
+.country-selector__notice--hidden,
+.country-selector__panel--hidden {
+  display: none;
+}
+
+.country-selector__notice {
+  margin-bottom: var(--form-space-3);
+  padding: var(--form-space-2) var(--form-space-3);
+  font-size: var(--form-text-sm);
+  line-height: var(--form-line-normal);
+  color: var(--form-danger);
+  background: var(--form-danger-subtle);
+  border: 1px solid var(--form-danger-border);
+  border-radius: var(--form-radius-md);
+}
+
+.country-selector__toggle {
+  border: none;
+  margin: 0 0 var(--form-space-3);
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--form-space-3) var(--form-space-4);
+}
+
+.country-selector__toggle-label {
+  width: 100%;
+  margin: 0 0 var(--form-space-1);
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-semibold);
+  color: var(--form-text);
+}
+
+.country-selector__radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--form-space-2);
+  font-size: var(--form-text-base);
+  cursor: pointer;
+}
+
+.country-selector__radio input {
+  width: auto;
+  max-width: none;
+  accent-color: var(--form-primary);
+}
+
+.country-selector__field-label {
+  display: block;
+  margin-bottom: var(--form-space-2);
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-medium);
+  color: var(--form-text);
+}
+
+/* Combobox */
+.country-selector__combobox {
+  position: relative;
+}
+
+.country-selector__combobox-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--form-space-1);
+  min-height: var(--form-input-height);
+  padding: var(--form-space-1) var(--form-space-2);
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  background: var(--form-surface);
+  box-shadow: var(--form-shadow-sm);
+  cursor: text;
+  transition:
+    border-color var(--form-transition-fast),
+    box-shadow var(--form-transition-fast);
+}
+
+.country-selector__combobox-control:hover:not(.country-selector__combobox-control--disabled) {
+  border-color: var(--form-border-strong);
+}
+
+.country-selector__combobox-control--focused {
+  border-color: var(--form-focus-border);
+  box-shadow: var(--form-focus-ring);
+}
+
+.country-selector__combobox-control--disabled {
+  opacity: 0.55;
+  background: var(--form-surface-muted);
+  cursor: not-allowed;
+}
+
+.country-selector__chips {
+  display: contents;
+}
+
+.country-selector__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--form-space-1);
+  max-width: 100%;
+  padding: 2px var(--form-space-1) 2px var(--form-space-2);
+  border-radius: 999px;
+  background: var(--form-surface-muted);
+  border: 1px solid var(--form-border);
+  font-size: var(--form-text-sm);
+  line-height: var(--form-line-tight);
+  color: var(--form-text);
+  white-space: nowrap;
+}
+
+.country-selector__chip--all {
+  background: var(--form-primary-subtle);
+  border-color: var(--form-primary-border);
+  color: var(--form-primary-hover);
+}
+
+.country-selector__chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.country-selector__chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--form-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--form-transition-fast),
+    color var(--form-transition-fast);
+}
+
+.country-selector__chip-remove:hover {
+  background: var(--form-border);
+  color: var(--form-text);
+}
+
+.country-selector__combobox-input {
+  flex: 1 1 80px;
+  min-width: 80px;
+  width: auto;
+  max-width: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: var(--form-space-1) var(--form-space-1);
+  font-family: inherit;
+  font-size: var(--form-text-base);
+  color: var(--form-text);
+  box-shadow: none;
+}
+
+.country-selector__combobox-input::placeholder {
+  color: var(--form-muted-light);
+}
+
+.country-selector__combobox-input:disabled {
+  cursor: not-allowed;
+}
+
+/* Dropdown */
+.country-selector__dropdown {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + var(--form-space-1));
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  background: var(--form-surface);
+  box-shadow: var(--form-shadow-lg);
+  overflow: hidden;
+}
+
+.country-selector__dropdown--hidden {
+  display: none;
+}
+
+.country-selector__dropdown-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--form-space-1);
+}
+
+.country-selector__dropdown-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.country-selector__dropdown-list::-webkit-scrollbar-thumb {
+  background: var(--form-border-strong);
+  border-radius: 4px;
+}
+
+.country-selector__dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--form-space-2);
+  width: 100%;
+  padding: var(--form-space-2) var(--form-space-2);
+  border: none;
+  border-radius: var(--form-radius-md);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  line-height: var(--form-line-tight);
+  color: var(--form-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--form-transition-fast);
+}
+
+.country-selector__dropdown-item:hover,
+.country-selector__dropdown-item--highlighted {
+  background: var(--form-surface-muted);
+}
+
+.country-selector__dropdown-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.country-selector__dropdown-item-check {
+  flex-shrink: 0;
+  width: 16px;
+  color: var(--form-primary);
+  font-size: var(--form-text-md);
+  font-weight: var(--form-weight-semibold);
+  text-align: center;
+  visibility: hidden;
+}
+
+.country-selector__dropdown-item--selected .country-selector__dropdown-item-check {
+  visibility: visible;
+}
+
+.country-selector__empty {
+  padding: var(--form-space-4);
+  font-size: var(--form-text-sm);
+  color: var(--form-muted);
+  text-align: center;
+}
+
+.country-selector__dropdown-divider {
+  height: 1px;
+  margin: 0;
+  background: var(--form-border);
+}
+
+.country-selector__dropdown-all {
+  display: block;
+  width: 100%;
+  padding: var(--form-space-2) var(--form-space-3);
+  border: none;
+  background: var(--form-surface-subtle);
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-medium);
+  color: var(--form-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--form-transition-fast);
+}
+
+.country-selector__dropdown-all:hover,
+.country-selector__dropdown-all--highlighted {
+  background: var(--form-surface-muted);
+}
+
+.country-selector__dropdown-all--selected {
+  color: var(--form-primary-hover);
+  background: var(--form-primary-subtle);
+}
+
+.copy-panel__country-selector-mount {
+  min-height: 48px;
+}

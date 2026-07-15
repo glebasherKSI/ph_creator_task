@@ -1,0 +1,478 @@
+.conditions-builder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-space-3);
+  font-size: var(--form-text-base);
+}
+
+.conditions-builder__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--form-space-2);
+}
+
+.conditions-builder__status {
+  flex: 1 1 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--form-space-2);
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-medium);
+  color: var(--form-muted);
+  padding: var(--form-space-2) var(--form-space-3);
+  border-radius: 999px;
+  background: var(--form-surface-muted);
+  border: 1px solid var(--form-border);
+}
+
+.conditions-builder__status--error {
+  color: var(--form-danger);
+  background: var(--form-danger-subtle);
+  border-color: var(--form-danger-border);
+}
+
+.conditions-builder__status--loading .conditions-builder__spinner {
+  display: inline-block;
+}
+
+.conditions-builder__spinner {
+  display: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--form-border-strong);
+  border-top-color: var(--form-primary);
+  border-radius: 50%;
+  animation: conditions-builder-spin 0.7s linear infinite;
+}
+
+@keyframes conditions-builder-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.conditions-builder__btn {
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  padding: var(--form-space-2) var(--form-space-3);
+  background: var(--form-surface);
+  color: var(--form-text-secondary);
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-medium);
+  cursor: pointer;
+  transition:
+    background var(--form-transition-fast),
+    border-color var(--form-transition-fast),
+    color var(--form-transition-fast);
+}
+
+.conditions-builder__btn:hover {
+  background: var(--form-surface-muted);
+  border-color: var(--form-border-strong);
+}
+
+.conditions-builder__btn--primary {
+  background: var(--form-primary-subtle);
+  border-color: var(--form-primary-border);
+  color: var(--form-primary-hover);
+}
+
+.conditions-builder__btn--primary:hover {
+  background: #dbeafe;
+}
+
+.conditions-builder__btn--active {
+  background: var(--form-primary);
+  border-color: var(--form-primary);
+  color: #fff;
+}
+
+.conditions-builder__btn--active:hover {
+  background: var(--form-primary-hover);
+}
+
+.conditions-builder__layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) 1fr;
+  gap: var(--form-space-3);
+  min-height: 200px;
+}
+
+.conditions-builder__sidebar {
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-lg);
+  background: var(--form-surface-subtle);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--form-shadow-sm);
+}
+
+.conditions-builder__sidebar-title {
+  padding: var(--form-space-2) var(--form-space-3);
+  font-weight: var(--form-weight-semibold);
+  font-size: var(--form-text-sm);
+  color: var(--form-text);
+  border-bottom: 1px solid var(--form-border);
+  background: var(--form-surface);
+}
+
+.conditions-builder__active-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--form-space-2);
+  overflow-y: auto;
+  flex: 1;
+  max-height: 360px;
+}
+
+.conditions-builder__active-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--form-radius-md);
+  padding: var(--form-space-2) var(--form-space-2);
+  margin-bottom: var(--form-space-1);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  line-height: var(--form-line-tight);
+  transition:
+    background var(--form-transition-fast),
+    border-color var(--form-transition-fast),
+    box-shadow var(--form-transition-fast);
+}
+
+.conditions-builder__active-item:hover {
+  background: var(--form-surface);
+  border-color: var(--form-border);
+}
+
+.conditions-builder__active-item--selected {
+  background: var(--form-surface);
+  border-color: var(--form-primary-border);
+  box-shadow: var(--form-focus-ring);
+}
+
+.conditions-builder__active-item-name {
+  display: block;
+  font-weight: var(--form-weight-medium);
+  color: var(--form-text);
+}
+
+.conditions-builder__active-item-key {
+  display: block;
+  font-size: var(--form-text-xs);
+  color: var(--form-muted);
+  margin-top: 2px;
+}
+
+.conditions-builder__empty-hint {
+  padding: var(--form-space-4);
+  color: var(--form-muted);
+  font-size: var(--form-text-sm);
+  text-align: center;
+}
+
+.conditions-builder__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-space-3);
+  min-width: 0;
+  /* Не ограничиваем высоту: карточка активного условия должна показываться
+     полностью, прокрутку обеспечивает сам slide-over. */
+  overflow: visible;
+}
+
+.conditions-builder__card {
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-lg);
+  background: var(--form-surface);
+  box-shadow: var(--form-shadow-sm);
+  overflow: hidden;
+}
+
+.conditions-builder__card--highlight {
+  box-shadow: var(--form-focus-ring);
+  border-color: var(--form-primary-border);
+}
+
+.conditions-builder__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--form-space-2);
+  padding: var(--form-space-2) var(--form-space-3);
+  border-bottom: 1px solid var(--form-border);
+  background: var(--form-surface-subtle);
+}
+
+.conditions-builder__card-title {
+  font-weight: var(--form-weight-semibold);
+  font-size: var(--form-text-md);
+  color: var(--form-text);
+}
+
+.conditions-builder__card-key {
+  font-size: var(--form-text-xs);
+  color: var(--form-muted);
+  font-weight: var(--form-weight-medium);
+}
+
+.conditions-builder__card-delete {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--form-danger);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-medium);
+  padding: var(--form-space-1) var(--form-space-2);
+  border-radius: var(--form-radius-sm);
+  transition:
+    background var(--form-transition-fast),
+    border-color var(--form-transition-fast);
+}
+
+.conditions-builder__card-delete:hover {
+  background: var(--form-danger-subtle);
+  border-color: var(--form-danger-border);
+}
+
+.conditions-builder__card-body {
+  padding: var(--form-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-space-3);
+}
+
+.conditions-builder__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--form-space-3);
+  align-items: flex-start;
+}
+
+.conditions-builder__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-space-1);
+  min-width: 140px;
+  flex: 1 1 140px;
+}
+
+.conditions-builder__field--wide {
+  flex: 1 1 100%;
+}
+
+.conditions-builder__label {
+  font-size: var(--form-text-xs);
+  font-weight: var(--form-weight-medium);
+  color: var(--form-muted);
+}
+
+.conditions-builder__select,
+.conditions-builder__input,
+.conditions-builder__textarea {
+  width: 100%;
+  min-height: var(--form-input-height);
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  padding: var(--form-space-2) var(--form-space-2);
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  background: var(--form-surface);
+  color: var(--form-text);
+  box-shadow: var(--form-shadow-sm);
+  transition:
+    border-color var(--form-transition-fast),
+    box-shadow var(--form-transition-fast);
+}
+
+.conditions-builder__select:focus,
+.conditions-builder__input:focus,
+.conditions-builder__textarea:focus {
+  outline: none;
+  border-color: var(--form-focus-border);
+  box-shadow: var(--form-focus-ring);
+}
+
+.conditions-builder__select--multi {
+  min-height: 100px;
+}
+
+.conditions-builder__combobox {
+  width: 100%;
+}
+
+.conditions-builder__textarea {
+  min-height: 80px;
+  font-family: var(--form-font-mono);
+  background: var(--form-code-bg);
+  resize: vertical;
+}
+
+.conditions-builder__checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-space-1);
+  max-height: 160px;
+  overflow-y: auto;
+  padding: var(--form-space-2);
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  background: var(--form-surface-subtle);
+}
+
+.conditions-builder__checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--form-space-2);
+  font-size: var(--form-text-sm);
+  cursor: pointer;
+}
+
+.conditions-builder__checkbox-label input {
+  accent-color: var(--form-primary);
+}
+
+.conditions-builder__toggle-group {
+  display: inline-flex;
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  overflow: hidden;
+  background: var(--form-surface);
+}
+
+.conditions-builder__toggle-btn {
+  border: none;
+  background: transparent;
+  padding: var(--form-space-1) var(--form-space-3);
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-medium);
+  cursor: pointer;
+  color: var(--form-muted);
+  transition:
+    background var(--form-transition-fast),
+    color var(--form-transition-fast);
+}
+
+.conditions-builder__toggle-btn--active {
+  background: var(--form-primary-subtle);
+  color: var(--form-primary-hover);
+  font-weight: var(--form-weight-semibold);
+}
+
+.conditions-builder__fallback-note {
+  font-size: var(--form-text-xs);
+  color: var(--form-muted);
+  margin: 0;
+}
+
+.conditions-builder__json-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-space-2);
+}
+
+.conditions-builder__json-wrap--hidden {
+  display: none;
+}
+
+.conditions-builder__ui-wrap--hidden {
+  display: none;
+}
+
+.conditions-builder__picker {
+  position: relative;
+}
+
+.conditions-builder__picker-popover {
+  position: absolute;
+  top: calc(100% + var(--form-space-1));
+  left: 0;
+  z-index: 20;
+  width: min(360px, 90vw);
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  background: var(--form-surface);
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-lg);
+  box-shadow: var(--form-shadow-lg);
+}
+
+.conditions-builder__picker-popover--hidden {
+  display: none;
+}
+
+.conditions-builder__picker-search {
+  padding: var(--form-space-2);
+  border-bottom: 1px solid var(--form-border);
+}
+
+.conditions-builder__picker-search input {
+  width: 100%;
+  min-height: var(--form-input-height);
+  border: 1px solid var(--form-border);
+  border-radius: var(--form-radius-md);
+  padding: var(--form-space-2) var(--form-space-3);
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+}
+
+.conditions-builder__picker-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--form-space-1);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.conditions-builder__picker-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: var(--form-space-2) var(--form-space-3);
+  border-radius: var(--form-radius-md);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  transition: background var(--form-transition-fast);
+}
+
+.conditions-builder__picker-item:hover {
+  background: var(--form-surface-muted);
+}
+
+.conditions-builder__picker-item small {
+  display: block;
+  color: var(--form-muted);
+  font-size: var(--form-text-xs);
+  margin-top: 2px;
+}
+
+@media (max-width: 720px) {
+  .conditions-builder__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .conditions-builder__active-list {
+    max-height: 160px;
+  }
+}
+
+.conditions-builder__country-selector-mount {
+  margin-top: var(--form-space-2);
+}
+
+.conditions-builder__country-selector-mount .country-selector {
+  width: 100%;
+}
