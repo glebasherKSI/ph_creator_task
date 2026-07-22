@@ -206,7 +206,7 @@ async function fetchAuthStatus(domain, options = {}) {
   } catch (err) {
     const message = String(err?.message || err);
     if (message === "AUTH_MESSAGE_TIMEOUT") {
-      return {
+      const timedOut = {
         domain: normalizedDomain,
         authenticated: false,
         pendingOtp: false,
@@ -214,14 +214,18 @@ async function fetchAuthStatus(domain, options = {}) {
         error: "Превышено время ожидания проверки входа — откройте админку в браузере",
         errorCode: AUTH_FETCH_ERRORS.TAB_REQUIRED,
       };
+      lastStatusByDomain.set(normalizedDomain, timedOut);
+      return timedOut;
     }
-    return {
+    const failed = {
       domain: normalizedDomain,
       authenticated: false,
       pendingOtp: false,
       awaitingMagicLink: false,
       error: "Не удалось проверить статус входа",
     };
+    lastStatusByDomain.set(normalizedDomain, failed);
+    return failed;
   }
 }
 
@@ -229,7 +233,7 @@ function scheduleRefreshModalState() {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(() => {
     void refreshModalState();
-  }, 450);
+  }, 550);
 }
 
 async function refreshModalState() {
@@ -420,12 +424,13 @@ export function resetAuthModalForDomainSwitch(newDomain) {
   prevCallback?.(false);
 }
 
-export function formatDomainAuthLabel(status) {
+export function formatDomainAuthLabel(status, options = {}) {
+  const forIndicator = Boolean(options.forIndicator);
   if (!status) return "нет входа";
   if (status.authenticated) return status.email ? `вход: ${status.email}` : "вход выполнен";
   if (status.pendingOtp) return "ожидание OTP";
   if (status.awaitingMagicLink) return "ожидание magic link";
-  if (status.error) return "ошибка входа";
+  if (status.error && !forIndicator) return "ошибка входа";
   return "нет входа";
 }
 
@@ -433,8 +438,10 @@ export function formatDomainAuthLabel(status) {
  * @param {string} domain
  * @returns {Promise<{ authenticated: boolean, pendingOtp: boolean, awaitingMagicLink: boolean, email?: string | null, error?: string }>}
  */
-export async function queryDomainAuthStatus(domain) {
-  return fetchAuthStatus(String(domain || "").trim(), { force: true });
+export async function queryDomainAuthStatus(domain, options = {}) {
+  return fetchAuthStatus(String(domain || "").trim(), {
+    force: Boolean(options.force),
+  });
 }
 
 export function mountAuthModal() {

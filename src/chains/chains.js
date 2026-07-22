@@ -112,6 +112,14 @@ const state = {
   statsFetchDebounceTimer: null,
 };
 
+const AUTH_INDICATOR_MIN_INTERVAL_MS = 2500;
+const AUTH_INDICATOR_STORAGE_DEBOUNCE_MS = 600;
+let authIndicatorGeneration = 0;
+let authIndicatorDebounceTimer = null;
+let lastAuthIndicatorFetchAt = 0;
+/** @type {{ domain: string, status: object } | null} */
+let lastAuthIndicatorSnapshot = null;
+
 const $ = (id) => document.getElementById(id);
 
 let copyPanel = null;
@@ -569,15 +577,51 @@ function renderTaskList() {
 async function loadDomains() {
   state.domains = await ensureDefaultDomainsInStorage();
   state.selectedDomain = fillDomainSelect($("domain-select"), state.domains, state.selectedDomain);
-  await refreshDomainAuthIndicator();
+  await refreshDomainAuthIndicator({ userAction: true });
 }
 
-async function refreshDomainAuthIndicator() {
+function authSessionSnapshot(record) {
+  if (!record || typeof record !== "object") return "";
+  return `${record.value || ""}|${record.email || ""}|${record.userId ?? ""}|${Boolean(record.verified)}`;
+}
+
+function authSessionsChangeAffectsDomain(changes, domain) {
+  const change = changes[STORAGE_KEYS.AUTH_SESSIONS];
+  if (!change || !domain) return false;
+  return authSessionSnapshot(change.oldValue?.[domain]) !== authSessionSnapshot(change.newValue?.[domain]);
+}
+
+function applyDomainAuthIndicatorEl(el, status) {
+  const label = formatDomainAuthLabel(status, { forIndicator: true });
+  el.hidden = false;
+  el.textContent = label;
+  el.title = label;
+
+  if (status?.authenticated) {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--ok";
+  } else if (status?.pendingOtp || status?.awaitingMagicLink) {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
+  } else {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
+  }
+}
+
+function scheduleDomainAuthIndicatorRefresh() {
+  clearTimeout(authIndicatorDebounceTimer);
+  authIndicatorDebounceTimer = setTimeout(() => {
+    void refreshDomainAuthIndicator({ userAction: true });
+  }, AUTH_INDICATOR_STORAGE_DEBOUNCE_MS);
+}
+
+async function refreshDomainAuthIndicator(options = {}) {
+  const userAction = Boolean(options.userAction);
   const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
   const el = $("domain-auth-indicator");
   if (!el) return;
 
   if (!domain) {
+    authIndicatorGeneration += 1;
+    lastAuthIndicatorSnapshot = null;
     el.textContent = "";
     el.hidden = true;
     el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
@@ -585,23 +629,30 @@ async function refreshDomainAuthIndicator() {
     return;
   }
 
-  el.hidden = false;
-  el.textContent = "…";
-  el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
-  el.title = "Проверка входа…";
-
-  const status = await queryDomainAuthStatus(domain);
-  const label = formatDomainAuthLabel(status);
-  el.textContent = label;
-  el.title = label;
-
-  if (status.authenticated) {
-    el.className = "toolbar__domain-auth toolbar__domain-auth--ok";
-  } else if (status.pendingOtp || status.awaitingMagicLink) {
-    el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
-  } else {
-    el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
+  const now = Date.now();
+  if (!userAction && now - lastAuthIndicatorFetchAt < AUTH_INDICATOR_MIN_INTERVAL_MS) {
+    return;
   }
+
+  const generation = ++authIndicatorGeneration;
+  const showPending =
+    userAction ||
+    !lastAuthIndicatorSnapshot ||
+    lastAuthIndicatorSnapshot.domain !== domain;
+
+  if (showPending) {
+    el.hidden = false;
+    el.textContent = "…";
+    el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
+    el.title = "Проверка входа…";
+  }
+
+  const status = await queryDomainAuthStatus(domain, { force: userAction });
+  if (generation !== authIndicatorGeneration) return;
+
+  lastAuthIndicatorFetchAt = Date.now();
+  lastAuthIndicatorSnapshot = { domain, status };
+  applyDomainAuthIndicatorEl(el, status);
 }
 
 async function getAdminContext() {
@@ -3095,7 +3146,7 @@ async function loadTasks(reset = true, loadAllPages = reset, authRetry = false) 
       setStatus("Вход не выполнен — загрузка отменена", true);
       return;
     }
-    void refreshDomainAuthIndicator();
+    void refreshDomainAuthIndicator({ userAction: true });
   }
 
   state.loading = true;
@@ -4079,7 +4130,7 @@ function bindEvents() {
       state.statsProjectId = inferProjectIdFromDomain(state.selectedDomain);
     }
     resetAuthModalForDomainSwitch(state.selectedDomain);
-    void refreshDomainAuthIndicator();
+    void refreshDomainAuthIndicator({ userAction: true });
     void copyPanel?.loadMeta(state.selectedDomain);
   });
 
@@ -4269,7 +4320,7 @@ function bindEvents() {
       (domain && changes[pendingOtpStorageKey(domain)]) ||
       (domain && changes[awaitingMagicLinkStorageKey(domain)]);
     if (domainAuthChanged) {
-      void refreshDomainAuthIndicator();
+      void refreshDomainAuthIndicator({ userAction: true });
     }
   });
 }
