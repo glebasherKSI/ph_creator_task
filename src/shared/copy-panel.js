@@ -88,7 +88,7 @@ const PANEL_MODES = {
     title: "Параметры задачи",
     sourceIdLabel: "ID задачи",
     submit: "Сохранить",
-    submitting: "Сохраняю изменения...",
+    submitting: "Сохранение...",
     previewStatus: "Payload собран, можно сохранить",
   },
 };
@@ -771,6 +771,15 @@ export function getCopyPanelMarkup({
       }
     </div>
     <pre id="copy-result" class="copy-panel__result">Здесь будет результат запросов</pre>
+    <div
+      id="copy-panel-submit-overlay"
+      class="copy-panel__submit-overlay copy-panel__submit-overlay--hidden"
+      aria-hidden="true"
+      aria-live="polite"
+    >
+      <span class="copy-panel__spinner" aria-hidden="true"></span>
+      <span class="copy-panel__submit-overlay-text">Сохранение...</span>
+    </div>
     </div>
   `;
 }
@@ -799,6 +808,27 @@ function updateMetaStatusEl(root, { loading = false, error = false, text = "" } 
 function setFormActionsEnabled(root, enabled) {
   root.querySelector("#copy-btn-create")?.toggleAttribute("disabled", !enabled);
   root.querySelector("#copy-btn-preview")?.toggleAttribute("disabled", !enabled);
+}
+
+function setSubmitting(root, submitting, { submittingText = "Сохранение..." } = {}) {
+  root.classList.toggle("copy-panel--submitting", submitting);
+  const overlay = root.querySelector("#copy-panel-submit-overlay");
+  overlay?.classList.toggle("copy-panel__submit-overlay--hidden", !submitting);
+  overlay?.setAttribute("aria-hidden", submitting ? "false" : "true");
+  const overlayText = overlay?.querySelector(".copy-panel__submit-overlay-text");
+  if (overlayText && submittingText) overlayText.textContent = submittingText;
+
+  const createBtn = root.querySelector("#copy-btn-create");
+  const previewBtn = root.querySelector("#copy-btn-preview");
+  if (submitting) {
+    root.__submitActionsWereEnabled = !createBtn?.disabled;
+    createBtn?.setAttribute("disabled", "");
+    previewBtn?.setAttribute("disabled", "");
+  } else if (root.__submitActionsWereEnabled) {
+    createBtn?.removeAttribute("disabled");
+    previewBtn?.removeAttribute("disabled");
+    root.__submitActionsWereEnabled = false;
+  }
 }
 
 function applyPanelModeUi(root, mode) {
@@ -1020,8 +1050,11 @@ export function mountCopyPanel(root, options = {}) {
   }
 
   root.querySelector("#copy-btn-create")?.addEventListener("click", async () => {
+    if (root.classList.contains("copy-panel--submitting")) return;
+
+    const labels = PANEL_MODES[panelMode];
     try {
-      const labels = PANEL_MODES[panelMode];
+      setSubmitting(root, true, { submittingText: labels.submitting });
       setStatus(labels.submitting);
       const requestBody = buildPayload();
       printResult(requestBody);
@@ -1036,6 +1069,8 @@ export function mountCopyPanel(root, options = {}) {
       const message = err.message || String(err);
       printResult(message);
       setStatus(message.split("\n")[0], true);
+    } finally {
+      setSubmitting(root, false);
     }
   });
 

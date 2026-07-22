@@ -1,11 +1,13 @@
-import { PAGE_SIZE } from "../shared/constants.js";
+import { PAGE_SIZE, STORAGE_KEYS } from "../shared/constants.js";
 import {
   fillDomainSelect,
   ensureDefaultDomainsInStorage,
   loadDomainsFromStorage,
   normalizeDomainOrEmpty,
 } from "../shared/domains.js";
-import { apiFetch, apiFetchResult, resolveAdminTab } from "../shared/api.js";
+import { apiFetch, apiFetchResult, API_REQUEST_TIMEOUT_MS, resolveAdminTab, withTimeout } from "../shared/api.js";
+import { ensureAuthenticated, formatDomainAuthLabel, isAuthError, isAuthModalOpen, mountAuthModal, queryDomainAuthStatus, resetAuthModalForDomainSwitch } from "../shared/auth-modal.js";
+import { awaitingMagicLinkStorageKey, pendingOtpStorageKey } from "../shared/auth.js";
 import { escapeHtml, formatCardDate } from "../shared/format.js";
 import { loadChainsLayout, saveChainsLayout, getDomainCanvasTemplates, upsertDomainCanvasTemplate, deleteDomainCanvasTemplate } from "../shared/storage.js";
 import { mountCopyPanel } from "../shared/copy-panel.js";
@@ -567,23 +569,56 @@ function renderTaskList() {
 async function loadDomains() {
   state.domains = await ensureDefaultDomainsInStorage();
   state.selectedDomain = fillDomainSelect($("domain-select"), state.domains, state.selectedDomain);
+  await refreshDomainAuthIndicator();
 }
 
-async function getWorkingTabId() {
-  const { tabId, domain } = await resolveAdminTab($("domain-select").value);
-  state.selectedDomain = domain;
-  state.selectedTabId = tabId;
-  return tabId;
+async function refreshDomainAuthIndicator() {
+  const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
+  const el = $("domain-auth-indicator");
+  if (!el) return;
+
+  if (!domain) {
+    el.textContent = "";
+    el.hidden = true;
+    el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
+    el.title = "";
+    return;
+  }
+
+  el.hidden = false;
+  el.textContent = "…";
+  el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
+  el.title = "Проверка входа…";
+
+  const status = await queryDomainAuthStatus(domain);
+  const label = formatDomainAuthLabel(status);
+  el.textContent = label;
+  el.title = label;
+
+  if (status.authenticated) {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--ok";
+  } else if (status.pendingOtp || status.awaitingMagicLink) {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
+  } else {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
+  }
+}
+
+async function getAdminContext() {
+  const context = await resolveAdminTab($("domain-select").value);
+  state.selectedDomain = context.domain;
+  state.selectedTabId = context.tabId ?? null;
+  return context;
 }
 
 async function callApi(path, method = "GET", body = null) {
-  const tabId = await getWorkingTabId();
-  return apiFetch(tabId, path, method, body);
+  const context = await getAdminContext();
+  return apiFetch(context, path, method, body);
 }
 
 async function callApiResult(path, method = "GET", body = null) {
-  const tabId = await getWorkingTabId();
-  return apiFetchResult(tabId, path, method, body);
+  const context = await getAdminContext();
+  return apiFetchResult(context, path, method, body);
 }
 
 function gridPosition(index) {
@@ -2697,9 +2732,14 @@ async function handleEditUpdate(requestBody) {
     copyPanel.refreshTaskOptions?.();
   }
 
-  const msg = `Задача #${taskId} обновлена`;
-  copyPanel.setStatus(msg);
-  setStatus(msg);
+  const taskName = state.catalog.get(taskId)?.name || name || "";
+  closeCopyPanel();
+  showToast(
+    taskName
+      ? `Задача успешно обновлена — #${taskId}: ${taskName}`
+      : `Задача успешно обновлена — #${taskId}`
+  );
+  setStatus(`Задача #${taskId} обновлена`);
   return response;
 }
 
@@ -3036,10 +3076,27 @@ function confirmReloadCatalog() {
   return confirm(msg);
 }
 
-async function loadTasks(reset = true, loadAllPages = reset) {
+async function loadTasks(reset = true, loadAllPages = reset, authRetry = false) {
   if (state.loading) return;
 
-  if (reset && !confirmReloadCatalog()) return;
+  if (reset && !authRetry && !confirmReloadCatalog()) return;
+
+  const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
+  if (!domain) {
+    setStatus("Выберите домен админки", true);
+    return;
+  }
+
+  if (!authRetry) {
+    const authed = await ensureAuthenticated(domain, {
+      message: "Для загрузки задач нужен вход в админку",
+    });
+    if (!authed) {
+      setStatus("Вход не выполнен — загрузка отменена", true);
+      return;
+    }
+    void refreshDomainAuthIndicator();
+  }
 
   state.loading = true;
   updateSaveButton();
@@ -3056,7 +3113,6 @@ async function loadTasks(reset = true, loadAllPages = reset) {
       renderCatalogSkeleton();
     }
 
-    const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
     let lastPage = [];
 
     do {
@@ -3065,8 +3121,12 @@ async function loadTasks(reset = true, loadAllPages = reset) {
           ? `Загружаю список: ${state.catalog.size}+...`
           : "Загружаю следующую страницу..."
       );
-      const data = await callApi(
-        `/admin/api/gamification/tasks?limit=${PAGE_SIZE}&offset=${state.offset}&locale=ru`
+      const data = await withTimeout(
+        callApi(
+          `/admin/api/gamification/tasks?limit=${PAGE_SIZE}&offset=${state.offset}&locale=ru`
+        ),
+        API_REQUEST_TIMEOUT_MS,
+        "Превышено время ожидания загрузки задач — проверьте вход в админку"
       );
       lastPage = taskListFromResponse(data);
       state.offset += lastPage.length;
@@ -3104,7 +3164,22 @@ async function loadTasks(reset = true, loadAllPages = reset) {
       `Список загружен: ${state.catalog.size} задач (Активно и Черновик)${hiddenNote} — ${domainLabel}. Выберите задачи слева.`
     );
   } catch (err) {
-    setStatus(`Ошибка: ${err.message || err}`, true);
+    if (isAuthError(err)) {
+      const authed = await ensureAuthenticated(domain, {
+        message: err.message?.includes("403")
+          ? "Вы не подтверждены — выполните вход (magic link + OTP)"
+          : err.message || "Требуется вход в админку",
+      });
+      if (authed) {
+        state.loading = false;
+        setButtonLoading("btn-load-tasks", false);
+        setButtonLoading("btn-load-more", false);
+        return loadTasks(reset, loadAllPages, true);
+      }
+      setStatus("Вход не выполнен — загрузка отменена", true);
+    } else {
+      setStatus(`Ошибка: ${err.message || err}`, true);
+    }
     if (reset) renderTaskList();
   } finally {
     state.loading = false;
@@ -3259,7 +3334,8 @@ function serializeCanvasTemplate(name, existingId = null) {
 function isTemplateModalOpen() {
   return (
     !$("template-save-overlay")?.classList.contains("chains-modal-overlay--hidden") ||
-    !$("template-load-overlay")?.classList.contains("chains-modal-overlay--hidden")
+    !$("template-load-overlay")?.classList.contains("chains-modal-overlay--hidden") ||
+    isAuthModalOpen()
   );
 }
 
@@ -4002,6 +4078,8 @@ function bindEvents() {
     if (!normalizeProjectId(state.statsProjectId)) {
       state.statsProjectId = inferProjectIdFromDomain(state.selectedDomain);
     }
+    resetAuthModalForDomainSwitch(state.selectedDomain);
+    void refreshDomainAuthIndicator();
     void copyPanel?.loadMeta(state.selectedDomain);
   });
 
@@ -4182,6 +4260,18 @@ function bindEvents() {
       closePanel();
     }
   });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
+    const domainAuthChanged =
+      changes[STORAGE_KEYS.AUTH_SESSIONS] ||
+      (domain && changes[pendingOtpStorageKey(domain)]) ||
+      (domain && changes[awaitingMagicLinkStorageKey(domain)]);
+    if (domainAuthChanged) {
+      void refreshDomainAuthIndicator();
+    }
+  });
 }
 
 async function init() {
@@ -4195,6 +4285,7 @@ async function init() {
       onUpdate: handleEditUpdate,
     });
 
+    mountAuthModal();
     await loadDomains();
     state.statsProjectId = inferProjectIdFromDomain(state.selectedDomain);
     void copyPanel.loadMeta(state.selectedDomain);

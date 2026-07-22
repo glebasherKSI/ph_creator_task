@@ -5,6 +5,18 @@ import {
 } from "./src/shared/constants.js";
 import { hostFromUrl, originPattern, loadDomainsFromStorage } from "./src/shared/domains.js";
 import {
+  adminApiFetch,
+  clearAwaitingMagicLink,
+  extractMagicLinkToken,
+  formatAuthFetchError,
+  getAuthStatus,
+  isAwaitingMagicLink,
+  logoutAdmin,
+  magicLogin,
+  sendMagicLoginInstructions,
+  verifyOtp,
+} from "./src/shared/auth.js";
+import {
   REPORTS_ENDPOINT,
   REPORTS_ORIGIN,
   REPORTS_FETCH_ERRORS,
@@ -134,7 +146,7 @@ async function fetchInReportsPageContext(tabId, endpoint, body, method = "POST")
         };
       }
     },
-    args: [endpoint, body, method],
+    args: [endpoint, body ?? null, method ?? "POST"],
   });
 
   return result;
@@ -229,9 +241,75 @@ function reportsErrorResponse(err) {
   };
 }
 
+function authErrorResponse(err, domain) {
+  const raw = String(err?.message || err);
+  return {
+    ok: false,
+    error: formatAuthFetchError(err, domain),
+    errorCode: raw.startsWith("AUTH_") ? raw : undefined,
+  };
+}
+
+async function handleAdminApiFetch(payload) {
+  const domain = payload?.domain;
+  const path = payload?.path;
+  const method = payload?.method || "GET";
+  const body = payload?.body ?? null;
+  const options = payload?.options ?? {};
+  return adminApiFetch(domain, path, method, body, options);
+}
+
+/** Недавно обработанные token → timestamp (защита от двойного вызова url + complete). */
+const recentMagicLoginTokens = new Map();
+const MAGIC_LOGIN_DEDUPE_MS = 60_000;
+
+async function handleMagicLinkUrl(url) {
+  const token = extractMagicLinkToken(url);
+  if (!token) return;
+
+  const now = Date.now();
+  const lastUsed = recentMagicLoginTokens.get(token);
+  if (lastUsed != null && now - lastUsed < MAGIC_LOGIN_DEDUPE_MS) return;
+  recentMagicLoginTokens.set(token, now);
+
+  let domain;
+  try {
+    domain = new URL(url).hostname;
+  } catch {
+    return;
+  }
+
+  const domains = await getDomains();
+  if (!domains.includes(domain)) return;
+
+  // Перехват только при активном входе через расширение — иначе съедаем
+  // одноразовый token раньше, чем админка успеет его принять в браузере.
+  if (!(await isAwaitingMagicLink(domain))) return;
+
+  try {
+    const result = await magicLogin(domain, token);
+    if (result?.ok) {
+      await clearAwaitingMagicLink(domain);
+    }
+  } catch {
+    /* user can retry manually from popup */
+  }
+}
+
+async function maybeHandleMagicLinkTab(tab) {
+  if (!tab?.url) return;
+  await handleMagicLinkUrl(tab.url);
+}
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status !== "complete") return;
-  maybeInjectTab(tab);
+  if (changeInfo.status === "complete") {
+    maybeInjectTab(tab);
+    maybeHandleMagicLinkTab(tab);
+    return;
+  }
+  if (changeInfo.url) {
+    maybeHandleMagicLinkTab({ ...tab, url: changeInfo.url });
+  }
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -258,6 +336,48 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     handleReportsState()
       .then((result) => sendResponse(result))
       .catch((err) => sendResponse(reportsErrorResponse(err)));
+    return true;
+  }
+
+  if (msg.action === "PH_ADMIN_API_FETCH") {
+    handleAdminApiFetch(msg.payload)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse(authErrorResponse(err, msg.payload?.domain)));
+    return true;
+  }
+
+  if (msg.action === "PH_AUTH_STATUS") {
+    getAuthStatus(msg.payload?.domain, { force: Boolean(msg.payload?.force) })
+      .then((status) => sendResponse({ ok: true, ...status }))
+      .catch((err) => sendResponse(authErrorResponse(err, msg.payload?.domain)));
+    return true;
+  }
+
+  if (msg.action === "PH_AUTH_SEND_MAGIC_LINK") {
+    sendMagicLoginInstructions(msg.payload?.domain, msg.payload?.email)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse(authErrorResponse(err, msg.payload?.domain)));
+    return true;
+  }
+
+  if (msg.action === "PH_AUTH_MAGIC_LOGIN") {
+    magicLogin(msg.payload?.domain, msg.payload?.token)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse(authErrorResponse(err, msg.payload?.domain)));
+    return true;
+  }
+
+  if (msg.action === "PH_AUTH_VERIFY_OTP") {
+    verifyOtp(msg.payload?.domain, msg.payload?.otp)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse(authErrorResponse(err, msg.payload?.domain)));
+    return true;
+  }
+
+  if (msg.action === "PH_AUTH_LOGOUT") {
+    logoutAdmin(msg.payload?.domain)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse(authErrorResponse(err, msg.payload?.domain)));
     return true;
   }
 });

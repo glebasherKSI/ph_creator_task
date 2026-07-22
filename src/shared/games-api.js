@@ -141,9 +141,9 @@ export function parseGamesOptions(raw) {
  * @returns {Promise<unknown>}
  */
 async function fetchGamesApi(domain, params) {
-  const { tabId } = await resolveAdminTab(domain);
+  const adminContext = await resolveAdminTab(domain);
   const query = new URLSearchParams({ locale: "ru", limit: String(SEARCH_LIMIT), ...params });
-  return apiFetch(tabId, `${GAMES_API_PATH}?${query.toString()}`);
+  return apiFetch(adminContext, `${GAMES_API_PATH}?${query.toString()}`);
 }
 
 /**
@@ -216,10 +216,10 @@ export async function resolveGamesByIds(domain, ids) {
 
     for (const paramName of ["identifiers[]", "ids[]", "game_ids[]"]) {
       try {
-        const { tabId } = await resolveAdminTab(key);
+        const adminContext = await resolveAdminTab(key);
         const query = new URLSearchParams({ locale: "ru", limit: String(Math.max(SEARCH_LIMIT, batch.length)) });
         for (const id of batch) query.append(paramName, id);
-        const raw = await apiFetch(tabId, `${GAMES_API_PATH}?${query.toString()}`);
+        const raw = await apiFetch(adminContext, `${GAMES_API_PATH}?${query.toString()}`);
         for (const opt of parseGamesOptions(raw)) {
           cache.data.set(opt.id, opt);
         }

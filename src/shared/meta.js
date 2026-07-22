@@ -111,8 +111,8 @@ export async function loadTaskMeta(domain) {
     return cached.data;
   }
 
-  const { tabId } = await resolveAdminTab(key);
-  const raw = await apiFetch(tabId, "/admin/api/gamification/tasks/meta?locale=ru");
+  const adminContext = await resolveAdminTab(key);
+  const raw = await apiFetch(adminContext, "/admin/api/gamification/tasks/meta?locale=ru");
   const data = parseTaskMeta(raw);
   cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
   return data;

@@ -520,6 +520,34 @@ body {
   box-shadow: var(--shadow-focus);
 }
 
+.toolbar__domain-auth {
+  display: inline-block;
+  max-width: 220px;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbar__domain-auth--ok {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.toolbar__domain-auth--pending {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.toolbar__domain-auth--idle {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
 .toolbar__load-group {
   display: inline-flex;
   align-items: center;
@@ -2692,6 +2720,119 @@ select:focus {
     height: 36px;
     justify-content: center;
   }
+}
+
+/* ============================ Auth modal ============================ */
+.chains-modal--auth {
+  width: min(440px, 100%);
+}
+
+.auth-stepper {
+  display: flex;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-4);
+  padding: 0;
+  list-style: none;
+}
+
+.auth-stepper__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--sp-2);
+  border-radius: var(--r-lg);
+  background: #f1f5f9;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.auth-stepper__num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.auth-stepper__item--active {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--primary);
+}
+
+.auth-stepper__item--active .auth-stepper__num {
+  background: var(--primary);
+  color: #fff;
+}
+
+.auth-stepper__item--done {
+  color: var(--text);
+}
+
+.auth-stepper__item--done .auth-stepper__num {
+  background: #22c55e;
+  color: #fff;
+}
+
+.auth-modal-status {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.auth-modal-status--idle {
+  background: #f8fafc;
+  color: var(--muted);
+}
+
+.auth-modal-status--pending {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.auth-modal-status--ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.auth-modal-status--error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.auth-modal-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.auth-modal-step--hidden {
+  display: none;
+}
+
+.auth-modal-step__btn {
+  align-self: flex-start;
+  margin-top: var(--sp-1);
+}
+
+.chains-modal__foot--auth {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+
+.chains-modal__foot--auth #btn-auth-open-admin {
+  margin-right: auto;
 }
 
 /* ============================ Template modals ============================ */

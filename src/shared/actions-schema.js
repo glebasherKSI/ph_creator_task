@@ -121,7 +121,7 @@ export const CONDITION_FIELD_KEYS_BY_ACTION = {
   scratch_card: ["scratch_card_ids"],
   leaderboard: [],
   sport_bet: ["sport_bets_count", "sport_bet_points_sum"],
-  user_update: [],
+  user_update: ["required_attributes"],
   tournament: ["tournaments_count", "games_taken_min"],
 };
 
@@ -147,7 +147,7 @@ export const ATTRIBUTE_FIELD_KEYS_BY_ACTION = {
   scratch_card: [],
   leaderboard: ["place_min", "place_max"],
   sport_bet: ["min_bet_amount", "odd", "result", "sport_bet_types", "sport_types"],
-  user_update: ["required_attributes"],
+  user_update: [],
   tournament: ["tournament_ids", "place_min", "place_max"],
 };
 
@@ -365,7 +365,7 @@ const FIELD_DEFS = {
     key: "required_attributes",
     label: "Атрибуты для заполнения",
     widget: "multi_select",
-    role: "attribute",
+    role: "condition",
     options: USER_UPDATE_PROFILE_ATTRIBUTE_OPTIONS,
   },
   duration: {
@@ -656,8 +656,13 @@ export function coerceActionRequirements(actionType, requirements) {
   }
 
   if (type === "user_update") {
-    for (const key of [...USER_UPDATE_PROFILE_ATTRIBUTE_KEYS, "required_attributes"]) {
+    for (const key of USER_UPDATE_PROFILE_ATTRIBUTE_KEYS) {
       delete out[key];
+    }
+    if ("required_attributes" in out) {
+      const attrs = normalizeRequiredAttributesValue(out.required_attributes);
+      if (attrs.length) out.required_attributes = attrs;
+      else delete out.required_attributes;
     }
   }
 
@@ -675,8 +680,12 @@ export function coerceActionConditions(actionType, conditions) {
   const source = conditions && typeof conditions === "object" ? { ...conditions } : {};
 
   if (type === "user_update") {
-    const { conditions: normalized } = normalizeUserUpdateApiPayload({}, source);
-    return normalized;
+    const cond = { ...source };
+    delete cond.required_attributes;
+    for (const key of USER_UPDATE_PROFILE_ATTRIBUTE_KEYS) {
+      delete cond[key];
+    }
+    return cond;
   }
 
   for (const key of COMPARISON_FIELD_KEYS) {
@@ -950,10 +959,10 @@ function extractUserUpdateRequiredAttributes(requirements, conditions) {
   const cond = conditions && typeof conditions === "object" ? conditions : {};
 
   const arraySource =
-    "required_attributes" in cond
-      ? cond.required_attributes
-      : "required_attributes" in req
-        ? req.required_attributes
+    "required_attributes" in req
+      ? req.required_attributes
+      : "required_attributes" in cond
+        ? cond.required_attributes
         : undefined;
   for (const id of normalizeRequiredAttributesValue(arraySource)) {
     attrs.add(id);
@@ -990,7 +999,7 @@ function normalizeUserUpdateApiPayload(requirements, conditions) {
     if (USER_UPDATE_PROFILE_ATTRIBUTE_SET.has(key) || key === "required_attributes") continue;
     cond[key] = val;
   }
-  if (attrs.length) cond.required_attributes = attrs;
+  if (attrs.length) req.required_attributes = attrs;
   return { requirements: req, conditions: cond };
 }
 

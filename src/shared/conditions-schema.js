@@ -150,8 +150,8 @@ export async function loadConditionsSchema(domain) {
   }
 
   try {
-    const { tabId } = await resolveAdminTab(key);
-    const raw = await apiFetch(tabId, CONDITIONS_API_PATH);
+    const adminContext = await resolveAdminTab(key);
+    const raw = await apiFetch(adminContext, CONDITIONS_API_PATH);
     const data = parseConditionsSchema(raw, "api");
     cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
     return data;
@@ -241,8 +241,8 @@ export async function loadDuplicableOptions(domain) {
   }
 
   try {
-    const { tabId } = await resolveAdminTab(key);
-    const raw = await apiFetch(tabId, CONSTANTS_API_PATH);
+    const adminContext = await resolveAdminTab(key);
+    const raw = await apiFetch(adminContext, CONSTANTS_API_PATH);
     const data = parseDuplicableOptions(raw);
     duplicableCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
     return data;

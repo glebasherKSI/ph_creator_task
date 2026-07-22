@@ -1,57 +1,58 @@
-<!DOCTYPE html>
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PromoHub конструктор задач</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="popup.css" />
-  </head>
-  <body>
-    <header class="header">
-      <h1 class="header__title">PromoHub конструктор задач</h1>
-    </header>
-
-    <main class="main">
-      <section class="card">
-        <h2 class="card__title">Админки</h2>
-        <ul id="domain-list" class="domain-list"></ul>
-
-        <div class="domain-add">
-          <input
-            id="domain-input"
-            class="domain-input"
-            type="text"
-            placeholder="admin.example.com"
-            spellcheck="false"
-          />
-          <button id="btn-add-domain" class="btn btn--secondary" type="button">Добавить</button>
-        </div>
-
-        <button id="btn-add-tab" class="btn btn--outline btn--block" type="button">
-          <span class="btn__icon" aria-hidden="true">+</span>
-          Добавить текущую вкладку
-        </button>
-      </section>
-
-      <p id="status" class="status" hidden></p>
-
-      <button id="btn-open-constructor" class="btn btn--primary btn--block" type="button">
-        Перейти в конструктор
-      </button>
-    </main>
-
-    <footer class="footer">
-      <span>DEVPRECISION INSIGHT</span>
-      <span class="footer__dot" aria-hidden="true">•</span>
-      <span id="app-version">V2.15.1</span>
-    </footer>
-
-    <script type="module" src="popup.js"></script>
-  </body>
-</html>
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PromoHub конструктор задач</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1 class="header__title">PromoHub конструктор задач</h1>
+    </header>
+
+    <main class="main">
+      <section class="card">
+        <h2 class="card__title">Админки</h2>
+        <p class="auth-hint">Вход выполняется в конструкторе при загрузке задач (magic link + OTP).</p>
+        <ul id="domain-list" class="domain-list"></ul>
+
+        <div class="domain-add">
+          <input
+            id="domain-input"
+            class="domain-input"
+            type="text"
+            placeholder="admin.example.com"
+            spellcheck="false"
+          />
+          <button id="btn-add-domain" class="btn btn--secondary" type="button">Добавить</button>
+        </div>
+
+        <button id="btn-add-tab" class="btn btn--outline btn--block" type="button">
+          <span class="btn__icon" aria-hidden="true">+</span>
+          Добавить текущую вкладку
+        </button>
+      </section>
+
+      <p id="status" class="status" hidden></p>
+
+      <button id="btn-open-constructor" class="btn btn--primary btn--block" type="button">
+        Перейти в конструктор
+      </button>
+    </main>
+
+    <footer class="footer">
+      <span>DEVPRECISION INSIGHT</span>
+      <span class="footer__dot" aria-hidden="true">•</span>
+      <span id="app-version">V2.15.1</span>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

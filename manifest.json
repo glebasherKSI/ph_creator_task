@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PromoHub конструктор задач",
-  "version": "2.17.0",
+  "version": "2.18.0",
   "description": "Управление доменами PromoHub admin и переход в конструктор связей задач.",
   "action": {
     "default_popup": "src/sniffer/popup.html",

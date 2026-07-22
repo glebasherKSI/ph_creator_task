@@ -68,6 +68,7 @@
                 Домен
               </span>
               <select id="domain-select" class="toolbar__domain-select" aria-label="Домен"></select>
+              <span id="domain-auth-indicator" class="toolbar__domain-auth" hidden aria-live="polite"></span>
             </div>
 
             <div class="toolbar__load-group">
@@ -478,6 +479,99 @@
         <div class="chains-modal__foot">
           <button id="btn-cancel-save-template" class="btn" type="button">Отмена</button>
           <button id="btn-confirm-save-template" class="btn btn--primary" type="button">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="auth-modal-overlay"
+      class="chains-modal-overlay chains-modal-overlay--hidden"
+      aria-hidden="true"
+    >
+      <div
+        class="chains-modal chains-modal--auth"
+        role="dialog"
+        aria-labelledby="auth-modal-title"
+        aria-modal="true"
+      >
+        <div class="chains-modal__head">
+          <h2 id="auth-modal-title">Вход в админку</h2>
+          <button id="btn-close-auth-modal" class="btn btn--icon" type="button" title="Закрыть">×</button>
+        </div>
+        <div class="chains-modal__body">
+          <p id="auth-modal-domain" class="chains-modal__meta"></p>
+          <p id="auth-modal-message" class="chains-modal__hint"></p>
+
+          <ol class="auth-stepper" aria-label="Шаги входа">
+            <li class="auth-stepper__item auth-stepper__item--active" data-step="1">
+              <span class="auth-stepper__num">1</span>
+              <span class="auth-stepper__label">Email</span>
+            </li>
+            <li class="auth-stepper__item" data-step="2">
+              <span class="auth-stepper__num">2</span>
+              <span class="auth-stepper__label">Magic link</span>
+            </li>
+            <li class="auth-stepper__item" data-step="3">
+              <span class="auth-stepper__num">3</span>
+              <span class="auth-stepper__label">OTP</span>
+            </li>
+          </ol>
+
+          <div id="auth-modal-status" class="auth-modal-status auth-modal-status--idle"></div>
+
+          <div id="auth-step-email" class="auth-modal-step">
+            <label class="chains-modal__label" for="auth-email">Email</label>
+            <input
+              id="auth-email"
+              class="chains-modal__input"
+              type="email"
+              placeholder="user@example.com"
+              autocomplete="email"
+              spellcheck="false"
+            />
+            <button id="btn-auth-send-magic-link" class="btn btn--primary auth-modal-step__btn" type="button">
+              Отправить magic link
+            </button>
+          </div>
+
+          <div id="auth-step-token" class="auth-modal-step auth-modal-step--hidden">
+            <p class="chains-modal__hint">
+              Откройте ссылку из письма в браузере (token подставится автоматически) или вставьте token вручную.
+            </p>
+            <label class="chains-modal__label" for="auth-token">Token (из URL magic link)</label>
+            <input
+              id="auth-token"
+              class="chains-modal__input"
+              type="text"
+              placeholder="-BLvXB5CpiL8jxHJFQks"
+              spellcheck="false"
+            />
+            <button id="btn-auth-magic-login" class="btn btn--soft auth-modal-step__btn" type="button">
+              Подтвердить magic link
+            </button>
+          </div>
+
+          <div id="auth-step-otp" class="auth-modal-step auth-modal-step--hidden">
+            <label class="chains-modal__label" for="auth-otp">OTP-код из письма</label>
+            <input
+              id="auth-otp"
+              class="chains-modal__input"
+              type="text"
+              inputmode="numeric"
+              placeholder="094855"
+              autocomplete="one-time-code"
+              spellcheck="false"
+            />
+            <button id="btn-auth-verify-otp" class="btn btn--primary auth-modal-step__btn" type="button">
+              Подтвердить OTP
+            </button>
+          </div>
+        </div>
+        <div class="chains-modal__foot chains-modal__foot--auth">
+          <button id="btn-auth-open-admin" class="btn btn--soft" type="button" hidden>
+            Открыть админку в браузере
+          </button>
+          <button id="btn-cancel-auth-modal" class="btn" type="button">Отмена</button>
         </div>
       </div>
     </div>

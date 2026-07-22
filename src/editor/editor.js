@@ -66,21 +66,21 @@ async function loadDomains() {
   state.selectedDomain = fillDomainSelect($("domain-select"), state.domains, state.selectedDomain);
 }
 
-async function getWorkingTabId() {
-  const { tabId, domain } = await resolveAdminTab($("domain-select").value);
-  state.selectedDomain = domain;
-  state.selectedTabId = tabId;
-  return tabId;
+async function getAdminContext() {
+  const context = await resolveAdminTab($("domain-select").value);
+  state.selectedDomain = context.domain;
+  state.selectedTabId = context.tabId ?? null;
+  return context;
 }
 
 async function callApi(path, method = "GET", body = null) {
-  const tabId = await getWorkingTabId();
-  return apiFetch(tabId, path, method, body);
+  const context = await getAdminContext();
+  return apiFetch(context, path, method, body);
 }
 
 async function callApiResult(path, method = "GET", body = null) {
-  const tabId = await getWorkingTabId();
-  return apiFetchResult(tabId, path, method, body);
+  const context = await getAdminContext();
+  return apiFetchResult(context, path, method, body);
 }
 
 function taskMatchesStatusFilter(task) {

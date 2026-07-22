@@ -2,11 +2,18 @@
 
 export const STORAGE_KEYS = {
   DOMAINS: "ph_admin_domains",
+  AUTH_SESSIONS: "ph_auth_sessions",
   REQUESTS: "ph_captured_requests",
   CAPTURE_ENABLED: "ph_capture_enabled",
   MAX_REQUESTS: "ph_max_requests",
   CANVAS_TEMPLATES: "ph_canvas_templates",
 };
+
+/** Cookie сессии PromoHub admin (Rails). */
+export const ADMIN_SESSION_COOKIE = "_casino_session";
+
+export const ADMIN_API_PREFIX = "/admin/api";
+export const ADMIN_AUTH_LOCALE = "ru";
 
 /** Максимум шаблонов канвы на один домен. */
 export const MAX_CANVAS_TEMPLATES_PER_DOMAIN = 20;

@@ -1,10 +1,37 @@
 /* Copy-panel form and slide-over panel */
 
 .copy-panel {
+  position: relative;
   font-family: var(--form-font);
   font-size: var(--form-text-base);
   line-height: var(--form-line-normal);
   color: var(--form-text-secondary);
+}
+
+.copy-panel__submit-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--form-space-3);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(2px);
+  border-radius: var(--form-radius-lg);
+  font-size: var(--form-text-base);
+  font-weight: var(--form-weight-medium);
+  color: var(--form-text-secondary);
+}
+
+.copy-panel__submit-overlay--hidden {
+  display: none;
+}
+
+.copy-panel--submitting .copy-panel__sections {
+  pointer-events: none;
+  user-select: none;
 }
 
 .copy-panel__title {

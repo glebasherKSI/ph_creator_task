@@ -175,8 +175,8 @@ export async function loadCountriesData(domain) {
   }
 
   try {
-    const { tabId } = await resolveAdminTab(key);
-    const raw = await apiFetch(tabId, CONSTANTS_API_PATH);
+    const adminContext = await resolveAdminTab(key);
+    const raw = await apiFetch(adminContext, CONSTANTS_API_PATH);
     let data = parseCountriesData(raw, "api");
     data = enrichFromConditions(data, schema);
     cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
