@@ -424,6 +424,10 @@ export function resetAuthModalForDomainSwitch(newDomain) {
   prevCallback?.(false);
 }
 
+export function isDomainAuthenticated(status) {
+  return isAuthenticatedStatus(status);
+}
+
 export function formatDomainAuthLabel(status, options = {}) {
   const forIndicator = Boolean(options.forIndicator);
   if (!status) return "нет входа";

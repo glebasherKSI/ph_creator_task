@@ -1,4 +1,4 @@
-import { PAGE_SIZE, STORAGE_KEYS } from "../shared/constants.js";
+import { PAGE_SIZE } from "../shared/constants.js";
 import {
   fillDomainSelect,
   ensureDefaultDomainsInStorage,
@@ -6,8 +6,7 @@ import {
   normalizeDomainOrEmpty,
 } from "../shared/domains.js";
 import { apiFetch, apiFetchResult, API_REQUEST_TIMEOUT_MS, resolveAdminTab, withTimeout } from "../shared/api.js";
-import { ensureAuthenticated, formatDomainAuthLabel, isAuthError, isAuthModalOpen, mountAuthModal, queryDomainAuthStatus, resetAuthModalForDomainSwitch } from "../shared/auth-modal.js";
-import { awaitingMagicLinkStorageKey, pendingOtpStorageKey } from "../shared/auth.js";
+import { ensureAuthenticated, formatDomainAuthLabel, isAuthError, isAuthModalOpen, isDomainAuthenticated, mountAuthModal, queryDomainAuthStatus, resetAuthModalForDomainSwitch } from "../shared/auth-modal.js";
 import { escapeHtml, formatCardDate } from "../shared/format.js";
 import { loadChainsLayout, saveChainsLayout, getDomainCanvasTemplates, upsertDomainCanvasTemplate, deleteDomainCanvasTemplate } from "../shared/storage.js";
 import { mountCopyPanel } from "../shared/copy-panel.js";
@@ -111,14 +110,6 @@ const state = {
   statsActiveFetchSeq: 0,
   statsFetchDebounceTimer: null,
 };
-
-const AUTH_INDICATOR_MIN_INTERVAL_MS = 2500;
-const AUTH_INDICATOR_STORAGE_DEBOUNCE_MS = 600;
-let authIndicatorGeneration = 0;
-let authIndicatorDebounceTimer = null;
-let lastAuthIndicatorFetchAt = 0;
-/** @type {{ domain: string, status: object } | null} */
-let lastAuthIndicatorSnapshot = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -577,51 +568,14 @@ function renderTaskList() {
 async function loadDomains() {
   state.domains = await ensureDefaultDomainsInStorage();
   state.selectedDomain = fillDomainSelect($("domain-select"), state.domains, state.selectedDomain);
-  await refreshDomainAuthIndicator({ userAction: true });
+  updateDomainAuthIndicator(null);
 }
 
-function authSessionSnapshot(record) {
-  if (!record || typeof record !== "object") return "";
-  return `${record.value || ""}|${record.email || ""}|${record.userId ?? ""}|${Boolean(record.verified)}`;
-}
-
-function authSessionsChangeAffectsDomain(changes, domain) {
-  const change = changes[STORAGE_KEYS.AUTH_SESSIONS];
-  if (!change || !domain) return false;
-  return authSessionSnapshot(change.oldValue?.[domain]) !== authSessionSnapshot(change.newValue?.[domain]);
-}
-
-function applyDomainAuthIndicatorEl(el, status) {
-  const label = formatDomainAuthLabel(status, { forIndicator: true });
-  el.hidden = false;
-  el.textContent = label;
-  el.title = label;
-
-  if (status?.authenticated) {
-    el.className = "toolbar__domain-auth toolbar__domain-auth--ok";
-  } else if (status?.pendingOtp || status?.awaitingMagicLink) {
-    el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
-  } else {
-    el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
-  }
-}
-
-function scheduleDomainAuthIndicatorRefresh() {
-  clearTimeout(authIndicatorDebounceTimer);
-  authIndicatorDebounceTimer = setTimeout(() => {
-    void refreshDomainAuthIndicator();
-  }, AUTH_INDICATOR_STORAGE_DEBOUNCE_MS);
-}
-
-async function refreshDomainAuthIndicator(options = {}) {
-  const userAction = Boolean(options.userAction);
-  const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
+function updateDomainAuthIndicator(status) {
   const el = $("domain-auth-indicator");
   if (!el) return;
 
-  if (!domain) {
-    authIndicatorGeneration += 1;
-    lastAuthIndicatorSnapshot = null;
+  if (!status) {
     el.textContent = "";
     el.hidden = true;
     el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
@@ -629,30 +583,83 @@ async function refreshDomainAuthIndicator(options = {}) {
     return;
   }
 
-  const now = Date.now();
-  if (!userAction && now - lastAuthIndicatorFetchAt < AUTH_INDICATOR_MIN_INTERVAL_MS) {
-    return;
+  const label = formatDomainAuthLabel(status, { forIndicator: true });
+  el.hidden = false;
+  el.textContent = label;
+  el.title = label;
+
+  if (status.authenticated) {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--ok";
+  } else if (status.pendingOtp || status.awaitingMagicLink) {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
+  } else {
+    el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
+  }
+}
+
+async function fetchAndUpdateDomainAuthIndicator(domain) {
+  if (!domain) {
+    updateDomainAuthIndicator(null);
+    return null;
   }
 
-  const generation = ++authIndicatorGeneration;
-  const showPending =
-    userAction ||
-    !lastAuthIndicatorSnapshot ||
-    lastAuthIndicatorSnapshot.domain !== domain;
-
-  if (showPending) {
+  const el = $("domain-auth-indicator");
+  if (el) {
     el.hidden = false;
     el.textContent = "…";
     el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
     el.title = "Проверка входа…";
   }
 
-  const status = await queryDomainAuthStatus(domain, { force: userAction });
-  if (generation !== authIndicatorGeneration) return;
+  const status = await queryDomainAuthStatus(domain, { force: true });
+  updateDomainAuthIndicator(status);
+  return status;
+}
 
-  lastAuthIndicatorFetchAt = Date.now();
-  lastAuthIndicatorSnapshot = { domain, status };
-  applyDomainAuthIndicatorEl(el, status);
+function resetUiForDomainSwitch() {
+  clearCanvasWithoutConfirm();
+  state.catalog.clear();
+  state.listChecked.clear();
+  state.offset = 0;
+  state.hasMore = false;
+  state.catalogHiddenByState = 0;
+  closePanel();
+  $("catalog-panel")?.classList.add("catalog-panel--hidden");
+  $("btn-load-more").disabled = true;
+  renderTaskList();
+  renderCards();
+  updateCounters();
+}
+
+async function handleDomainSwitch() {
+  const domain = state.selectedDomain;
+  resetAuthModalForDomainSwitch(domain);
+  resetUiForDomainSwitch();
+  updateDomainAuthIndicator(null);
+
+  if (!domain) {
+    setStatus("Выберите домен админки", true);
+    return;
+  }
+
+  void copyPanel?.loadMeta(domain);
+
+  const status = await fetchAndUpdateDomainAuthIndicator(domain);
+  if (isDomainAuthenticated(status)) {
+    await loadTasks(true, true, false, { skipConfirm: true, skipAuthCheck: true });
+    return;
+  }
+
+  const authed = await ensureAuthenticated(domain, {
+    message: "Для загрузки задач нужен вход в админку",
+  });
+  if (!authed) {
+    setStatus("Вход не выполнен — выберите домен или нажмите «Загрузить задачи»", true);
+    return;
+  }
+
+  await fetchAndUpdateDomainAuthIndicator(domain);
+  await loadTasks(true, true, false, { skipConfirm: true, skipAuthCheck: true });
 }
 
 async function getAdminContext() {
@@ -3127,10 +3134,13 @@ function confirmReloadCatalog() {
   return confirm(msg);
 }
 
-async function loadTasks(reset = true, loadAllPages = reset, authRetry = false) {
+async function loadTasks(reset = true, loadAllPages = reset, authRetry = false, options = {}) {
   if (state.loading) return;
 
-  if (reset && !authRetry && !confirmReloadCatalog()) return;
+  const skipConfirm = Boolean(options.skipConfirm);
+  const skipAuthCheck = Boolean(options.skipAuthCheck);
+
+  if (reset && !authRetry && !skipConfirm && !confirmReloadCatalog()) return;
 
   const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
   if (!domain) {
@@ -3138,7 +3148,7 @@ async function loadTasks(reset = true, loadAllPages = reset, authRetry = false) 
     return;
   }
 
-  if (!authRetry) {
+  if (!authRetry && !skipAuthCheck) {
     const authed = await ensureAuthenticated(domain, {
       message: "Для загрузки задач нужен вход в админку",
     });
@@ -3146,7 +3156,7 @@ async function loadTasks(reset = true, loadAllPages = reset, authRetry = false) 
       setStatus("Вход не выполнен — загрузка отменена", true);
       return;
     }
-    void refreshDomainAuthIndicator({ userAction: true });
+    void fetchAndUpdateDomainAuthIndicator(domain);
   }
 
   state.loading = true;
@@ -3222,6 +3232,7 @@ async function loadTasks(reset = true, loadAllPages = reset, authRetry = false) 
           : err.message || "Требуется вход в админку",
       });
       if (authed) {
+        void fetchAndUpdateDomainAuthIndicator(domain);
         state.loading = false;
         setButtonLoading("btn-load-tasks", false);
         setButtonLoading("btn-load-more", false);
@@ -4129,10 +4140,7 @@ function bindEvents() {
     if (!normalizeProjectId(state.statsProjectId)) {
       state.statsProjectId = inferProjectIdFromDomain(state.selectedDomain);
     }
-    resetAuthModalForDomainSwitch(state.selectedDomain);
-    lastAuthIndicatorSnapshot = null;
-    void refreshDomainAuthIndicator({ userAction: true });
-    void copyPanel?.loadMeta(state.selectedDomain);
+    void handleDomainSwitch();
   });
 
   $("btn-load-tasks").addEventListener("click", () => loadTasks(true));
@@ -4310,19 +4318,6 @@ function bindEvents() {
       }
       state.linkSourceId = null;
       closePanel();
-    }
-  });
-
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "local") return;
-    const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
-    if (!domain) return;
-    const domainAuthChanged =
-      authSessionsChangeAffectsDomain(changes, domain) ||
-      changes[pendingOtpStorageKey(domain)] ||
-      changes[awaitingMagicLinkStorageKey(domain)];
-    if (domainAuthChanged) {
-      scheduleDomainAuthIndicatorRefresh();
     }
   });
 }
