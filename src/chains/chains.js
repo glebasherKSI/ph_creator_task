@@ -609,7 +609,7 @@ function applyDomainAuthIndicatorEl(el, status) {
 function scheduleDomainAuthIndicatorRefresh() {
   clearTimeout(authIndicatorDebounceTimer);
   authIndicatorDebounceTimer = setTimeout(() => {
-    void refreshDomainAuthIndicator({ userAction: true });
+    void refreshDomainAuthIndicator();
   }, AUTH_INDICATOR_STORAGE_DEBOUNCE_MS);
 }
 
@@ -4130,6 +4130,7 @@ function bindEvents() {
       state.statsProjectId = inferProjectIdFromDomain(state.selectedDomain);
     }
     resetAuthModalForDomainSwitch(state.selectedDomain);
+    lastAuthIndicatorSnapshot = null;
     void refreshDomainAuthIndicator({ userAction: true });
     void copyPanel?.loadMeta(state.selectedDomain);
   });
@@ -4315,12 +4316,13 @@ function bindEvents() {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
+    if (!domain) return;
     const domainAuthChanged =
-      changes[STORAGE_KEYS.AUTH_SESSIONS] ||
-      (domain && changes[pendingOtpStorageKey(domain)]) ||
-      (domain && changes[awaitingMagicLinkStorageKey(domain)]);
+      authSessionsChangeAffectsDomain(changes, domain) ||
+      changes[pendingOtpStorageKey(domain)] ||
+      changes[awaitingMagicLinkStorageKey(domain)];
     if (domainAuthChanged) {
-      void refreshDomainAuthIndicator({ userAction: true });
+      scheduleDomainAuthIndicatorRefresh();
     }
   });
 }
