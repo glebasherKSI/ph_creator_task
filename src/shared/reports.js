@@ -79,7 +79,8 @@ function toDateInputValue(date) {
 export function buildReportsPayload({ from, to, projectId } = {}) {
   const today = new Date();
   const fromDate = new Date(today);
-  fromDate.setDate(fromDate.getDate() - 6);
+  // 14 дней по умолчанию — типичный период сезонных кампаний (~2 недели).
+  fromDate.setDate(fromDate.getDate() - 13);
 
   const fromValue = from || toDateInputValue(fromDate);
   const toValue = to || toDateInputValue(today);
@@ -158,11 +159,35 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+/** Нормализует имя задачи для сопоставления admin ↔ reports (пробелы, регистр). */
+export function normalizeTaskNameForMatch(value) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+/** Сопоставляет имя из admin API и строку отчёта Reports (в т.ч. «(Копия)»). */
+export function reportTaskNamesMatch(reportName, adminName) {
+  const report = normalizeTaskNameForMatch(reportName);
+  const admin = normalizeTaskNameForMatch(adminName);
+  if (!report || !admin) return false;
+  return report.includes(admin) || admin.includes(report);
+}
+
+export function extractReportCountAll(response) {
+  const raw = response?.countAll ?? response?.count_all;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 export function normalizeReportRows(response) {
   const rowsRaw = Array.isArray(response?.rows) ? response.rows : [];
   return rowsRaw.map((row) => ({
     projectId: String(row?.project_id ?? "--"),
-    name: String(row?.name ?? "").trim(),
+    name: String(row?.name ?? "")
+      .trim()
+      .replace(/\s+/g, " "),
     period: String(row?.period ?? ""),
     tasksCount: toNumber(row?.tasks_count),
     tasksActive: toNumber(row?.tasks_active),

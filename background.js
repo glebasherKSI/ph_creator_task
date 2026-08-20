@@ -172,6 +172,55 @@ async function setActiveReportsProject(tabId, projectId) {
   }
 }
 
+async function fetchReportsAllPages(tabId, body) {
+  const perPage = Number(body?.perPage) > 0 ? Number(body.perPage) : 500;
+  const allRows = [];
+  let currentPage = 1;
+  let countAll = null;
+  let lastResult = null;
+  let lastData = null;
+
+  while (currentPage <= 100) {
+    const pageBody = { ...body, currentPage, perPage };
+    const result = await fetchInReportsPageContext(tabId, REPORTS_ENDPOINT, pageBody);
+    if (!result) {
+      throw new Error(REPORTS_FETCH_ERRORS.SCRIPT_FAILED);
+    }
+    if (!result.ok && result.errorCode) {
+      throw new Error(result.errorCode);
+    }
+    if (!result.ok) {
+      throw new Error(REPORTS_FETCH_ERRORS.SCRIPT_FAILED);
+    }
+
+    const data = result.data && typeof result.data === "object" ? result.data : {};
+    const pageRows = Array.isArray(data.rows) ? data.rows : [];
+    const pageCountAll = Number(data.countAll ?? data.count_all);
+    if (Number.isFinite(pageCountAll) && pageCountAll >= 0) {
+      countAll = pageCountAll;
+    }
+
+    allRows.push(...pageRows);
+    lastResult = result;
+    lastData = data;
+
+    if (!pageRows.length) break;
+    if (pageRows.length < perPage) break;
+    if (countAll != null && allRows.length >= countAll) break;
+
+    currentPage += 1;
+  }
+
+  return {
+    ...lastResult,
+    data: {
+      ...lastData,
+      rows: allRows,
+      countAll: countAll ?? allRows.length,
+    },
+  };
+}
+
 async function handleReportsFetch(payload) {
   const body = payload?.body || {};
   const { sessionCookie } = await resolveReportsAuthCookies();
@@ -184,7 +233,7 @@ async function handleReportsFetch(payload) {
   if (reportsTab?.id) {
     try {
       await setActiveReportsProject(reportsTab.id, body.project_id);
-      const result = await fetchInReportsPageContext(reportsTab.id, REPORTS_ENDPOINT, body);
+      const result = await fetchReportsAllPages(reportsTab.id, body);
       if (!result) {
         throw new Error(REPORTS_FETCH_ERRORS.SCRIPT_FAILED);
       }

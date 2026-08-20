@@ -20,7 +20,8 @@ const SERIES = [
     fixedMin: 0,
     fixedMax: 100,
   },
-  { key: "depositsSum", label: "Депозиты", color: "#1baf7a", type: "area", digits: 0 },
+  { key: "depositsSum", label: "Сумма депозитов", color: "#1baf7a", type: "area", digits: 0 },
+  { key: "depositsCount", label: "Количество депозитов", color: "#159f6e", type: "bar", digits: 0 },
   { key: "betsSum", label: "Оборот ставок", color: "#4a3aa7", type: "area", digits: 0 },
 ];
 

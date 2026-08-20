@@ -103,8 +103,8 @@ export function mountMultiCombobox(container, config) {
   }
 
   function getFilteredOptions() {
-    const q = searchQuery.trim().toLowerCase();
     if (remoteSearch) return options;
+    const q = searchQuery.trim().toLowerCase();
     if (!q) return options;
     return options.filter(
       (item) =>
@@ -136,6 +136,9 @@ export function mountMultiCombobox(container, config) {
     const q = String(query || "").trim();
     const seq = ++searchSeq;
     clearTimeout(searchTimer);
+    if (q.length >= minSearchLength) {
+      setSearchLoading(true);
+    }
     searchTimer = setTimeout(async () => {
       if (q.length < minSearchLength) {
         if (seq !== searchSeq) return;

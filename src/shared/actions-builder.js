@@ -139,16 +139,16 @@ function isRemoteOptionsField(def) {
 }
 
 function normalizeMultiSelectValue(current) {
-  return Array.isArray(current)
-    ? current
-        .map((item) => {
-          if (item && typeof item === "object" && !Array.isArray(item)) {
-            return String(item.id ?? item.value ?? item.name ?? "");
-          }
-          return String(item);
-        })
-        .filter(Boolean)
-    : [];
+  if (current == null || current === "") return [];
+  const items = Array.isArray(current) ? current : [current];
+  return items
+    .map((item) => {
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        return String(item.id ?? item.value ?? item.name ?? "");
+      }
+      return String(item);
+    })
+    .filter(Boolean);
 }
 
 function mountRemoteGamesCombobox(mount, def, current, onFieldChange, domain) {

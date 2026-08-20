@@ -69,6 +69,15 @@
               </span>
               <select id="domain-select" class="toolbar__domain-select" aria-label="Домен"></select>
               <span id="domain-auth-indicator" class="toolbar__domain-auth" hidden aria-live="polite"></span>
+              <button
+                id="btn-complete-auth-otp"
+                class="btn btn--soft btn--compact toolbar__complete-otp"
+                type="button"
+                hidden
+                title="Завершить вход — ввести OTP"
+              >
+                Завершить вход (OTP)
+              </button>
             </div>
 
             <div class="toolbar__load-group">
@@ -484,6 +493,73 @@
     </div>
 
     <div
+      id="copy-to-project-overlay"
+      class="chains-modal-overlay chains-modal-overlay--hidden"
+      aria-hidden="true"
+    >
+      <div
+        class="chains-modal"
+        role="dialog"
+        aria-labelledby="copy-to-project-title"
+        aria-modal="true"
+      >
+        <div class="chains-modal__head">
+          <h2 id="copy-to-project-title">Скопировать на другой проект</h2>
+          <button id="btn-close-copy-to-project" class="btn btn--icon" type="button" title="Закрыть">×</button>
+        </div>
+        <div class="chains-modal__body">
+          <div id="copy-to-project-mode-wrap">
+            <span class="chains-modal__label">Что копировать</span>
+            <div
+              id="copy-to-project-mode"
+              class="template-save-mode"
+              role="group"
+              aria-label="Режим копирования"
+            >
+              <button
+                type="button"
+                class="template-save-mode__btn template-save-mode__btn--active"
+                data-mode="task"
+              >
+                Текущая карточка
+              </button>
+              <button type="button" class="template-save-mode__btn" data-mode="template">
+                Сохранённый шаблон
+              </button>
+            </div>
+          </div>
+          <div id="copy-to-project-task-section">
+            <p id="copy-to-project-source" class="chains-modal__meta"></p>
+          </div>
+          <div id="copy-to-project-template-section" class="meta--hidden">
+            <label class="chains-modal__label" for="copy-to-project-template">Шаблон</label>
+            <select id="copy-to-project-template" class="chains-modal__input chains-modal__select">
+              <option value="">— Выберите шаблон —</option>
+            </select>
+            <p id="copy-to-project-template-empty" class="chains-modal__hint meta--hidden">
+              Нет сохранённых шаблонов на текущем домене. Сначала сохраните шаблон канвы.
+            </p>
+          </div>
+          <label class="chains-modal__label" for="copy-to-project-domain">Целевой проект (домен)</label>
+          <select id="copy-to-project-domain" class="chains-modal__input chains-modal__select">
+            <option value="">— Выберите домен —</option>
+          </select>
+          <p id="copy-to-project-hint" class="chains-modal__hint">
+            На целевой проект сохранится локальный шаблон-черновик с полными данными задачи
+            (без создания на бэке). Откройте целевой проект → «Загрузить шаблон», поправьте
+            несовместимые поля и сохраните задачу на бэк. Нужна авторизация на целевом проекте.
+          </p>
+        </div>
+        <div class="chains-modal__foot">
+          <button id="btn-cancel-copy-to-project" class="btn" type="button">Отмена</button>
+          <button id="btn-confirm-copy-to-project" class="btn btn--primary" type="button">
+            Сохранить черновик
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
       id="auth-modal-overlay"
       class="chains-modal-overlay chains-modal-overlay--hidden"
       aria-hidden="true"
@@ -538,6 +614,9 @@
             <p class="chains-modal__hint">
               Откройте ссылку из письма в браузере (token подставится автоматически) или вставьте token вручную.
             </p>
+            <button id="btn-auth-back-to-email" class="btn auth-modal-step__back" type="button">
+              ← Отправить письмо заново
+            </button>
             <label class="chains-modal__label" for="auth-token">Token (из URL magic link)</label>
             <input
               id="auth-token"
@@ -613,6 +692,9 @@
     <div id="card-context-menu" class="card-context-menu card-context-menu--hidden" role="menu">
       <button type="button" class="card-context-menu__item" data-action="edit" role="menuitem">Изменить</button>
       <button type="button" class="card-context-menu__item" data-action="copy" role="menuitem">Скопировать задачу</button>
+      <button type="button" class="card-context-menu__item" data-action="copy-to-project" role="menuitem">
+        Скопировать на другой проект
+      </button>
       <button
         type="button"
         id="card-context-menu-backend"

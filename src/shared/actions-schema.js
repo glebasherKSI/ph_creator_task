@@ -314,7 +314,7 @@ const FIELD_DEFS = {
   sport_bet_types: {
     key: "sport_bet_types",
     label: "Тип ставки",
-    widget: "select",
+    widget: "multi_select",
     role: "attribute",
     options: [
       { id: "single", label: "Ординар" },

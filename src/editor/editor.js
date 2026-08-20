@@ -15,12 +15,14 @@ import {
 import {
   buildReportsPayload,
   computeMetrics,
+  extractReportCountAll,
   extractReportsProjects,
   formatMetricNumber,
   formatReportsFetchError,
   inferProjectIdFromDomain,
   normalizeProjectId,
   normalizeReportRows,
+  reportTaskNamesMatch,
 } from "../shared/reports.js";
 import { escapeHtml } from "../shared/format.js";
 import { getTaskChartsMarkup, groupStatsRowsByTask, mountTaskCharts } from "../shared/stats-charts.js";
@@ -42,6 +44,7 @@ const state = {
   statsError: "",
   statsTaskOnly: false,
   statsUpdatedAt: "",
+  statsReportCountAll: null,
   statsProjectId: "",
   statsProjects: [],
   statsProjectsLoading: false,
@@ -140,9 +143,9 @@ function getActiveTask() {
 function getFilteredStatsRows() {
   if (!state.statsTaskOnly) return state.statsRows;
   const activeTask = getActiveTask();
-  const taskName = String(activeTask?.name || "").trim().toLowerCase();
+  const taskName = String(activeTask?.name || "").trim();
   if (!taskName) return state.statsRows;
-  return state.statsRows.filter((row) => String(row.name || "").toLowerCase().includes(taskName));
+  return state.statsRows.filter((row) => reportTaskNamesMatch(row.name, taskName));
 }
 
 function getStatsProjectFieldMarkup(inferredProjectId) {
@@ -228,13 +231,26 @@ function getStatsPanelMarkup() {
   const groupedRows = groupStatsRowsByTask(rows);
   const metrics = computeMetrics(rows, payload?.period);
   const statusClass = state.statsError ? "stats-panel__status stats-panel__status--error" : "stats-panel__status";
+  const activeTaskMissing =
+    state.statsTaskOnly &&
+    activeTask &&
+    state.statsRows.length > 0 &&
+    !rows.length &&
+    !state.statsLoading &&
+    !state.statsError;
   const statusText = state.statsLoading
     ? "Загрузка отчета..."
     : state.statsError
       ? state.statsError
-      : state.statsUpdatedAt
-        ? `Обновлено: ${state.statsUpdatedAt}. Строк: ${rows.length}`
-        : "Отчет не загружен";
+      : activeTaskMissing
+        ? `Задача «${activeTask.name || activeTask.id}» не найдена в отчёте за выбранный период. Проверьте даты и проект.`
+        : state.statsUpdatedAt
+          ? `Обновлено: ${state.statsUpdatedAt}. Строк: ${rows.length}${
+              state.statsReportCountAll != null && state.statsRows.length < state.statsReportCountAll
+                ? ` (загружено ${state.statsRows.length} из ${state.statsReportCountAll})`
+                : ""
+            }`
+          : "Отчет не загружен";
 
   return `
     <div class="stats-panel">
@@ -358,6 +374,7 @@ async function loadStatsReport({ force = false } = {}) {
       return;
     }
     state.statsRows = normalizeReportRows(result.data);
+    state.statsReportCountAll = extractReportCountAll(result.data);
     state.statsUpdatedAt = new Date().toLocaleString("ru-RU");
     state.statsError = "";
   } catch (err) {

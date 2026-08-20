@@ -1,4 +1,3 @@
-import { STORAGE_KEYS } from "./constants.js";
 import {
   AUTH_FETCH_ERRORS,
   adminTabUrl,
@@ -6,8 +5,6 @@ import {
   clearPendingOtpFlow,
   extractMagicLinkToken,
   formatAuthFetchError,
-  awaitingMagicLinkStorageKey,
-  pendingOtpStorageKey,
   sendAuthMessage,
   setAwaitingMagicLink,
 } from "./auth.js";
@@ -19,15 +16,15 @@ function isValidAdminUser(user) {
 }
 
 function isAuthenticatedStatus(status) {
-  if (!status?.authenticated) return false;
+  if (!status?.authenticated || status.pendingOtp) return false;
   return isValidAdminUser(status.user) || Boolean(status.email);
 }
 
 /** @type {{ domain: string, onComplete: (ok: boolean) => void } | null} */
 let pending = null;
+/** @type {{ sentMagicLink: boolean, submittedMagicLogin: boolean } | null} */
+let modalFlow = null;
 let mounted = false;
-let refreshTimer = null;
-let skipStorageRefreshUntil = 0;
 /** @type {Map<string, number>} */
 const lastStatusFetchByDomain = new Map();
 /** @type {Map<string, object>} */
@@ -150,6 +147,7 @@ function finish(ok) {
   const domain = pending?.domain;
   const callback = pending?.onComplete;
   pending = null;
+  modalFlow = null;
   closeOverlay();
   if (domain) void clearAwaitingMagicLink(domain);
   callback?.(ok);
@@ -229,49 +227,32 @@ async function fetchAuthStatus(domain, options = {}) {
   }
 }
 
-function scheduleRefreshModalState() {
-  clearTimeout(refreshTimer);
-  refreshTimer = setTimeout(() => {
-    void refreshModalState();
-  }, 550);
+function isPendingForDomain(domain) {
+  return pending?.domain === domain;
 }
 
-async function refreshModalState() {
-  if (!pending?.domain) return;
+function applyModalStepFromStatus(status) {
+  const domainLabel = pending?.domain;
+  if (!domainLabel) return;
 
-  const status = await fetchAuthStatus(pending.domain, { force: true });
-  if (status?.throttled) return;
-  const domainLabel = pending.domain;
-
-  if (status?.authenticated) {
-    setStatusLine(`Вход выполнен${status.email ? ` (${status.email})` : ""}`, "ok");
-    finish(isAuthenticatedStatus(status));
+  if (modalFlow?.sentMagicLink && !modalFlow?.submittedMagicLogin) {
+    setStatusLine("Письмо отправлено. Откройте ссылку из email или вставьте token вручную.", "pending");
+    showStepPanel(2);
     return;
   }
 
-  if (status?.pendingOtp) {
+  if (status?.pendingOtp || modalFlow?.submittedMagicLogin) {
+    if (modalFlow) modalFlow.submittedMagicLogin = true;
     setStatusLine("Magic link принят — введите OTP из письма", "pending");
     showStepPanel(3);
     $("auth-otp")?.focus();
     return;
   }
 
-  if (status?.awaitingMagicLink) {
-    setStatusLine("Письмо отправлено. Откройте ссылку из email или вставьте token вручную.", "pending");
-    showStepPanel(2);
-    return;
-  }
-
   if (status?.error && !status?.authenticated) {
     const formatted = formatAuthModalError(status, domainLabel);
     setStatusLine(formatted.message, "error", { showOpenAdmin: formatted.showOpenAdmin });
-    return;
-  }
-
-  const emailSent = Boolean($("auth-email")?.value?.trim());
-  if (emailSent) {
-    setStatusLine("Письмо отправлено. Откройте ссылку из email или вставьте token вручную.", "pending");
-    showStepPanel(2);
+    showStepPanel(1);
     return;
   }
 
@@ -279,25 +260,11 @@ async function refreshModalState() {
   showStepPanel(1);
 }
 
-function onStorageChanged(changes, area) {
-  if (area !== "local" || !pending?.domain) return;
-  if (Date.now() < skipStorageRefreshUntil) return;
-  const domain = pending.domain;
-  const domainAuthChanged =
-    changes[STORAGE_KEYS.AUTH_SESSIONS] ||
-    changes[pendingOtpStorageKey(domain)] ||
-    changes[awaitingMagicLinkStorageKey(domain)];
-  if (domainAuthChanged) {
-    scheduleRefreshModalState();
-  }
-}
-
 function reportAuthStepError(err, domain, fallbackMessage) {
   const formatted = formatAuthModalError(err, domain);
   setStatusLine(formatted.message || fallbackMessage, "error", {
     showOpenAdmin: formatted.showOpenAdmin,
   });
-  skipStorageRefreshUntil = Date.now() + 4000;
 }
 
 async function sendMagicLink() {
@@ -323,6 +290,8 @@ async function sendMagicLink() {
   }
 
   await setAwaitingMagicLink(domain);
+  if (!isPendingForDomain(domain)) return;
+  if (modalFlow) modalFlow.sentMagicLink = true;
   setStatusLine("Письмо отправлено. Откройте ссылку из email или вставьте token ниже.", "pending");
   showStepPanel(2);
   $("auth-token")?.focus();
@@ -352,10 +321,11 @@ async function submitMagicLogin() {
 
   $("auth-token").value = "";
   await clearAwaitingMagicLink(domain);
+  if (!isPendingForDomain(domain)) return;
+  if (modalFlow) modalFlow.submittedMagicLogin = true;
   setStatusLine("Magic link принят — введите OTP", "pending");
   showStepPanel(3);
   $("auth-otp")?.focus();
-  await refreshModalState();
 }
 
 async function submitOtp() {
@@ -378,6 +348,7 @@ async function submitOtp() {
     reportAuthStepError(result, domain, "OTP не принят");
     return;
   }
+  if (!isPendingForDomain(domain)) return;
 
   const authStatus = result.authStatus;
   if (authStatus?.authenticated) {
@@ -393,11 +364,25 @@ async function submitOtp() {
   }
 
   $("auth-otp").value = "";
-  await refreshModalState();
+  setStatusLine("OTP принят, но вход не подтверждён — повторите попытку", "error");
+  showStepPanel(3);
 }
 
 function cancelAuth() {
   finish(false);
+}
+
+async function backToEmailStep() {
+  const domain = pending?.domain;
+  if (!domain) return;
+
+  await clearAwaitingMagicLink(domain);
+  if (!isPendingForDomain(domain)) return;
+  if (modalFlow) modalFlow.sentMagicLink = false;
+  $("auth-token").value = "";
+  setStatusLine(`Шаг 1: отправьте magic link на email (${domain})`, "idle");
+  showStepPanel(1);
+  $("auth-email")?.focus();
 }
 
 function resetAuthFormFields() {
@@ -415,16 +400,18 @@ function resetAuthFormFields() {
 export function resetAuthModalForDomainSwitch(newDomain) {
   const normalizedDomain = String(newDomain || "").trim();
   if (!isAuthModalOpen() || !pending?.domain) return;
-  if (pending.domain === normalizedDomain) return;
+  if (pending?.domain === normalizedDomain) return;
 
-  const prevCallback = pending.onComplete;
+  const prevCallback = pending?.onComplete;
   pending = null;
+  modalFlow = null;
   resetAuthFormFields();
   closeOverlay();
   prevCallback?.(false);
 }
 
 export function isDomainAuthenticated(status) {
+  if (status?.pendingOtp) return false;
   return isAuthenticatedStatus(status);
 }
 
@@ -454,6 +441,7 @@ export function mountAuthModal() {
 
   $("btn-auth-send-magic-link")?.addEventListener("click", () => void sendMagicLink());
   $("btn-auth-magic-login")?.addEventListener("click", () => void submitMagicLogin());
+  $("btn-auth-back-to-email")?.addEventListener("click", () => void backToEmailStep());
   $("btn-auth-verify-otp")?.addEventListener("click", () => void submitOtp());
   $("btn-auth-open-admin")?.addEventListener("click", () => void openAdminTab());
   $("btn-cancel-auth-modal")?.addEventListener("click", cancelAuth);
@@ -483,8 +471,6 @@ export function mountAuthModal() {
   $("auth-modal-overlay")?.addEventListener("click", (ev) => {
     if (ev.target.id === "auth-modal-overlay") cancelAuth();
   });
-
-  chrome.storage.onChanged.addListener(onStorageChanged);
 }
 
 /**
@@ -502,7 +488,7 @@ export async function ensureAuthenticated(domain, options = {}) {
   }
 
   const status = await fetchAuthStatus(normalizedDomain, { force: true });
-  if (isAuthenticatedStatus(status)) return true;
+  if (isAuthenticatedStatus(status) && !options.forcePrompt) return true;
 
   if (isAuthModalOpen() && pending?.domain === normalizedDomain) {
     return new Promise((resolve) => {
@@ -521,19 +507,31 @@ export async function ensureAuthenticated(domain, options = {}) {
     pending = { domain: normalizedDomain, onComplete: resolve };
 
     void (async () => {
+      const flowDomain = normalizedDomain;
       if (!status?.pendingOtp) {
-        await clearPendingOtpFlow(normalizedDomain);
+        await clearPendingOtpFlow(flowDomain);
+        await clearAwaitingMagicLink(flowDomain);
       }
+      if (!isPendingForDomain(flowDomain)) return;
 
-      $("auth-modal-domain").textContent = normalizedDomain;
-      setModalMessage(options.message || "Для работы с API нужен вход в админку");
+      modalFlow = {
+        sentMagicLink: false,
+        submittedMagicLogin: Boolean(status?.pendingOtp),
+      };
+
+      $("auth-modal-domain").textContent = flowDomain;
+      setModalMessage(
+        options.message ||
+          (status?.pendingOtp
+            ? "Завершите вход — введите OTP из письма"
+            : "Для работы с API нужен вход в админку")
+      );
       resetAuthFormFields();
       $("auth-email").value = status?.email || "";
-      skipStorageRefreshUntil = 0;
       lastStatusFetchByDomain.delete(normalizedDomain);
 
       openOverlay();
-      await refreshModalState();
+      applyModalStepFromStatus(status);
     })();
   });
 }

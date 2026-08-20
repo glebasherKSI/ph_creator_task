@@ -136,14 +136,59 @@ export function parseGamesOptions(raw) {
 }
 
 /**
+ * Admin collection API serializes search as filters[field]=value (qs brackets), not flat params.
+ * @param {Record<string, unknown>} params
+ * @returns {URLSearchParams}
+ */
+function buildGamesQueryParams(params = {}) {
+  const query = new URLSearchParams({
+    locale: "ru",
+    limit: String(SEARCH_LIMIT),
+    offset: "0",
+  });
+
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "filters" && value && typeof value === "object" && !Array.isArray(value)) {
+      for (const [filterKey, filterValue] of Object.entries(/** @type {Record<string, unknown>} */ (value))) {
+        if (filterValue == null || !String(filterValue).trim()) continue;
+        query.append(`filters[${filterKey}]`, String(filterValue));
+      }
+      continue;
+    }
+    if (value == null || !String(value).trim()) continue;
+    query.set(key, String(value));
+  }
+
+  return query;
+}
+
+/**
  * @param {string} domain
- * @param {Record<string, string>} params
+ * @param {Record<string, unknown>} params
  * @returns {Promise<unknown>}
  */
 async function fetchGamesApi(domain, params) {
   const adminContext = await resolveAdminTab(domain);
-  const query = new URLSearchParams({ locale: "ru", limit: String(SEARCH_LIMIT), ...params });
+  const query = buildGamesQueryParams(params);
   return apiFetch(adminContext, `${GAMES_API_PATH}?${query.toString()}`);
+}
+
+/**
+ * @param {{ id: string, label: string }} item
+ * @param {string} q
+ */
+function gameMatchesQuery(item, q) {
+  const needle = q.toLowerCase();
+  return item.label.toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle);
+}
+
+/**
+ * @param {Array<{ id: string, label: string }>} data
+ * @param {string} q
+ */
+function filterGamesByQuery(data, q) {
+  if (!q) return data;
+  return data.filter((item) => gameMatchesQuery(item, q));
 }
 
 /**
@@ -163,18 +208,37 @@ export async function searchGames(domain, query = "") {
     return cached.data;
   }
 
+  // Admin panel: GET /admin/api/game_specs?filters[title]=…&limit=&offset=&locale=
   const paramSets = q
-    ? [{ search: q }, { query: q }, { q }, { term: q }, { identifier: q }]
-    : [{}, { search: "" }];
+    ? [
+        { filters: { title: q } },
+        { filters: { identifier: q } },
+        { filters: { frontend_identifier: q } },
+        { filters: { producer: q } },
+      ]
+    : [{}];
 
   let lastError = null;
+
   for (const params of paramSets) {
     try {
       const raw = await fetchGamesApi(key, params);
       const data = parseGamesOptions(raw);
-      if (data.length || !q) {
+      if (!q) {
         searchCache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS });
         return data;
+      }
+      if (params.filters) {
+        if (data.length) {
+          searchCache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+          return data;
+        }
+        continue;
+      }
+      if (data.some((item) => gameMatchesQuery(item, q))) {
+        const filtered = filterGamesByQuery(data, q);
+        searchCache.set(cacheKey, { data: filtered, expiresAt: Date.now() + CACHE_TTL_MS });
+        return filtered;
       }
     } catch (err) {
       lastError = err;
@@ -182,6 +246,7 @@ export async function searchGames(domain, query = "") {
   }
 
   if (lastError) throw lastError;
+  searchCache.set(cacheKey, { data: [], expiresAt: Date.now() + CACHE_TTL_MS });
   return [];
 }
 

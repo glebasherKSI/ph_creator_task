@@ -10,11 +10,6 @@ const MAGIC_LINK_PATH_RE = /\/admin\/-\/auth\/magic-login(?:\?|$)/;
 
 /** @typedef {{ value?: string, email?: string, userId?: number, updatedAt?: number, verified?: boolean }} AuthSessionRecord */
 
-function sessionIsVerified(record) {
-  if (!record?.value) return false;
-  return Boolean(record.verified || record.email || record.userId);
-}
-
 /**
  * @returns {Promise<Record<string, AuthSessionRecord>>}
  */
@@ -286,21 +281,12 @@ export async function removeBrowserSessionCookie(domainInput) {
 /**
  * @param {string} domainInput
  */
-export async function syncSessionFromBrowser(domainInput, options = {}) {
+export async function syncSessionFromBrowser(domainInput, _options = {}) {
   const cookie = await readBrowserSessionCookie(domainInput);
   if (!cookie?.value) return null;
 
   const domain = normalizeDomainOrEmpty(domainInput);
   if (!domain) return null;
-
-  const existing = await getStoredAuthSession(domain);
-  const inAuthFlow =
-    options.force === true ||
-    sessionIsVerified(existing) ||
-    (await hasPendingOtpFlow(domain)) ||
-    (await isAwaitingMagicLink(domain));
-
-  if (!inAuthFlow) return cookie.value;
 
   await saveStoredAuthSession(domainInput, { value: cookie.value });
   return cookie.value;
@@ -745,6 +731,26 @@ export async function fetchCurrentUser(domainInput, options = {}) {
 }
 
 /**
+ * Проверяет, что сессия прошла OTP (API задач доступен).
+ * current_user может отвечать и до OTP — этот probe отличает полный вход.
+ * @param {string} domainInput
+ */
+async function probeFullAuth(domainInput) {
+  try {
+    const result = await adminApiFetch(
+      domainInput,
+      `${ADMIN_API_PREFIX}/gamification/tasks?limit=1&offset=0`,
+      "GET",
+      null,
+      { skipCookieSync: true }
+    );
+    return Boolean(result.ok);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * @param {string} domainInput
  * @param {{ force?: boolean }} [options]
  */
@@ -764,23 +770,106 @@ export async function getAuthStatus(domainInput, options = {}) {
   const stored = await getStoredAuthSession(domain);
   const pendingOtp = await hasPendingOtpFlow(domain);
   const awaitingMagicLink = await isAwaitingMagicLink(domain);
-  const verified = sessionIsVerified(stored);
 
-  if (!verified && !pendingOtp) {
-    return {
-      domain,
-      authenticated: false,
-      pendingOtp: false,
-      awaitingMagicLink,
-      email: stored?.email ?? null,
-    };
-  }
-
-  if (stored?.value) {
+  const cookie = await readBrowserSessionCookie(domain);
+  if (cookie?.value) {
+    await saveStoredAuthSession(domain, { value: cookie.value });
+  } else if (stored?.value) {
     await ensureBrowserSessionCookie(domain);
   }
 
-  if (pendingOtp && !verified) {
+  const hasSession = Boolean(cookie?.value || stored?.value);
+
+  const otpIncomplete = pendingOtp || stored?.verified === false;
+
+  if (hasSession) {
+    try {
+      const { ok, user, cached } = await fetchCurrentUser(domain, { force: options.force });
+      if (ok && isValidAdminUser(user)) {
+        const sessionValue = cookie?.value || stored?.value;
+        const email = user.email ? String(user.email) : stored?.email ?? null;
+
+        if (otpIncomplete) {
+          const fullAuth = await probeFullAuth(domain);
+          if (!fullAuth) {
+            await saveStoredAuthSession(domain, {
+              value: sessionValue,
+              email,
+              userId: user.id != null ? Number(user.id) : undefined,
+              verified: false,
+            });
+            return {
+              domain,
+              authenticated: false,
+              pendingOtp: true,
+              awaitingMagicLink: false,
+              email,
+              user,
+            };
+          }
+          await clearPendingOtpFlow(domain);
+        }
+
+        await saveStoredAuthSession(domain, {
+          value: sessionValue,
+          email,
+          userId: user.id != null ? Number(user.id) : undefined,
+          verified: true,
+        });
+
+        await clearPendingOtpFlow(domain);
+        await clearAwaitingMagicLink(domain);
+
+        return {
+          domain,
+          authenticated: true,
+          pendingOtp: false,
+          awaitingMagicLink: false,
+          email,
+          user,
+        };
+      }
+
+      const cachedResult = cached ? currentUserFailureCache.get(domain)?.result : null;
+      const fetchError =
+        cachedResult && typeof cachedResult === "object" && cachedResult.error
+          ? formatAuthFetchError(cachedResult.error, domain)
+          : undefined;
+
+      if (otpIncomplete) {
+        return {
+          domain,
+          authenticated: false,
+          pendingOtp: true,
+          awaitingMagicLink: false,
+          email: stored?.email ?? null,
+          error: fetchError,
+          cached: Boolean(cached),
+        };
+      }
+
+      return {
+        domain,
+        authenticated: false,
+        pendingOtp: false,
+        awaitingMagicLink,
+        email: stored?.email ?? null,
+        error: fetchError,
+        cached: Boolean(cached),
+      };
+    } catch (err) {
+      return {
+        domain,
+        authenticated: false,
+        pendingOtp: otpIncomplete && Boolean(stored?.value),
+        awaitingMagicLink: false,
+        email: stored?.email ?? null,
+        error: formatAuthFetchError(err, domain),
+      };
+    }
+  }
+
+  if (otpIncomplete) {
     return {
       domain,
       authenticated: false,
@@ -790,55 +879,13 @@ export async function getAuthStatus(domainInput, options = {}) {
     };
   }
 
-  try {
-    const { ok, user, cached } = await fetchCurrentUser(domain, { force: options.force });
-    if (!ok || !isValidAdminUser(user)) {
-      const cachedResult = cached ? currentUserFailureCache.get(domain)?.result : null;
-      const fetchError =
-        cachedResult && typeof cachedResult === "object" && cachedResult.error
-          ? formatAuthFetchError(cachedResult.error, domain)
-          : undefined;
-      return {
-        domain,
-        authenticated: false,
-        pendingOtp: pendingOtp && Boolean(stored?.value),
-        awaitingMagicLink: false,
-        email: stored?.email ?? null,
-        error: fetchError,
-        cached: Boolean(cached),
-      };
-    }
-
-    const cookie = await readBrowserSessionCookie(domain);
-    const email = user.email ? String(user.email) : stored?.email ?? null;
-    await saveStoredAuthSession(domain, {
-      value: stored?.value || cookie?.value,
-      email,
-      userId: user.id != null ? Number(user.id) : undefined,
-      verified: true,
-    });
-
-    await clearPendingOtpFlow(domain);
-    await clearAwaitingMagicLink(domain);
-
-    return {
-      domain,
-      authenticated: true,
-      pendingOtp: false,
-      awaitingMagicLink: false,
-      email,
-      user,
-    };
-  } catch (err) {
-    return {
-      domain,
-      authenticated: false,
-      pendingOtp: pendingOtp && Boolean(stored?.value),
-      awaitingMagicLink: false,
-      email: stored?.email ?? null,
-      error: formatAuthFetchError(err, domain),
-    };
-  }
+  return {
+    domain,
+    authenticated: false,
+    pendingOtp: false,
+    awaitingMagicLink,
+    email: stored?.email ?? null,
+  };
 }
 
 export async function sendMagicLoginInstructions(domainInput, email) {
@@ -868,6 +915,10 @@ export async function magicLogin(domainInput, token) {
   await syncSessionFromBrowser(domainInput, { force: true });
   if (result.ok) {
     await setPendingOtpFlow(domainInput);
+    const cookie = await readBrowserSessionCookie(domainInput);
+    if (cookie?.value) {
+      await saveStoredAuthSession(domainInput, { value: cookie.value, verified: false });
+    }
   } else {
     await clearPendingOtpFlow(domainInput);
   }

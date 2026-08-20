@@ -8,6 +8,8 @@ import {
 import { apiFetch, apiFetchResult, API_REQUEST_TIMEOUT_MS, resolveAdminTab, withTimeout } from "../shared/api.js";
 import { ensureAuthenticated, formatDomainAuthLabel, isAuthError, isAuthModalOpen, isDomainAuthenticated, mountAuthModal, queryDomainAuthStatus, resetAuthModalForDomainSwitch } from "../shared/auth-modal.js";
 import { escapeHtml, formatCardDate } from "../shared/format.js";
+import { loadConditionsSchema } from "../shared/conditions-schema.js";
+import { setConditionsLabelSchema } from "../shared/labels-ru.js";
 import { loadChainsLayout, saveChainsLayout, getDomainCanvasTemplates, upsertDomainCanvasTemplate, deleteDomainCanvasTemplate } from "../shared/storage.js";
 import { mountCopyPanel } from "../shared/copy-panel.js";
 import {
@@ -23,12 +25,14 @@ import { ACTION_LABELS } from "../shared/actions-schema.js";
 import {
   buildReportsPayload,
   computeMetrics,
+  extractReportCountAll,
   extractReportsProjects,
   formatMetricNumber,
   formatReportsFetchError,
   inferProjectIdFromDomain,
   normalizeProjectId,
   normalizeReportRows,
+  reportTaskNamesMatch,
 } from "../shared/reports.js";
 import { getTaskChartsMarkup, groupStatsRowsByTask, mountTaskCharts } from "../shared/stats-charts.js";
 const CARD_W = 220;
@@ -101,6 +105,7 @@ const state = {
   statsError: "",
   statsTaskOnly: false,
   statsUpdatedAt: "",
+  statsReportCountAll: null,
   statsProjectId: "",
   statsProjects: [],
   statsProjectsLoading: false,
@@ -116,6 +121,16 @@ const $ = (id) => document.getElementById(id);
 let copyPanel = null;
 let copyPanelSourceId = null;
 let copyPanelMode = "copy";
+/** @type {string|null} целевой домен для копирования на другой проект */
+let copyCrossDomainTarget = null;
+/** @type {string|null} id задачи для модалки «Скопировать на другой проект» */
+let copyToProjectTaskId = null;
+/** @type {"task"|"template"} режим модалки копирования на другой проект */
+let copyToProjectMode = "task";
+/** @type {string|null} id сохранённого шаблона для копирования на другой проект */
+let copyToProjectTemplateId = null;
+/** @type {string|null} локальный черновик, который сохраняем на бэк через «Создать» */
+let promotingLocalDraftId = null;
 let contextMenuTaskId = null;
 let canvasContextMenuPoint = null;
 let viewportAnimation = null;
@@ -580,20 +595,30 @@ function updateDomainAuthIndicator(status) {
     el.hidden = true;
     el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
     el.title = "";
+    el.dataset.action = "";
     return;
   }
 
   const label = formatDomainAuthLabel(status, { forIndicator: true });
   el.hidden = false;
   el.textContent = label;
-  el.title = label;
+  el.title =
+    status.pendingOtp ? "Нажмите, чтобы завершить вход (OTP)" : label;
 
   if (status.authenticated) {
     el.className = "toolbar__domain-auth toolbar__domain-auth--ok";
+    el.dataset.action = "";
   } else if (status.pendingOtp || status.awaitingMagicLink) {
-    el.className = "toolbar__domain-auth toolbar__domain-auth--pending";
+    el.className = "toolbar__domain-auth toolbar__domain-auth--pending toolbar__domain-auth--action";
+    el.dataset.action = status.pendingOtp ? "complete-otp" : "";
   } else {
     el.className = "toolbar__domain-auth toolbar__domain-auth--idle";
+    el.dataset.action = "";
+  }
+
+  const btnCompleteOtp = $("btn-complete-auth-otp");
+  if (btnCompleteOtp) {
+    btnCompleteOtp.hidden = !status.pendingOtp;
   }
 }
 
@@ -631,7 +656,24 @@ function resetUiForDomainSwitch() {
   updateCounters();
 }
 
-async function handleDomainSwitch() {
+async function promptCompleteOtpAuth() {
+  const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
+  if (!domain) {
+    setStatus("Выберите домен админки", true);
+    return;
+  }
+
+  const authed = await ensureAuthenticated(domain, {
+    forcePrompt: true,
+    message: "Завершите вход — введите OTP из письма",
+  });
+  if (authed) {
+    await fetchAndUpdateDomainAuthIndicator(domain);
+    await loadTasks(true, true, false, { skipConfirm: true, skipAuthCheck: true });
+  }
+}
+
+function handleDomainSwitch() {
   const domain = state.selectedDomain;
   resetAuthModalForDomainSwitch(domain);
   resetUiForDomainSwitch();
@@ -643,23 +685,7 @@ async function handleDomainSwitch() {
   }
 
   void copyPanel?.loadMeta(domain);
-
-  const status = await fetchAndUpdateDomainAuthIndicator(domain);
-  if (isDomainAuthenticated(status)) {
-    await loadTasks(true, true, false, { skipConfirm: true, skipAuthCheck: true });
-    return;
-  }
-
-  const authed = await ensureAuthenticated(domain, {
-    message: "Для загрузки задач нужен вход в админку",
-  });
-  if (!authed) {
-    setStatus("Вход не выполнен — выберите домен или нажмите «Загрузить задачи»", true);
-    return;
-  }
-
-  await fetchAndUpdateDomainAuthIndicator(domain);
-  await loadTasks(true, true, false, { skipConfirm: true, skipAuthCheck: true });
+  setStatus("Нажмите «Загрузить задачи»");
 }
 
 async function getAdminContext() {
@@ -921,11 +947,39 @@ function isTaskConfiguredOnBackend(task) {
   return !!(task && task.configuredOnBackend);
 }
 
+function isTaskLocalOnly(task) {
+  return !!(task && (task.localOnly === true || task.notSyncedWithBackend === true));
+}
+
+function newLocalDraftId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return `local_${crypto.randomUUID()}`;
+  }
+  return `local_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function snapshotTaskBodyForDraft(task) {
+  const raw = task && typeof task === "object" ? cloneJson(task) : {};
+  delete raw.configuredOnBackend;
+  delete raw.localOnly;
+  delete raw.notSyncedWithBackend;
+  delete raw._full;
+  delete raw.x;
+  delete raw.y;
+  delete raw.headerColor;
+  return raw;
+}
+
 function serializeCanvasTaskLayout(task) {
   const entry = { x: task.x, y: task.y };
   const colorId = normalizeHeaderColorId(task.headerColor);
   if (colorId) entry.headerColor = colorId;
-  if (isTaskConfiguredOnBackend(task)) entry.configuredOnBackend = true;
+  if (isTaskLocalOnly(task)) {
+    entry.localOnly = true;
+    entry.configuredOnBackend = false;
+  } else if (isTaskConfiguredOnBackend(task)) {
+    entry.configuredOnBackend = true;
+  }
   return entry;
 }
 
@@ -952,6 +1006,14 @@ function toggleTaskBackendConfigured(taskId) {
   const id = String(taskId);
   const task = state.canvas.get(id);
   if (!task) return;
+  if (isTaskLocalOnly(task)) {
+    hideCardContextMenu();
+    showToast("Локальный черновик ещё не на бэке — откройте «Изменить» и сохраните", {
+      type: "warning",
+      durationMs: 5000,
+    });
+    return;
+  }
 
   if (isTaskConfiguredOnBackend(task)) delete task.configuredOnBackend;
   else task.configuredOnBackend = true;
@@ -964,7 +1026,20 @@ function toggleTaskBackendConfigured(taskId) {
 function updateCardContextMenuBackendState(taskId) {
   const task = state.canvas.get(String(taskId));
   const btn = $("card-context-menu-backend");
+  const editBtn = $("card-context-menu")?.querySelector('[data-action="edit"]');
+  if (editBtn) {
+    editBtn.textContent = isTaskLocalOnly(task) ? "Изменить и сохранить на бэк" : "Изменить";
+  }
   if (!btn) return;
+  if (isTaskLocalOnly(task)) {
+    btn.textContent = "Только локально — не на бэке";
+    btn.setAttribute("aria-checked", "false");
+    btn.disabled = true;
+    btn.title = "Черновик хранится локально. Откройте «Изменить», поправьте поля и создайте на бэке.";
+    return;
+  }
+  btn.disabled = false;
+  btn.removeAttribute("title");
   const configured = isTaskConfiguredOnBackend(task);
   btn.textContent = configured ? "Не настроена на бэке" : "Настроена на бэке";
   btn.setAttribute("aria-checked", configured ? "true" : "false");
@@ -2082,6 +2157,7 @@ function renderCards() {
     if (state.selectedTargetId === taskId) card.classList.add("task-card--selected");
     if (state.canvasSelected.has(taskId)) card.classList.add("task-card--multi-selected");
     if (state.linkSourceId === taskId) card.classList.add("task-card--link-source");
+    if (isTaskLocalOnly(task)) card.classList.add("task-card--local-only");
     if (blockConflict) {
       card.classList.add("task-card--block-conflict");
       card.title = blockConflict.tooltip;
@@ -2091,17 +2167,25 @@ function renderCards() {
       ? `<span class="task-card__block-badge" aria-label="Конфликт блокировки">⚠ блок</span>`
       : "";
 
-    const backendBadge = isTaskConfiguredOnBackend(task)
-      ? `<span class="task-card__backend-badge" title="Настроена на бэке" aria-label="Настроена на бэке">BE</span>`
+    const localBadge = isTaskLocalOnly(task)
+      ? `<span class="task-card__local-badge" title="Только локально — не синхронизирована с бэком" aria-label="Только локально">Только локально</span>`
       : "";
 
+    const backendBadge =
+      !isTaskLocalOnly(task) && isTaskConfiguredOnBackend(task)
+        ? `<span class="task-card__backend-badge" title="Настроена на бэке" aria-label="Настроена на бэке">BE</span>`
+        : "";
+
     const headClass = buildCardHeadClassName(task.headerColor);
+
+    const idLabel = isTaskLocalOnly(task) ? "черновик" : task.id;
 
     card.innerHTML = `
       <div class="task-card__port task-card__port--in" data-port="in" title="Вход"></div>
       <div class="${headClass}">
         <div class="task-card__head-main">
-          <span class="task-card__id">#${task.id}</span>
+          <span class="task-card__id">#${escapeHtml(String(idLabel))}</span>
+          ${localBadge}
           ${backendBadge}
           ${blockBadge}
         </div>
@@ -2586,9 +2670,15 @@ function closeCopyPanel() {
     overlay.setAttribute("aria-hidden", "true");
     copyPanelSourceId = null;
     copyPanelMode = "copy";
+    promotingLocalDraftId = null;
+    const hadCrossDomain = !!copyCrossDomainTarget;
+    copyCrossDomainTarget = null;
     copyPanel?.setMode("copy");
     $("copy-panel-overlay-title").textContent = "Скопировать задачу";
     copyPanelCloseTimer = null;
+    if (hadCrossDomain) {
+      void copyPanel?.loadMeta(state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value));
+    }
   };
 
   if (prefersReducedMotion()) {
@@ -2604,17 +2694,33 @@ function closeCopyPanel() {
 function setCopyPanelChrome(mode) {
   copyPanelMode = mode === "edit" ? "edit" : "copy";
   copyPanel?.setMode(copyPanelMode);
-  $("copy-panel-overlay-title").textContent =
-    copyPanelMode === "edit" ? "Изменить задачу" : "Скопировать задачу";
+  if (promotingLocalDraftId) {
+    $("copy-panel-overlay-title").textContent = "Сохранить черновик на бэк";
+  } else if (copyPanelMode === "edit") {
+    $("copy-panel-overlay-title").textContent = "Изменить задачу";
+  } else if (copyCrossDomainTarget) {
+    $("copy-panel-overlay-title").textContent = `Скопировать на ${copyCrossDomainTarget}`;
+  } else {
+    $("copy-panel-overlay-title").textContent = "Скопировать задачу";
+  }
+  if (promotingLocalDraftId) {
+    return "Поправьте несовместимые поля (группы, теги, бонусы) и нажмите «Создать» — задача появится на бэке.";
+  }
   return copyPanelMode === "edit"
     ? "Измените поля и нажмите «Сохранить»."
-    : "Измените поля и нажмите «Создать».";
+    : copyCrossDomainTarget
+      ? `Измените поля и нажмите «Создать» — задача будет создана на ${copyCrossDomainTarget}.`
+      : "Измените поля и нажмите «Создать».";
 }
 
 async function loadFullTaskForCopy(taskId) {
   const id = String(taskId);
   const canvasTask = state.canvas.get(id);
-  if (canvasTask?._full) return canvasTask._full;
+  if (isTaskLocalOnly(canvasTask) && canvasTask?._full) return canvasTask._full;
+  if (canvasTask?._full && !isTaskLocalOnly(canvasTask)) return canvasTask._full;
+  if (isTaskLocalOnly(canvasTask)) {
+    throw new Error("У локального черновика нет данных задачи");
+  }
   const full = await fetchTaskConditions(id);
   if (full) return full;
   const data = await callApi(`/admin/api/gamification/tasks/${id}?locale=ru`);
@@ -2644,20 +2750,42 @@ async function openTaskPanel(taskId, mode = "copy") {
     copyPanel.fillFromTask(task);
     copyPanel.printResult(task);
     copyPanel.setStatus(`Задача #${id}. ${submitHint}`);
+    if (promotingLocalDraftId || isTaskLocalOnly(state.canvas.get(id))) {
+      showToast(
+        "Черновик с другого проекта: проверьте группы, теги и бонус-группы перед сохранением на бэк",
+        { type: "warning", durationMs: 7000 }
+      );
+    }
   } catch (err) {
     copyPanel.setStatus(`Ошибка загрузки: ${err.message || err}`, true);
   }
 }
 
 async function openCopyPanel(taskId) {
+  promotingLocalDraftId = null;
   return openTaskPanel(taskId, "copy");
 }
 
 async function openEditPanel(taskId) {
-  return openTaskPanel(taskId, "edit");
+  const id = String(taskId);
+  const task = state.canvas.get(id);
+  if (isTaskLocalOnly(task)) {
+    promotingLocalDraftId = id;
+    return openTaskPanel(id, "copy");
+  }
+  promotingLocalDraftId = null;
+  return openTaskPanel(id, "edit");
 }
 
 async function handleCopyCreate(requestBody) {
+  const crossDomain = copyCrossDomainTarget
+    ? normalizeDomainOrEmpty(copyCrossDomainTarget)
+    : "";
+
+  if (crossDomain) {
+    return handleCopyCreateToDomain(requestBody, crossDomain);
+  }
+
   const { data: response, headers, url } = await callApiResult(
     "/admin/api/gamification/tasks?locale=ru",
     "POST",
@@ -2685,8 +2813,14 @@ async function handleCopyCreate(requestBody) {
 
   const sourceId = copyPanelSourceId;
   const source = sourceId ? state.canvas.get(sourceId) : null;
-  const x = source ? source.x + CARD_W + COL_GAP : GRID_START_X;
-  const y = source ? source.y : GRID_START_Y;
+  const promoteLocal = !!(source && isTaskLocalOnly(source));
+
+  const x = promoteLocal
+    ? source.x
+    : source
+      ? source.x + CARD_W + COL_GAP
+      : GRID_START_X;
+  const y = promoteLocal ? source.y : source ? source.y : GRID_START_Y;
 
   state.catalog.set(newIdStr, {
     id: newIdStr,
@@ -2695,6 +2829,10 @@ async function handleCopyCreate(requestBody) {
       created.frontend_identifier || requestBody.gamification_task?.frontend_identifier || "",
     state: String(created.state ?? requestBody.gamification_task?.state ?? "draft").toLowerCase(),
   });
+
+  if (promoteLocal) {
+    remapCanvasTaskId(String(sourceId), newIdStr);
+  }
 
   state.canvas.set(newIdStr, {
     id: newIdStr,
@@ -2707,6 +2845,11 @@ async function handleCopyCreate(requestBody) {
     ...(source?.headerColor ? { headerColor: source.headerColor } : {}),
   });
 
+  if (promoteLocal && state.canvas.has(String(sourceId))) {
+    state.canvas.delete(String(sourceId));
+  }
+
+  promotingLocalDraftId = null;
   importGraphFromConditions([newIdStr]);
   await persistCanvasPositions();
   renderCards();
@@ -2721,7 +2864,77 @@ async function handleCopyCreate(requestBody) {
       ? `Задача успешно создана — #${newIdStr}: ${taskName}`
       : `Задача успешно создана — #${newIdStr}`
   );
-  setStatus(`Создана задача #${newIdStr} — карточка добавлена на канву`);
+  setStatus(
+    promoteLocal
+      ? `Локальный черновик сохранён на бэк как #${newIdStr}`
+      : `Создана задача #${newIdStr} — карточка добавлена на канву`
+  );
+  return response;
+}
+
+/** Переносит рёбра/конфиги/выделение с локального id на реальный после POST. */
+function remapCanvasTaskId(fromId, toId) {
+  const from = String(fromId);
+  const to = String(toId);
+  if (from === to) return;
+
+  state.edges = state.edges.map((e) => ({
+    from: e.from === from ? to : e.from,
+    to: e.to === from ? to : e.to,
+  }));
+
+  if (state.targetConfigs.has(from)) {
+    state.targetConfigs.set(to, state.targetConfigs.get(from));
+    state.targetConfigs.delete(from);
+  }
+
+  if (state.dirtyTargets.has(from)) {
+    state.dirtyTargets.delete(from);
+    state.dirtyTargets.add(to);
+  }
+
+  if (state.canvasSelected.has(from)) {
+    state.canvasSelected.delete(from);
+    state.canvasSelected.add(to);
+  }
+
+  if (state.linkSourceId === from) state.linkSourceId = to;
+  if (state.selectedTargetId === from) state.selectedTargetId = to;
+  if (state.selectedEdgeKey) {
+    const parsed = parseEdgeKey(state.selectedEdgeKey);
+    const nextFrom = parsed.from === from ? to : parsed.from;
+    const nextTo = parsed.to === from ? to : parsed.to;
+    state.selectedEdgeKey = edgeKey(nextFrom, nextTo);
+  }
+  state.listChecked.delete(from);
+}
+
+async function handleCopyCreateToDomain(requestBody, targetDomain) {
+  const context = await resolveAdminTab(targetDomain);
+  const apiForDomain = (path, method = "GET", body = null) => apiFetch(context, path, method, body);
+
+  const { data: response, headers, url } = await apiFetchResult(
+    context,
+    "/admin/api/gamification/tasks?locale=ru",
+    "POST",
+    requestBody
+  );
+
+  const newId = await resolveCreatedTaskId(apiForDomain, requestBody, response, { headers, url });
+  const taskName = requestBody.gamification_task?.name || "";
+  const idLabel = newId != null ? `#${newId}` : "(id не получен)";
+
+  closeCopyPanel();
+  showToast(
+    taskName
+      ? `Задача скопирована на ${targetDomain} — ${idLabel}: ${taskName}`
+      : `Задача скопирована на ${targetDomain} — ${idLabel}`
+  );
+  setStatus(
+    newId != null
+      ? `Задача #${newId} создана на ${targetDomain}`
+      : `Задача создана на ${targetDomain}, но id не найден`
+  );
   return response;
 }
 
@@ -3025,12 +3238,17 @@ async function onDocumentMouseUp(ev) {
 }
 
 async function fetchTaskConditions(taskId) {
+  const id = String(taskId);
+  const existingEarly = state.canvas.get(id);
+  if (isTaskLocalOnly(existingEarly)) {
+    return existingEarly._full || null;
+  }
+
   const data = await callApi(`/admin/api/gamification/tasks/${taskId}?locale=ru`);
   const full = taskFromResponse(data);
   if (!full) return null;
   const existing = state.canvas.get(String(taskId));
   if (existing) {
-    const id = String(taskId);
     const isDirty = state.dirtyTargets.has(id);
     if (!isDirty) {
       existing.conditions = full.conditions || [];
@@ -3051,7 +3269,8 @@ async function placeTaskOnCanvas(id, positions, useSavedPosition = true) {
   const saved = useSavedPosition ? positions[id] : null;
   const pos = saved || { x: GRID_START_X, y: GRID_START_Y };
   const headerColor = normalizeHeaderColorId(saved?.headerColor);
-  const configuredOnBackend = saved?.configuredOnBackend === true;
+  const localOnly = saved?.localOnly === true;
+  const configuredOnBackend = !localOnly && saved?.configuredOnBackend === true;
   state.canvas.set(id, {
     id,
     name: meta.name,
@@ -3060,7 +3279,29 @@ async function placeTaskOnCanvas(id, positions, useSavedPosition = true) {
     x: pos.x,
     y: pos.y,
     ...(headerColor ? { headerColor } : {}),
+    ...(localOnly ? { localOnly: true } : {}),
     ...(configuredOnBackend ? { configuredOnBackend: true } : {}),
+  });
+  return true;
+}
+
+function placeLocalDraftOnCanvas(id, layout, body) {
+  const draftId = String(id);
+  const full = body && typeof body === "object" ? cloneJson(body) : {};
+  const headerColor = normalizeHeaderColorId(layout?.headerColor);
+  const x = Number.isFinite(Number(layout?.x)) ? Number(layout.x) : GRID_START_X;
+  const y = Number.isFinite(Number(layout?.y)) ? Number(layout.y) : GRID_START_Y;
+
+  state.canvas.set(draftId, {
+    id: draftId,
+    name: full.name || "(локальный черновик)",
+    frontend_identifier: full.frontend_identifier || "",
+    conditions: Array.isArray(full.conditions) ? full.conditions : [],
+    _full: full,
+    x,
+    y,
+    localOnly: true,
+    ...(headerColor ? { headerColor } : {}),
   });
   return true;
 }
@@ -3227,6 +3468,7 @@ async function loadTasks(reset = true, loadAllPages = reset, authRetry = false, 
   } catch (err) {
     if (isAuthError(err)) {
       const authed = await ensureAuthenticated(domain, {
+        forcePrompt: true,
         message: err.message?.includes("403")
           ? "Вы не подтверждены — выполните вход (magic link + OTP)"
           : err.message || "Требуется вход в админку",
@@ -3273,7 +3515,10 @@ async function saveChanges() {
   updateSaveButton();
   setButtonLoading("btn-save", true);
 
-  const targets = [...state.dirtyTargets].filter((id) => state.canvas.has(id));
+  const targets = [...state.dirtyTargets].filter((id) => {
+    const task = state.canvas.get(id);
+    return task && !isTaskLocalOnly(task);
+  });
   let okCount = 0;
   let errCount = 0;
 
@@ -3369,8 +3614,12 @@ function formatTemplateDate(iso) {
 
 function serializeCanvasTemplate(name, existingId = null) {
   const canvas = {};
+  const taskBodies = {};
   for (const [id, task] of state.canvas.entries()) {
     canvas[id] = serializeCanvasTaskLayout(task);
+    if (isTaskLocalOnly(task) && task._full) {
+      taskBodies[id] = snapshotTaskBodyForDraft(task._full);
+    }
   }
 
   const targetConfigs = {};
@@ -3379,7 +3628,7 @@ function serializeCanvasTemplate(name, existingId = null) {
   }
 
   const now = new Date().toISOString();
-  return {
+  const template = {
     id: existingId || newTemplateId(),
     name: String(name || "").trim(),
     domain: getCurrentDomain(),
@@ -3391,12 +3640,27 @@ function serializeCanvasTemplate(name, existingId = null) {
     labels: serializeCanvasLabels(),
     viewport: { ...state.viewport },
   };
+  if (Object.keys(taskBodies).length) template.taskBodies = taskBodies;
+  return template;
+}
+
+function countTemplateLocalDrafts(template) {
+  const bodies = template?.taskBodies && typeof template.taskBodies === "object"
+    ? template.taskBodies
+    : {};
+  const canvas = template?.canvas && typeof template.canvas === "object" ? template.canvas : {};
+  const ids = new Set([
+    ...Object.keys(bodies),
+    ...Object.keys(canvas).filter((id) => canvas[id]?.localOnly === true),
+  ]);
+  return ids.size;
 }
 
 function isTemplateModalOpen() {
   return (
     !$("template-save-overlay")?.classList.contains("chains-modal-overlay--hidden") ||
     !$("template-load-overlay")?.classList.contains("chains-modal-overlay--hidden") ||
+    !$("copy-to-project-overlay")?.classList.contains("chains-modal-overlay--hidden") ||
     isAuthModalOpen()
   );
 }
@@ -3611,22 +3875,35 @@ async function renderTemplateLoadList() {
   for (const tpl of templates) {
     const taskCount = tpl.canvas ? Object.keys(tpl.canvas).length : 0;
     const edgeCount = Array.isArray(tpl.edges) ? tpl.edges.length : 0;
+    const draftCount = countTemplateLocalDrafts(tpl);
+    const draftNote = draftCount ? ` · ${draftCount} черновик.` : "";
     const li = document.createElement("li");
     li.className = "template-list__item";
     li.innerHTML = `
       <button type="button" class="template-list__load" data-template-id="${escapeHtml(tpl.id)}">
         <span class="template-list__name">${escapeHtml(tpl.name)}</span>
-        <span class="template-list__meta">${taskCount} задач · ${edgeCount} связей · ${escapeHtml(formatTemplateDate(tpl.updatedAt || tpl.createdAt))}</span>
+        <span class="template-list__meta">${taskCount} задач · ${edgeCount} связей${draftNote} · ${escapeHtml(formatTemplateDate(tpl.updatedAt || tpl.createdAt))}</span>
       </button>
-      <button
-        type="button"
-        class="btn btn--icon btn--ghost btn--danger-icon template-list__delete"
-        data-template-id="${escapeHtml(tpl.id)}"
-        title="Удалить шаблон"
-        aria-label="Удалить шаблон ${escapeHtml(tpl.name)}"
-      >
-        <span class="material-symbols-outlined" aria-hidden="true">delete</span>
-      </button>
+      <div class="template-list__actions">
+        <button
+          type="button"
+          class="btn btn--icon btn--ghost template-list__copy-project"
+          data-template-id="${escapeHtml(tpl.id)}"
+          title="Скопировать шаблон на другой проект"
+          aria-label="Скопировать шаблон ${escapeHtml(tpl.name)} на другой проект"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">drive_file_move</span>
+        </button>
+        <button
+          type="button"
+          class="btn btn--icon btn--ghost btn--danger-icon template-list__delete"
+          data-template-id="${escapeHtml(tpl.id)}"
+          title="Удалить шаблон"
+          aria-label="Удалить шаблон ${escapeHtml(tpl.name)}"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+        </button>
+      </div>
     `;
     fragment.appendChild(li);
   }
@@ -3691,7 +3968,15 @@ async function applyCanvasTemplate(template) {
     return;
   }
 
-  if (!state.catalog.size) {
+  const positions = template.canvas || {};
+  const taskBodies =
+    template.taskBodies && typeof template.taskBodies === "object" ? template.taskBodies : {};
+  const taskIds = Object.keys(positions);
+  const hasLocalDrafts = taskIds.some(
+    (id) => positions[id]?.localOnly === true || taskBodies[id]
+  );
+
+  if (!state.catalog.size && !hasLocalDrafts) {
     showToast("Сначала загрузите задачи для домена", { type: "warning" });
     return;
   }
@@ -3708,12 +3993,27 @@ async function applyCanvasTemplate(template) {
   try {
     clearCanvasWithoutConfirm();
 
-    const positions = template.canvas || {};
-    const taskIds = Object.keys(positions);
     const missing = [];
     const placed = [];
+    let localDraftCount = 0;
 
     for (const id of taskIds) {
+      const layout = positions[id] || {};
+      const body = taskBodies[id];
+      const isLocal = layout.localOnly === true || !!body;
+
+      if (isLocal && body) {
+        placeLocalDraftOnCanvas(id, layout, body);
+        placed.push(id);
+        localDraftCount += 1;
+        continue;
+      }
+
+      if (isLocal && !body) {
+        missing.push(id);
+        continue;
+      }
+
       if (!state.catalog.has(id)) {
         missing.push(id);
         continue;
@@ -3723,6 +4023,7 @@ async function applyCanvasTemplate(template) {
 
     for (let i = 0; i < placed.length; i += 1) {
       const id = placed[i];
+      if (isTaskLocalOnly(state.canvas.get(id))) continue;
       try {
         const msg = `Загрузка условий: ${i + 1}/${placed.length} (#${id})`;
         setStatus(msg);
@@ -3783,6 +4084,11 @@ async function applyCanvasTemplate(template) {
         `Шаблон загружен. ${missing.length} задач не найдено в каталоге и пропущено`,
         { type: "warning", durationMs: 7000 }
       );
+    } else if (localDraftCount) {
+      showToast(
+        `Шаблон «${template.name}» загружен (${loadedCount} задач, ${localDraftCount} только локально). Поправьте данные и сохраните на бэк.`,
+        { durationMs: 8000 }
+      );
     } else {
       showToast(`Шаблон «${template.name}» загружен (${loadedCount} задач)`);
     }
@@ -3796,6 +4102,457 @@ async function applyCanvasTemplate(template) {
     setButtonLoading("btn-load-template", false);
     hideCanvasLoading();
   }
+}
+
+function closeCopyToProjectModal() {
+  const overlay = $("copy-to-project-overlay");
+  overlay?.classList.add("chains-modal-overlay--hidden");
+  overlay?.setAttribute("aria-hidden", "true");
+  copyToProjectTaskId = null;
+  copyToProjectTemplateId = null;
+  copyToProjectMode = "task";
+}
+
+function getCopyToProjectMode() {
+  const active = $("copy-to-project-mode")?.querySelector(".template-save-mode__btn--active");
+  return active?.dataset.mode === "template" ? "template" : "task";
+}
+
+function updateCopyToProjectHint(mode = getCopyToProjectMode()) {
+  const hint = $("copy-to-project-hint");
+  if (!hint) return;
+  if (mode === "template") {
+    hint.textContent =
+      "На целевой проект сохранится локальный шаблон-черновик со всеми задачами выбранного шаблона, связями и раскладкой (без создания на бэке). Откройте целевой проект → «Загрузить шаблон», поправьте несовместимые поля и сохраните задачи на бэк. Нужна авторизация на целевом проекте.";
+    return;
+  }
+  hint.textContent =
+    "На целевой проект сохранится локальный шаблон-черновик с полными данными задачи (без создания на бэке). Откройте целевой проект → «Загрузить шаблон», поправьте несовместимые поля и сохраните задачу на бэк. Нужна авторизация на целевом проекте.";
+}
+
+function setCopyToProjectMode(mode) {
+  const next = mode === "template" ? "template" : "task";
+  copyToProjectMode = next;
+  for (const btn of $("copy-to-project-mode")?.querySelectorAll("[data-mode]") || []) {
+    btn.classList.toggle("template-save-mode__btn--active", btn.dataset.mode === next);
+  }
+  $("copy-to-project-task-section")?.classList.toggle("meta--hidden", next === "template");
+  $("copy-to-project-template-section")?.classList.toggle("meta--hidden", next !== "template");
+  updateCopyToProjectHint(next);
+
+  if (next === "template") {
+    $("copy-to-project-template")?.focus();
+  } else {
+    $("copy-to-project-domain")?.focus();
+  }
+}
+
+function fillCopyToProjectDomainSelect() {
+  const currentDomain = getCurrentDomain();
+  const others = (state.domains || []).filter((d) => d && d !== currentDomain);
+  const select = $("copy-to-project-domain");
+  if (!select) return others;
+
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "— Выберите домен —";
+  select.appendChild(placeholder);
+  for (const domain of others) {
+    const opt = document.createElement("option");
+    opt.value = domain;
+    opt.textContent = domain;
+    select.appendChild(opt);
+  }
+  select.value = "";
+  return others;
+}
+
+async function populateCopyToProjectTemplateSelect(selectedId = "") {
+  const domain = getCurrentDomain();
+  const select = $("copy-to-project-template");
+  const empty = $("copy-to-project-template-empty");
+  const templates = domain ? await getDomainCanvasTemplates(domain) : [];
+
+  if (select) {
+    select.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = templates.length
+      ? "— Выберите шаблон —"
+      : "— Нет шаблонов —";
+    select.appendChild(placeholder);
+
+    for (const tpl of templates) {
+      const taskCount = tpl.canvas ? Object.keys(tpl.canvas).length : 0;
+      const opt = document.createElement("option");
+      opt.value = tpl.id;
+      opt.textContent = `${tpl.name} (${taskCount} задач)`;
+      select.appendChild(opt);
+    }
+
+    const preferred = selectedId || copyToProjectTemplateId || "";
+    select.value = preferred && templates.some((t) => t.id === preferred) ? preferred : "";
+    copyToProjectTemplateId = select.value || null;
+    select.disabled = !templates.length;
+  }
+
+  empty?.classList.toggle("meta--hidden", templates.length > 0);
+  return templates;
+}
+
+async function openCopyToProjectModal(taskId, { mode = "task", templateId = null } = {}) {
+  hideCardContextMenu();
+
+  const currentDomain = getCurrentDomain();
+  const others = fillCopyToProjectDomainSelect();
+  if (!others.length) {
+    showToast("Нет других проектов в списке доменов — добавьте админку в popup", {
+      type: "warning",
+    });
+    return;
+  }
+
+  const nextMode = mode === "template" ? "template" : "task";
+  if (nextMode === "task") {
+    const id = String(taskId || "");
+    if (!id) return;
+    copyToProjectTaskId = id;
+    const sourceMeta = $("copy-to-project-source");
+    const canvasTask = state.canvas.get(id);
+    const name = canvasTask?.name || state.catalog.get(id)?.name || "";
+    if (sourceMeta) {
+      sourceMeta.textContent = name ? `Задача #${id}: ${name}` : `Задача #${id}`;
+    }
+  } else {
+    copyToProjectTaskId = taskId ? String(taskId) : copyToProjectTaskId;
+    if (!copyToProjectTaskId) {
+      const sourceMeta = $("copy-to-project-source");
+      if (sourceMeta) {
+        sourceMeta.textContent =
+          "Для режима «Текущая карточка» откройте меню задачи на канве → «Скопировать на другой проект»";
+      }
+    }
+  }
+
+  copyToProjectTemplateId = templateId ? String(templateId) : null;
+  await populateCopyToProjectTemplateSelect(copyToProjectTemplateId || "");
+  setCopyToProjectMode(nextMode);
+
+  const overlay = $("copy-to-project-overlay");
+  overlay?.classList.remove("chains-modal-overlay--hidden");
+  overlay?.setAttribute("aria-hidden", "false");
+
+  if (nextMode === "template") {
+    $("copy-to-project-template")?.focus();
+  } else {
+    $("copy-to-project-domain")?.focus();
+  }
+}
+
+async function openCopyTemplateToProjectModal(templateId) {
+  const id = String(templateId || "");
+  if (!id) return;
+  closeLoadTemplateModal();
+  await openCopyToProjectModal(null, { mode: "template", templateId: id });
+}
+
+/**
+ * Собирает полные тела задач шаблона: из taskBodies или загрузкой с текущего домена.
+ * @returns {Promise<{ bodies: Record<string, object>, failed: string[] }>}
+ */
+async function gatherTaskBodiesForTemplateCopy(template) {
+  const canvas = template?.canvas && typeof template.canvas === "object" ? template.canvas : {};
+  const existingBodies =
+    template?.taskBodies && typeof template.taskBodies === "object" ? template.taskBodies : {};
+  const ids = Object.keys(canvas);
+  const bodies = {};
+  const failed = [];
+
+  for (let i = 0; i < ids.length; i += 1) {
+    const id = String(ids[i]);
+    setStatus(`Собираю данные задач шаблона: ${i + 1}/${ids.length} (#${id})…`);
+
+    if (existingBodies[id]) {
+      bodies[id] = snapshotTaskBodyForDraft(existingBodies[id]);
+      continue;
+    }
+
+    const canvasTask = state.canvas.get(id);
+    if (canvasTask?._full) {
+      bodies[id] = snapshotTaskBodyForDraft(canvasTask._full);
+      continue;
+    }
+
+    if (canvas[id]?.localOnly === true) {
+      failed.push(id);
+      continue;
+    }
+
+    try {
+      const full = await loadFullTaskForCopy(id);
+      bodies[id] = snapshotTaskBodyForDraft(full);
+    } catch {
+      failed.push(id);
+    }
+  }
+
+  return { bodies, failed };
+}
+
+function buildLocalDraftTemplateFromSourceTemplate(sourceTemplate, bodies, targetDomain) {
+  const currentDomain = getCurrentDomain();
+  const srcCanvas =
+    sourceTemplate?.canvas && typeof sourceTemplate.canvas === "object" ? sourceTemplate.canvas : {};
+  const idMap = new Map();
+
+  for (const oldId of Object.keys(bodies)) {
+    idMap.set(String(oldId), newLocalDraftId());
+  }
+
+  const canvas = {};
+  const taskBodies = {};
+  for (const [oldId, body] of Object.entries(bodies)) {
+    const newId = idMap.get(String(oldId));
+    const layout = srcCanvas[oldId] || {};
+    const entry = {
+      x: Number.isFinite(Number(layout.x)) ? Number(layout.x) : GRID_START_X,
+      y: Number.isFinite(Number(layout.y)) ? Number(layout.y) : GRID_START_Y,
+      localOnly: true,
+      configuredOnBackend: false,
+    };
+    const colorId = normalizeHeaderColorId(layout.headerColor);
+    if (colorId) entry.headerColor = colorId;
+    canvas[newId] = entry;
+    taskBodies[newId] = body;
+  }
+
+  const edges = [];
+  for (const edge of Array.isArray(sourceTemplate?.edges) ? sourceTemplate.edges : []) {
+    const from = idMap.get(String(edge.from));
+    const to = idMap.get(String(edge.to));
+    if (!from || !to || from === to) continue;
+    edges.push({ from, to });
+  }
+
+  const targetConfigs = {};
+  const srcConfigs =
+    sourceTemplate?.targetConfigs && typeof sourceTemplate.targetConfigs === "object"
+      ? sourceTemplate.targetConfigs
+      : {};
+  for (const [oldId, cfg] of Object.entries(srcConfigs)) {
+    const newId = idMap.get(String(oldId));
+    if (!newId || !cfg || typeof cfg !== "object") continue;
+    const next = { ...defaultGtConfig(), ...cfg };
+    if (Array.isArray(next.list)) {
+      next.list = next.list.map((ref) => idMap.get(String(ref))).filter(Boolean);
+    }
+    targetConfigs[newId] = next;
+  }
+
+  const labels = Array.isArray(sourceTemplate?.labels)
+    ? sourceTemplate.labels.map((label) => ({ ...label }))
+    : [];
+
+  const now = new Date().toISOString();
+  const sourceName = String(sourceTemplate?.name || "").trim();
+  const templateName = sourceName
+    ? `Черновик: ${sourceName}`
+    : `Черновик шаблона с ${currentDomain || "источника"}`;
+
+  return {
+    id: newTemplateId(),
+    name: templateName,
+    domain: targetDomain,
+    sourceDomain: currentDomain || "",
+    sourceTemplateId: sourceTemplate?.id ? String(sourceTemplate.id) : "",
+    isLocalDraftTemplate: true,
+    createdAt: now,
+    updatedAt: now,
+    canvas,
+    taskBodies,
+    edges,
+    targetConfigs,
+    labels,
+    viewport:
+      sourceTemplate?.viewport && typeof sourceTemplate.viewport === "object"
+        ? { ...sourceTemplate.viewport }
+        : { x: 0, y: 0, scale: 1 },
+  };
+}
+
+async function ensureTargetDomainAuthForCopy(targetDomain, { forTemplate = false } = {}) {
+  const authStatus = await queryDomainAuthStatus(targetDomain, { force: true });
+  if (isDomainAuthenticated(authStatus)) return true;
+
+  showToast(
+    `Нет авторизации на ${targetDomain}. Авторизуйтесь на целевом проекте, чтобы продолжить копирование.`,
+    { type: "warning", durationMs: 6000 }
+  );
+  const authed = await ensureAuthenticated(targetDomain, {
+    message: forTemplate
+      ? `Для копирования шаблона на ${targetDomain} нужна авторизация на этом проекте`
+      : `Для копирования задачи на ${targetDomain} нужна авторизация на этом проекте`,
+  });
+  if (!authed) {
+    showToast(`Копирование отменено: нет авторизации на ${targetDomain}`, { type: "warning" });
+    return false;
+  }
+  return true;
+}
+
+async function confirmCopyTaskToProject(taskId, targetDomain) {
+  const currentDomain = getCurrentDomain();
+  setStatus(`Готовлю локальный черновик для ${targetDomain}…`);
+  try {
+    const full = await loadFullTaskForCopy(taskId);
+    const draftId = newLocalDraftId();
+    const sourceName = full?.name || state.canvas.get(String(taskId))?.name || "";
+    const templateName = sourceName
+      ? `Черновик: ${sourceName}`
+      : `Черновик с ${currentDomain || "источника"} (#${taskId})`;
+
+    const now = new Date().toISOString();
+    const body = snapshotTaskBodyForDraft(full);
+    const template = {
+      id: newTemplateId(),
+      name: templateName,
+      domain: targetDomain,
+      sourceDomain: currentDomain || "",
+      sourceTaskId: String(taskId),
+      isLocalDraftTemplate: true,
+      createdAt: now,
+      updatedAt: now,
+      canvas: {
+        [draftId]: {
+          x: GRID_START_X,
+          y: GRID_START_Y,
+          localOnly: true,
+          configuredOnBackend: false,
+        },
+      },
+      taskBodies: {
+        [draftId]: body,
+      },
+      edges: [],
+      targetConfigs: {},
+      labels: [],
+      viewport: { x: 0, y: 0, scale: 1 },
+    };
+
+    await upsertDomainCanvasTemplate(targetDomain, template);
+    showToast(
+      `Черновик задачи сохранён на ${targetDomain}. Откройте проект → «Загрузить шаблон», затем поправьте данные перед сохранением на бэк.`,
+      { durationMs: 9000 }
+    );
+    setStatus(`Локальный черновик сохранён в шаблонах ${targetDomain}`);
+  } catch (err) {
+    showToast(`Не удалось сохранить черновик: ${err.message || err}`, { type: "warning" });
+    setStatus(`Ошибка копирования черновика: ${err.message || err}`, true);
+  }
+}
+
+async function confirmCopyTemplateToProject(templateId, targetDomain) {
+  const domain = getCurrentDomain();
+  const templates = domain ? await getDomainCanvasTemplates(domain) : [];
+  const sourceTemplate = templates.find((tpl) => tpl.id === templateId);
+  if (!sourceTemplate) {
+    showToast("Шаблон не найден на текущем домене", { type: "warning" });
+    return;
+  }
+
+  const taskCount = sourceTemplate.canvas ? Object.keys(sourceTemplate.canvas).length : 0;
+  if (!taskCount) {
+    showToast("В выбранном шаблоне нет задач", { type: "warning" });
+    return;
+  }
+
+  setStatus(`Готовлю черновик шаблона для ${targetDomain}…`);
+  try {
+    const { bodies, failed } = await gatherTaskBodiesForTemplateCopy(sourceTemplate);
+    const copiedCount = Object.keys(bodies).length;
+    if (!copiedCount) {
+      showToast(
+        "Не удалось загрузить данные ни одной задачи шаблона. Черновик не сохранён.",
+        { type: "warning", durationMs: 7000 }
+      );
+      setStatus("Копирование шаблона отменено: нет данных задач", true);
+      return;
+    }
+
+    const draftTemplate = buildLocalDraftTemplateFromSourceTemplate(
+      sourceTemplate,
+      bodies,
+      targetDomain
+    );
+    await upsertDomainCanvasTemplate(targetDomain, draftTemplate);
+
+    const edgeCount = draftTemplate.edges.length;
+    let message = `Шаблон «${draftTemplate.name}» сохранён на ${targetDomain} (${copiedCount} задач`;
+    if (edgeCount) message += `, ${edgeCount} связей`;
+    message += `). Откройте проект → «Загрузить шаблон».`;
+    if (failed.length) {
+      message += ` Не удалось загрузить ${failed.length} задач: ${failed.slice(0, 8).join(", ")}${
+        failed.length > 8 ? "…" : ""
+      }.`;
+    }
+    showToast(message, {
+      type: failed.length ? "warning" : "success",
+      durationMs: failed.length ? 11000 : 9000,
+    });
+    setStatus(
+      failed.length
+        ? `Черновик шаблона сохранён на ${targetDomain} (пропущено ${failed.length})`
+        : `Черновик шаблона сохранён в шаблонах ${targetDomain}`
+    );
+  } catch (err) {
+    showToast(`Не удалось скопировать шаблон: ${err.message || err}`, { type: "warning" });
+    setStatus(`Ошибка копирования шаблона: ${err.message || err}`, true);
+  }
+}
+
+async function confirmCopyToProject() {
+  const mode = getCopyToProjectMode();
+  const targetDomain = normalizeDomainOrEmpty($("copy-to-project-domain")?.value);
+  const taskId = copyToProjectTaskId;
+  const selectedTemplateId =
+    mode === "template"
+      ? String($("copy-to-project-template")?.value || copyToProjectTemplateId || "").trim()
+      : "";
+
+  if (mode === "task" && !taskId) {
+    showToast("Сначала выберите задачу на канве", { type: "warning" });
+    return;
+  }
+  if (mode === "template" && !selectedTemplateId) {
+    showToast("Выберите шаблон для копирования", { type: "warning" });
+    $("copy-to-project-template")?.focus();
+    return;
+  }
+  if (!targetDomain) {
+    showToast("Выберите целевой проект", { type: "warning" });
+    $("copy-to-project-domain")?.focus();
+    return;
+  }
+
+  const currentDomain = getCurrentDomain();
+  if (targetDomain === currentDomain) {
+    showToast("Выберите другой проект, не текущий", { type: "warning" });
+    return;
+  }
+
+  closeCopyToProjectModal();
+
+  const authed = await ensureTargetDomainAuthForCopy(targetDomain, {
+    forTemplate: mode === "template",
+  });
+  if (!authed) return;
+
+  if (mode === "template") {
+    await confirmCopyTemplateToProject(selectedTemplateId, targetDomain);
+    return;
+  }
+  await confirmCopyTaskToProject(taskId, targetDomain);
 }
 
 function bindTemplateEvents() {
@@ -3835,11 +4592,45 @@ function bindTemplateEvents() {
     if (ev.target.id === "template-load-overlay") closeLoadTemplateModal();
   });
 
+  $("btn-close-copy-to-project")?.addEventListener("click", closeCopyToProjectModal);
+  $("btn-cancel-copy-to-project")?.addEventListener("click", closeCopyToProjectModal);
+  $("btn-confirm-copy-to-project")?.addEventListener("click", () => void confirmCopyToProject());
+  $("copy-to-project-mode")?.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-mode]");
+    if (!btn || btn.classList.contains("template-save-mode__btn--active")) return;
+    setCopyToProjectMode(btn.dataset.mode);
+  });
+  $("copy-to-project-template")?.addEventListener("change", (ev) => {
+    copyToProjectTemplateId = String(ev.target.value || "").trim() || null;
+  });
+  $("copy-to-project-template")?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      void confirmCopyToProject();
+    }
+  });
+  $("copy-to-project-domain")?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      void confirmCopyToProject();
+    }
+  });
+  $("copy-to-project-overlay")?.addEventListener("click", (ev) => {
+    if (ev.target.id === "copy-to-project-overlay") closeCopyToProjectModal();
+  });
+
   $("template-load-list")?.addEventListener("click", (ev) => {
     const deleteBtn = ev.target.closest(".template-list__delete");
     if (deleteBtn) {
       ev.stopPropagation();
       void handleDeleteTemplate(deleteBtn.dataset.templateId);
+      return;
+    }
+
+    const copyBtn = ev.target.closest(".template-list__copy-project");
+    if (copyBtn) {
+      ev.stopPropagation();
+      void openCopyTemplateToProjectModal(copyBtn.dataset.templateId);
       return;
     }
 
@@ -3870,9 +4661,9 @@ function getActiveTaskForStats() {
 function getFilteredStatsRows() {
   if (!state.statsTaskOnly) return state.statsRows;
   const activeTask = getActiveTaskForStats();
-  const taskName = String(activeTask?.name || "").trim().toLowerCase();
+  const taskName = String(activeTask?.name || "").trim();
   if (!taskName) return state.statsRows;
-  return state.statsRows.filter((row) => String(row.name || "").toLowerCase().includes(taskName));
+  return state.statsRows.filter((row) => reportTaskNamesMatch(row.name, taskName));
 }
 
 function getStatsProjectFieldMarkup(inferredProjectId) {
@@ -3965,13 +4756,26 @@ function getStatsPanelMarkup() {
   const groupedRows = groupStatsRowsByTask(rows);
   const metrics = computeMetrics(rows, payload?.period);
   const statusClass = state.statsError ? "stats-panel__status stats-panel__status--error" : "stats-panel__status";
+  const activeTaskMissing =
+    state.statsTaskOnly &&
+    activeTask &&
+    state.statsRows.length > 0 &&
+    !rows.length &&
+    !state.statsLoading &&
+    !state.statsError;
   const statusText = state.statsLoading
     ? "Загрузка отчета..."
     : state.statsError
       ? state.statsError
-      : state.statsUpdatedAt
-        ? `Обновлено: ${state.statsUpdatedAt}. Строк: ${rows.length}`
-        : "Отчет не загружен";
+      : activeTaskMissing
+        ? `Задача «${activeTask.name || activeTask.id}» не найдена в отчёте за выбранный период. Проверьте даты и проект.`
+        : state.statsUpdatedAt
+          ? `Обновлено: ${state.statsUpdatedAt}. Строк: ${rows.length}${
+              state.statsReportCountAll != null && state.statsRows.length < state.statsReportCountAll
+                ? ` (загружено ${state.statsRows.length} из ${state.statsReportCountAll})`
+                : ""
+            }`
+          : "Отчет не загружен";
 
   return `
     <div class="stats-panel">
@@ -4095,6 +4899,7 @@ async function loadStatsReport({ force = false } = {}) {
       return;
     }
     state.statsRows = normalizeReportRows(result.data);
+    state.statsReportCountAll = extractReportCountAll(result.data);
     state.statsUpdatedAt = new Date().toLocaleString("ru-RU");
     state.statsError = "";
   } catch (err) {
@@ -4142,6 +4947,13 @@ function bindEvents() {
     }
     void handleDomainSwitch();
   });
+
+  $("domain-auth-indicator")?.addEventListener("click", () => {
+    if ($("domain-auth-indicator")?.dataset.action === "complete-otp") {
+      void promptCompleteOtpAuth();
+    }
+  });
+  $("btn-complete-auth-otp")?.addEventListener("click", () => void promptCompleteOtpAuth());
 
   $("btn-load-tasks").addEventListener("click", () => loadTasks(true));
   $("btn-load-more").addEventListener("click", () => loadTasks(false, false));
@@ -4191,6 +5003,10 @@ function bindEvents() {
     if (!btn || !contextMenuTaskId) return;
     if (btn.dataset.action === "edit") openEditPanel(contextMenuTaskId);
     if (btn.dataset.action === "copy") openCopyPanel(contextMenuTaskId);
+    if (btn.dataset.action === "copy-to-project") {
+      void openCopyToProjectModal(contextMenuTaskId);
+      return;
+    }
     if (btn.dataset.action === "set-color") {
       ev.stopPropagation();
       setTaskHeaderColor(contextMenuTaskId, btn.dataset.color || null);
@@ -4302,6 +5118,7 @@ function bindEvents() {
       if (isTemplateModalOpen()) {
         closeSaveTemplateModal();
         closeLoadTemplateModal();
+        closeCopyToProjectModal();
         return;
       }
       if (isCopyPanelOpen()) {
@@ -4327,7 +5144,10 @@ async function init() {
     copyPanel = mountCopyPanel($("copy-panel-mount"), {
       title: "Параметры копии",
       showPreview: true,
-      getDomain: () => state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value),
+      getDomain: () =>
+        copyCrossDomainTarget ||
+        state.selectedDomain ||
+        normalizeDomainOrEmpty($("domain-select").value),
       getTaskOptions: buildCatalogTaskOptions,
       onCreate: handleCopyCreate,
       onUpdate: handleEditUpdate,
