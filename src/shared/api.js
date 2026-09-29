@@ -1,8 +1,17 @@
 import { normalizeDomainOrEmpty } from "./domains.js";
-import { AUTH_MESSAGE_TIMEOUT_MS, formatAuthFetchError, withTimeout } from "./auth.js";
+import { formatAuthFetchError, withTimeout } from "./auth.js";
 
 export { withTimeout };
 export const API_REQUEST_TIMEOUT_MS = 30_000;
+
+/** Кэш успешной сессии — повторные apiFetch не ждут PH_AUTH_STATUS. */
+const AUTH_CONTEXT_TTL_MS = 60_000;
+/** Короткий gate: не ждём полный AUTH_MESSAGE_TIMEOUT_MS (20с) перед API. */
+const AUTH_STATUS_GATE_MS = 2_000;
+/** @type {Map<string, number>} domain → timestamp */
+const authenticatedAtByDomain = new Map();
+/** @type {Map<string, Promise<{ authenticated: boolean, timedOut?: boolean, explicitDeny?: boolean }>>} */
+const inflightAuthStatusByDomain = new Map();
 
 export function formatApiError(response) {
   const status = response?.status;
@@ -31,42 +40,100 @@ export async function findTabForDomain(domain) {
   return tab?.id ?? null;
 }
 
-async function queryAuthStatus(domain) {
-  try {
-    const response = await withTimeout(
-      chrome.runtime.sendMessage({
-        action: "PH_AUTH_STATUS",
-        payload: { domain, force: true },
-      }),
-      AUTH_MESSAGE_TIMEOUT_MS,
-      "AUTH_STATUS_TIMEOUT"
-    );
-    if (response?.ok && response.authenticated) return response;
-  } catch (err) {
-    const message = String(err?.message || err);
-    if (message === "AUTH_STATUS_TIMEOUT") {
-      throw new Error("Превышено время ожидания проверки входа — откройте админку в браузере");
-    }
-  }
-  return null;
+/**
+ * Сбрасывает кэш «вход подтверждён» для домена (или для всех).
+ * @param {string} [domainInput]
+ */
+export function clearResolvedAdminContext(domainInput) {
+  const domain = normalizeDomainOrEmpty(domainInput);
+  if (domain) authenticatedAtByDomain.delete(domain);
+  else authenticatedAtByDomain.clear();
 }
 
 /**
- * Возвращает контекст API только при подтверждённой сессии (background → adminApiFetch).
+ * @param {string} domain
+ * @param {number} [timeoutMs]
+ * @returns {Promise<{ authenticated: boolean, timedOut?: boolean, explicitDeny?: boolean }>}
+ */
+async function queryAuthStatus(domain, timeoutMs = AUTH_STATUS_GATE_MS) {
+  try {
+    // force: false — не обходим failure-cache current_user и не дублируем тяжёлый probe.
+    const response = await withTimeout(
+      chrome.runtime.sendMessage({
+        action: "PH_AUTH_STATUS",
+        payload: { domain, force: false },
+      }),
+      timeoutMs,
+      "AUTH_STATUS_TIMEOUT"
+    );
+    if (response?.ok && response.authenticated) {
+      return { authenticated: true };
+    }
+    // Явный отказ только без pending OTP и без «cached failure» current_user —
+    // иначе блокируем живую сессию ложным deny.
+    if (
+      response?.ok &&
+      response.authenticated === false &&
+      !response.pendingOtp &&
+      !response.cached &&
+      !response.awaitingMagicLink
+    ) {
+      return { authenticated: false, explicitDeny: true };
+    }
+    return { authenticated: false };
+  } catch (err) {
+    const message = String(err?.message || err);
+    if (message === "AUTH_STATUS_TIMEOUT") {
+      return { authenticated: false, timedOut: true };
+    }
+    return { authenticated: false };
+  }
+}
+
+/**
+ * Возвращает контекст API (background → adminApiFetch).
+ * Не блокирует загрузку условий/meta на долгом PH_AUTH_STATUS (раньше до 20с):
+ * короткий gate, soft-fail, кэш успеха; реальный 401/403 — из PH_ADMIN_API_FETCH.
  * @returns {Promise<{ domain: string, mode: "background" }>}
  */
 export async function resolveAdminTab(domainInput) {
   const domain = normalizeDomainOrEmpty(domainInput);
   if (!domain) throw new Error("Выберите домен админки");
 
-  const authStatus = await queryAuthStatus(domain);
-  if (authStatus?.authenticated) {
+  const cachedAt = authenticatedAtByDomain.get(domain);
+  if (cachedAt != null && Date.now() - cachedAt < AUTH_CONTEXT_TTL_MS) {
     return { domain, mode: "background" };
   }
 
+  let statusPromise = inflightAuthStatusByDomain.get(domain);
+  if (!statusPromise) {
+    statusPromise = queryAuthStatus(domain, AUTH_STATUS_GATE_MS).finally(() => {
+      inflightAuthStatusByDomain.delete(domain);
+    });
+    inflightAuthStatusByDomain.set(domain, statusPromise);
+  }
+
+  const authStatus = await statusPromise;
+
+  if (authStatus.authenticated) {
+    authenticatedAtByDomain.set(domain, Date.now());
+    return { domain, mode: "background" };
+  }
+
+  // Таймаут / мягкий сбой / cached failure: не мешаем API.
+  if (authStatus.timedOut || !authStatus.explicitDeny) {
+    return { domain, mode: "background" };
+  }
+
+  authenticatedAtByDomain.delete(domain);
   throw new Error(
     `Требуется вход в админку https://${domain} — нажмите «Загрузить задачи» для авторизации`
   );
+}
+
+function isHttpAuthFailure(response) {
+  const status = Number(response?.status);
+  return status === 401 || status === 403;
 }
 
 async function sendApiRequestViaBackground(domain, path, method = "GET", body = null) {
@@ -79,8 +146,10 @@ async function sendApiRequestViaBackground(domain, path, method = "GET", body = 
     "Превышено время ожидания API — проверьте вход в админку"
   );
   if (!response?.ok) {
+    if (isHttpAuthFailure(response)) clearResolvedAdminContext(domain);
     throw new Error(formatApiError(response));
   }
+  authenticatedAtByDomain.set(domain, Date.now());
   return response;
 }
 

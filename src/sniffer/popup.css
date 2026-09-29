@@ -259,9 +259,22 @@ body {
   color: var(--muted);
 }
 
-.domain-input--select {
+.graphic-input {
+  display: block;
   width: 100%;
   margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: #fafafa;
+}
+
+.graphic-input:focus {
+  outline: none;
+  border-color: #93c5fd;
+  background: #fff;
 }
 
 .auth-status {

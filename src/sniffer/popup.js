@@ -1,4 +1,10 @@
 import { STORAGE_KEYS } from "../shared/constants.js";
+import {
+  GRAPHIC_DEFAULT_BASE_URL,
+  graphicLoginFromPage,
+  graphicLogoutFromPage,
+  graphicStatusFromPage,
+} from "../shared/graphic-api.js";
 
 import {
 
@@ -354,6 +360,65 @@ async function openConstructor() {
 
 
 
+function graphicUserLabel(user) {
+  if (!user || typeof user !== "object") return "";
+  return String(user.username || user.email || user.login || "").trim();
+}
+
+function applyGraphicPopupStatus(status) {
+  const statusEl = $("graphic-popup-status");
+  const urlEl = $("graphic-popup-url");
+  const loginWrap = $("graphic-popup-login");
+  const logoutBtn = $("btn-graphic-popup-logout");
+  const authenticated = Boolean(status?.authenticated);
+  const baseUrl = status?.baseUrl || GRAPHIC_DEFAULT_BASE_URL;
+  if (urlEl && (authenticated || !urlEl.value)) urlEl.value = baseUrl;
+  const name = graphicUserLabel(status?.user);
+  if (statusEl) {
+    statusEl.textContent = authenticated
+      ? name
+        ? `Вход: ${name}`
+        : "Вход выполнен"
+      : "Вход не выполнен";
+  }
+  if (loginWrap) loginWrap.hidden = authenticated;
+  if (logoutBtn) logoutBtn.hidden = !authenticated;
+}
+
+async function refreshGraphicPopup() {
+  const status = await graphicStatusFromPage();
+  applyGraphicPopupStatus(status);
+}
+
+async function handleGraphicPopupLogin() {
+  const login = $("graphic-popup-login-input")?.value.trim() || "";
+  const password = $("graphic-popup-password")?.value || "";
+  const baseUrl = $("graphic-popup-url")?.value.trim() || GRAPHIC_DEFAULT_BASE_URL;
+  if (!login || !password) {
+    setStatus("Укажите логин и пароль Graphic");
+    return;
+  }
+  setStatus("Вход в Graphic…");
+  try {
+    const status = await graphicLoginFromPage(login, password, baseUrl);
+    if ($("graphic-popup-password")) $("graphic-popup-password").value = "";
+    applyGraphicPopupStatus(status);
+    setStatus("");
+  } catch (err) {
+    setStatus(err?.message || String(err));
+  }
+}
+
+async function handleGraphicPopupLogout() {
+  try {
+    const status = await graphicLogoutFromPage();
+    applyGraphicPopupStatus(status);
+    setStatus("");
+  } catch (err) {
+    setStatus(err?.message || String(err));
+  }
+}
+
 async function init() {
 
   const manifest = chrome.runtime.getManifest();
@@ -371,6 +436,8 @@ async function init() {
   renderDomains();
 
   await refreshAuthStatuses();
+
+  await refreshGraphicPopup();
 
 }
 
@@ -408,6 +475,16 @@ $("btn-add-tab").addEventListener("click", addCurrentTabDomain);
 
 $("btn-open-constructor").addEventListener("click", openConstructor);
 
+$("btn-graphic-popup-login")?.addEventListener("click", () => void handleGraphicPopupLogin());
+
+$("btn-graphic-popup-logout")?.addEventListener("click", () => void handleGraphicPopupLogout());
+
+$("graphic-popup-password")?.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Enter") return;
+  ev.preventDefault();
+  void handleGraphicPopupLogin();
+});
+
 
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -436,6 +513,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
     return;
 
+  }
+
+  if (changes[STORAGE_KEYS.GRAPHIC_AUTH] || changes[STORAGE_KEYS.GRAPHIC_BASE_URL]) {
+    void refreshGraphicPopup();
   }
 
 

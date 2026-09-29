@@ -1,15 +1,19 @@
 {
   "manifest_version": 3,
   "name": "PromoHub конструктор задач",
-  "version": "2.18.0",
+  "version": "2.18.2",
   "description": "Управление доменами PromoHub admin и переход в конструктор связей задач.",
   "action": {
     "default_popup": "src/sniffer/popup.html",
     "default_title": "PromoHub конструктор задач"
   },
   "permissions": ["storage", "tabs", "scripting", "cookies"],
-  "host_permissions": ["https://reports.maxbit.private/*"],
-  "optional_host_permissions": ["https://*/*"],
+  "host_permissions": [
+    "https://reports.maxbit.private/*",
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

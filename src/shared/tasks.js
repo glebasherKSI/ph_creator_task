@@ -186,6 +186,13 @@ export function resolveTagFromInput(raw, fallbackTag, fallbackTagId) {
   return { tag: null, tag_id: null };
 }
 
+function stripFromCreatePayload(payload) {
+  for (const key of Object.keys(payload)) {
+    if (STRIP_FROM_CREATE.has(key)) delete payload[key];
+  }
+  return payload;
+}
+
 function applyCreateDefaults(payload) {
   if (!("infinite" in payload)) payload.infinite = false;
   if (!("state" in payload)) payload.state = "draft";
@@ -208,6 +215,7 @@ export function buildCreatePayload(task, overrides = {}) {
   const payload = {};
   for (const key of CREATE_TASK_KEYS) {
     if (!(key in merged) || merged[key] === undefined) continue;
+    if (STRIP_FROM_CREATE.has(key)) continue;
     if (key === "tag") continue;
     if (key === "tag_id") continue;
     payload[key] = cloneJson(merged[key]);
@@ -221,6 +229,7 @@ export function buildCreatePayload(task, overrides = {}) {
   if (tagInfo.tag_id != null) payload.tag_id = tagInfo.tag_id;
   if (tagInfo.tag) payload.tag = tagInfo.tag;
 
+  stripFromCreatePayload(payload);
   return applyCreateDefaults(payload);
 }
 
@@ -238,6 +247,7 @@ export function buildPatchPayload(task, conditions) {
   if (tag) payload.tag = tag;
 
   applyCreateDefaults(payload);
+  stripFromCreatePayload(payload);
   payload.id = task.id;
   return { gamification_task: payload };
 }

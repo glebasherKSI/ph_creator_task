@@ -1,4 +1,4 @@
-import { PAGE_SIZE } from "../shared/constants.js";
+import { PAGE_SIZE, STORAGE_KEYS } from "../shared/constants.js";
 import {
   fillDomainSelect,
   ensureDefaultDomainsInStorage,
@@ -35,6 +35,14 @@ import {
   reportTaskNamesMatch,
 } from "../shared/reports.js";
 import { getTaskChartsMarkup, groupStatsRowsByTask, mountTaskCharts } from "../shared/stats-charts.js";
+import {
+  GRAPHIC_DEFAULT_BASE_URL,
+  graphicApiGet,
+  graphicLoginFromPage,
+  graphicLogoutFromPage,
+  graphicStatusFromPage,
+} from "../shared/graphic-api.js";
+import { mapPlannerTaskToDraft } from "../shared/graphic-task-map.js";
 const CARD_W = 220;
 const CARD_H = 110;
 const CARD_MIN_H = CARD_H;
@@ -66,6 +74,11 @@ const CARD_HEADER_COLORS = {
   pink: { label: "Розовый" },
   amber: { label: "Янтарный" },
 };
+
+/** Кэш полных тел задач (conditions/_full) — повторное добавление на канву без ожидания API. */
+const TASK_FULL_CACHE_TTL_MS = 10 * 60 * 1000;
+/** @type {Map<string, { full: object, expiresAt: number }>} key = domain::taskId */
+const taskFullByIdCache = new Map();
 
 const state = {
   domains: [],
@@ -114,6 +127,13 @@ const state = {
   statsFetchSeq: 0,
   statsActiveFetchSeq: 0,
   statsFetchDebounceTimer: null,
+  graphicAuthenticated: false,
+  graphicUser: null,
+  graphicBaseUrl: GRAPHIC_DEFAULT_BASE_URL,
+  packagesStatusFilter: "ready",
+  packagesItems: [],
+  packagesLoading: false,
+  packagesError: "",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -1823,7 +1843,23 @@ function buildCardMetaHtml(task) {
   return `<div class="task-card__meta">${parts.join("")}</div>`;
 }
 
+function plannerNoteFromCanvasTask(task) {
+  return String(task?._full?._plannerNote || task?._plannerNote || "").trim();
+}
+
+function buildPlannerHintHtml(task) {
+  const note = plannerNoteFromCanvasTask(task);
+  if (!note) return "";
+  return `<div class="task-card__planner-hint" title="${escapeHtml(note)}">Бриф из графика — настроить вручную</div>`;
+}
+
 function buildCardDepsHtml(taskId) {
+  const task = state.canvas.get(String(taskId));
+  // conditions === null → ещё грузим _full; [] → загружено, связей нет
+  if (task && task.conditions == null && !isTaskLocalOnly(task)) {
+    return '<div class="task-card__deps task-card__deps--loading">Загрузка условий…</div>';
+  }
+
   const { incoming, outgoing } = getDependencyRefs(taskId);
   const parts = [];
 
@@ -2195,6 +2231,7 @@ function renderCards() {
         <div class="task-card__name">${escapeHtml(task.name || "(без названия)")}</div>
         <div class="task-card__fi">${escapeHtml(task.frontend_identifier || "—")}</div>
         ${buildCardMetaHtml(task)}
+        ${buildPlannerHintHtml(task)}
         ${buildCardDepsHtml(task.id)}
       </div>
       <div class="task-card__port task-card__port--out" data-port="out" title="Выход — перетащите к цели"></div>
@@ -3237,6 +3274,44 @@ async function onDocumentMouseUp(ev) {
   await persistCanvasPositions();
 }
 
+function taskFullCacheKey(taskId) {
+  const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select")?.value);
+  return `${domain}::${String(taskId)}`;
+}
+
+function readCachedTaskFull(taskId) {
+  const key = taskFullCacheKey(taskId);
+  const cached = taskFullByIdCache.get(key);
+  if (!cached || cached.expiresAt <= Date.now() || !cached.full) {
+    if (cached) taskFullByIdCache.delete(key);
+    return null;
+  }
+  return cached.full;
+}
+
+function writeCachedTaskFull(taskId, full) {
+  if (!full || typeof full !== "object") return;
+  taskFullByIdCache.set(taskFullCacheKey(taskId), {
+    full,
+    expiresAt: Date.now() + TASK_FULL_CACHE_TTL_MS,
+  });
+}
+
+function applyFullTaskToCanvas(taskId, full) {
+  const id = String(taskId);
+  const existing = state.canvas.get(id);
+  if (!existing || !full) return;
+  const isDirty = state.dirtyTargets.has(id);
+  if (!isDirty) {
+    existing.conditions = Array.isArray(full.conditions) ? full.conditions : [];
+    importGraphFromConditions([id]);
+  }
+  existing._full = full;
+  existing.name = full.name || existing.name;
+  existing.frontend_identifier = full.frontend_identifier || existing.frontend_identifier;
+  syncCatalogTaskMeta(id, full);
+}
+
 async function fetchTaskConditions(taskId) {
   const id = String(taskId);
   const existingEarly = state.canvas.get(id);
@@ -3244,21 +3319,17 @@ async function fetchTaskConditions(taskId) {
     return existingEarly._full || null;
   }
 
+  const cachedFull = readCachedTaskFull(id);
+  if (cachedFull) {
+    applyFullTaskToCanvas(id, cachedFull);
+    return cachedFull;
+  }
+
   const data = await callApi(`/admin/api/gamification/tasks/${taskId}?locale=ru`);
   const full = taskFromResponse(data);
   if (!full) return null;
-  const existing = state.canvas.get(String(taskId));
-  if (existing) {
-    const isDirty = state.dirtyTargets.has(id);
-    if (!isDirty) {
-      existing.conditions = full.conditions || [];
-      importGraphFromConditions([id]);
-    }
-    existing._full = full;
-    existing.name = full.name || existing.name;
-    existing.frontend_identifier = full.frontend_identifier || existing.frontend_identifier;
-    syncCatalogTaskMeta(String(taskId), full);
-  }
+  writeCachedTaskFull(id, full);
+  applyFullTaskToCanvas(id, full);
   return full;
 }
 
@@ -3322,35 +3393,53 @@ async function addSelectedToCanvas() {
     const positions = layout.positions || {};
     const canvasBeforeAdd = new Set(state.canvas.keys());
     const userIds = ids.map(String);
-    let done = 0;
+    const placed = [];
 
     for (const id of userIds) {
       if (!(await placeTaskOnCanvas(id, positions, false))) continue;
-
-      try {
-        const msg = `Загрузка условий: ${done + 1}/${userIds.length} (#${id})`;
-        setStatus(msg);
-        showCanvasLoading(msg);
-        await fetchTaskConditions(id);
-      } catch {
-        /* пропускаем отдельные ошибки */
-      }
-
-      done += 1;
+      placed.push(id);
       state.listChecked.delete(id);
     }
 
-    importGraphFromConditions(userIds);
-    layoutCanvasTasks({ onlyIds: userIds, fixedIds: [...canvasBeforeAdd] });
+    // Сразу показываем карточки (conditions: null → «Загрузка условий…»), затем догружаем _full.
+    layoutCanvasTasks({ onlyIds: placed, fixedIds: [...canvasBeforeAdd] });
     renderCards();
-    if (measureCardHeights()) {
-      layoutCanvasTasks({ onlyIds: userIds, fixedIds: [...canvasBeforeAdd] });
-    }
+    renderTaskList();
+    updateAddToCanvasButton();
+
+    let done = 0;
+    const refreshAfterConditions = () => {
+      importGraphFromConditions(placed);
+      layoutCanvasTasks({ onlyIds: placed, fixedIds: [...canvasBeforeAdd] });
+      renderCards();
+      if (measureCardHeights()) {
+        layoutCanvasTasks({ onlyIds: placed, fixedIds: [...canvasBeforeAdd] });
+        renderCards();
+      }
+    };
+
+    await Promise.all(
+      placed.map(async (id) => {
+        try {
+          await fetchTaskConditions(id);
+        } catch {
+          const task = state.canvas.get(id);
+          if (task && task.conditions == null) task.conditions = [];
+        } finally {
+          done += 1;
+          const msg = `Загрузка условий: ${done}/${placed.length}`;
+          setStatus(msg);
+          showCanvasLoading(msg);
+          refreshAfterConditions();
+        }
+      })
+    );
+
     await persistCanvasPositions();
     renderCards();
     renderTaskList();
 
-    setStatus(`На канве ${state.canvas.size} задач (добавлено ${done})`);
+    setStatus(`На канве ${state.canvas.size} задач (добавлено ${placed.length})`);
   } catch (err) {
     setStatus(`Ошибка добавления: ${err.message || err}`, true);
   } finally {
@@ -4021,18 +4110,23 @@ async function applyCanvasTemplate(template) {
       if (await placeTaskOnCanvas(id, positions, true)) placed.push(id);
     }
 
-    for (let i = 0; i < placed.length; i += 1) {
-      const id = placed[i];
-      if (isTaskLocalOnly(state.canvas.get(id))) continue;
-      try {
-        const msg = `Загрузка условий: ${i + 1}/${placed.length} (#${id})`;
-        setStatus(msg);
-        showCanvasLoading(msg);
-        await fetchTaskConditions(id);
-      } catch {
-        /* пропускаем отдельные ошибки */
-      }
-    }
+    const remotePlaced = placed.filter((id) => !isTaskLocalOnly(state.canvas.get(id)));
+    let condDone = 0;
+    await Promise.all(
+      remotePlaced.map(async (id) => {
+        try {
+          await fetchTaskConditions(id);
+        } catch {
+          const task = state.canvas.get(id);
+          if (task && task.conditions == null) task.conditions = [];
+        } finally {
+          condDone += 1;
+          const msg = `Загрузка условий: ${condDone}/${remotePlaced.length}`;
+          setStatus(msg);
+          showCanvasLoading(msg);
+        }
+      })
+    );
 
     state.edges = [];
     state.targetConfigs.clear();
@@ -4829,17 +4923,281 @@ function renderStatsPanel() {
   bindStatsEvents();
 }
 
+function graphicUserLabel(user) {
+  if (!user || typeof user !== "object") return "";
+  return String(user.username || user.email || user.login || "").trim();
+}
+
+function setGraphicAuthStatus(text, kind = "") {
+  const el = $("graphic-auth-status");
+  if (!el) return;
+  el.textContent = text || "";
+  el.classList.toggle("packages-auth__status--ok", kind === "ok");
+  el.classList.toggle("packages-auth__status--error", kind === "error");
+}
+
+function applyGraphicAuthToForm(status) {
+  state.graphicAuthenticated = Boolean(status?.authenticated);
+  state.graphicUser = status?.user || null;
+  state.graphicBaseUrl = status?.baseUrl || GRAPHIC_DEFAULT_BASE_URL;
+  const urlEl = $("graphic-base-url");
+  if (urlEl && !urlEl.value) urlEl.value = state.graphicBaseUrl;
+  if (urlEl && status?.baseUrl) urlEl.value = status.baseUrl;
+  $("btn-graphic-logout")?.toggleAttribute("hidden", !state.graphicAuthenticated);
+  const name = graphicUserLabel(state.graphicUser);
+  if (state.graphicAuthenticated) {
+    setGraphicAuthStatus(name ? `Вход выполнен: ${name}` : "Вход выполнен", "ok");
+  } else {
+    setGraphicAuthStatus("Вход в Graphic не выполнен");
+  }
+}
+
+function packageKindLabel(kind) {
+  if (kind === "seasonal") return "Сезонные";
+  if (kind === "permanent") return "Постоянные";
+  return kind || "—";
+}
+
+function packageStatusLabel(status) {
+  if (status === "ready") return "Готово";
+  if (status === "draft") return "Черновик";
+  if (status === "archived") return "Архив";
+  return status || "—";
+}
+
+function formatPackageDates(pkg) {
+  const from = formatCardDate(pkg?.available_from) || "—";
+  const till = formatCardDate(pkg?.available_till) || "—";
+  return `${from} → ${till}`;
+}
+
+function renderPackagesList() {
+  const list = $("packages-list");
+  const errorEl = $("packages-error");
+  if (!list) return;
+
+  if (errorEl) {
+    errorEl.hidden = !state.packagesError;
+    errorEl.textContent = state.packagesError || "";
+  }
+
+  if (!state.graphicAuthenticated) {
+    list.innerHTML = '<li class="packages-list__empty">Сначала войдите в Promo Graphic</li>';
+    return;
+  }
+  if (state.packagesLoading) {
+    list.innerHTML = '<li class="packages-list__empty">Загрузка пакетов…</li>';
+    return;
+  }
+  if (!state.packagesItems.length) {
+    list.innerHTML = '<li class="packages-list__empty">Пакетов нет</li>';
+    return;
+  }
+
+  list.innerHTML = "";
+  for (const pkg of state.packagesItems) {
+    const li = document.createElement("li");
+    li.className = "packages-item";
+    const meta = document.createElement("div");
+    meta.className = "packages-item__meta";
+    const name = document.createElement("div");
+    name.className = "packages-item__name";
+    name.textContent = pkg.name || `Пакет #${pkg.id}`;
+    const sub = document.createElement("div");
+    sub.className = "packages-item__sub";
+    sub.textContent = [
+      pkg.project_code || "—",
+      packageKindLabel(pkg.kind),
+      packageStatusLabel(pkg.status),
+      formatPackageDates(pkg),
+      `${pkg.task_count ?? 0} задач`,
+    ].join(" · ");
+    meta.append(name, sub);
+    const btn = document.createElement("button");
+    btn.className = "btn btn--primary";
+    btn.type = "button";
+    btn.textContent = "Открыть на канве";
+    btn.dataset.packageId = String(pkg.id);
+    li.append(meta, btn);
+    list.appendChild(li);
+  }
+}
+
+async function refreshGraphicAuthUi() {
+  const status = await graphicStatusFromPage();
+  applyGraphicAuthToForm(status);
+  return status;
+}
+
+async function loadGraphicPackages() {
+  if (!state.graphicAuthenticated) {
+    state.packagesItems = [];
+    state.packagesError = "";
+    renderPackagesList();
+    return;
+  }
+  state.packagesLoading = true;
+  state.packagesError = "";
+  renderPackagesList();
+  try {
+    const data = await graphicApiGet("/api/promohub-planner/packages", {
+      status: state.packagesStatusFilter,
+    });
+    state.packagesItems = Array.isArray(data?.packages) ? data.packages : [];
+  } catch (err) {
+    state.packagesItems = [];
+    state.packagesError = err?.message || String(err);
+    if (/истекла|Нет входа/i.test(state.packagesError)) {
+      state.graphicAuthenticated = false;
+      state.graphicUser = null;
+      applyGraphicAuthToForm({ authenticated: false, user: null, baseUrl: state.graphicBaseUrl });
+    }
+  } finally {
+    state.packagesLoading = false;
+    renderPackagesList();
+  }
+}
+
+async function refreshPackagesView() {
+  await refreshGraphicAuthUi();
+  await loadGraphicPackages();
+}
+
+function nextDraftStackOrigin() {
+  let y = GRID_START_Y;
+  for (const task of state.canvas.values()) {
+    const bottom = Number(task.y) + CARD_H + GRID_GAP_Y;
+    if (Number.isFinite(bottom) && bottom > y) y = bottom;
+  }
+  return { x: GRID_START_X, y };
+}
+
+async function openPackageOnCanvas(packageId) {
+  const id = Number(packageId);
+  if (!Number.isInteger(id) || id <= 0) return;
+
+  setMainView("canvas");
+  showCanvasLoading("Открываю пакет на канве…");
+  try {
+    const pkg = await graphicApiGet(`/api/promohub-planner/packages/${id}`);
+    let tasks = Array.isArray(pkg?.tasks) ? pkg.tasks : [];
+    if (!tasks.length) {
+      const extra = await graphicApiGet(`/api/promohub-planner/packages/${id}/tasks`);
+      tasks = Array.isArray(extra?.tasks) ? extra.tasks : [];
+    }
+    if (!tasks.length) {
+      showToast("В пакете нет задач", { type: "warning" });
+      return;
+    }
+
+    const origin = nextDraftStackOrigin();
+    const placed = [];
+    const tasksById = new Map();
+    for (const item of tasks) {
+      if (!item || item.id == null) continue;
+      tasksById.set(item.id, item);
+      tasksById.set(String(item.id), item);
+    }
+    tasks.forEach((task, index) => {
+      const body = mapPlannerTaskToDraft(task, { tasksById });
+      const draftId = newLocalDraftId();
+      const col = index % GRID_COLS;
+      const row = Math.floor(index / GRID_COLS);
+      placeLocalDraftOnCanvas(
+        draftId,
+        {
+          x: origin.x + col * (CARD_W + GRID_GAP_X),
+          y: origin.y + row * (CARD_H + GRID_GAP_Y),
+        },
+        body
+      );
+      placed.push(draftId);
+    });
+
+    renderCards();
+    updateCounters();
+    void persistCanvasPositions();
+    showToast(
+      `На канву добавлено ${placed.length} черновиков из «${pkg.name || id}». ПКМ → Изменить — сохранение на бэк вручную.`,
+      { durationMs: 7000 }
+    );
+  } catch (err) {
+    showToast(err?.message || String(err), { type: "warning" });
+  } finally {
+    hideCanvasLoading();
+  }
+}
+
+async function handleGraphicLogin() {
+  const login = $("graphic-login")?.value.trim() || "";
+  const password = $("graphic-password")?.value || "";
+  const baseUrl = $("graphic-base-url")?.value.trim() || GRAPHIC_DEFAULT_BASE_URL;
+  if (!login || !password) {
+    setGraphicAuthStatus("Укажите логин и пароль", "error");
+    return;
+  }
+  $("btn-graphic-login")?.setAttribute("disabled", "true");
+  setGraphicAuthStatus("Вхожу…");
+  try {
+    const status = await graphicLoginFromPage(login, password, baseUrl);
+    if ($("graphic-password")) $("graphic-password").value = "";
+    applyGraphicAuthToForm(status);
+    await loadGraphicPackages();
+  } catch (err) {
+    setGraphicAuthStatus(err?.message || String(err), "error");
+  } finally {
+    $("btn-graphic-login")?.removeAttribute("disabled");
+  }
+}
+
+async function handleGraphicLogout() {
+  try {
+    const status = await graphicLogoutFromPage();
+    applyGraphicAuthToForm(status);
+    state.packagesItems = [];
+    state.packagesError = "";
+    renderPackagesList();
+  } catch (err) {
+    setGraphicAuthStatus(err?.message || String(err), "error");
+  }
+}
+
+function bindPackagesEvents() {
+  $("btn-graphic-login")?.addEventListener("click", () => void handleGraphicLogin());
+  $("btn-graphic-logout")?.addEventListener("click", () => void handleGraphicLogout());
+  $("graphic-password")?.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      void handleGraphicLogin();
+    }
+  });
+  $("btn-packages-refresh")?.addEventListener("click", () => void refreshPackagesView());
+  $("packages-status-filter")?.addEventListener("change", (ev) => {
+    state.packagesStatusFilter = String(ev.target?.value || "");
+    void loadGraphicPackages();
+  });
+  $("packages-list")?.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("[data-package-id]");
+    if (!btn) return;
+    void openPackageOnCanvas(btn.dataset.packageId);
+  });
+}
+
 function setMainView(view) {
-  state.currentMainView = view === "stats" ? "stats" : "canvas";
-  const isStats = state.currentMainView === "stats";
-  $("view-canvas")?.classList.toggle("main-view--active", !isStats);
-  $("view-stats")?.classList.toggle("main-view--active", isStats);
-  $("view-canvas")?.setAttribute("aria-hidden", String(isStats));
-  $("view-stats")?.setAttribute("aria-hidden", String(!isStats));
-  $("tab-canvas")?.classList.toggle("main-tabs__btn--active", !isStats);
-  $("tab-stats")?.classList.toggle("main-tabs__btn--active", isStats);
-  $("tab-canvas")?.setAttribute("aria-selected", String(!isStats));
-  $("tab-stats")?.setAttribute("aria-selected", String(isStats));
+  const allowed = view === "stats" || view === "packages" ? view : "canvas";
+  state.currentMainView = allowed;
+  $("view-canvas")?.classList.toggle("main-view--active", allowed === "canvas");
+  $("view-stats")?.classList.toggle("main-view--active", allowed === "stats");
+  $("view-packages")?.classList.toggle("main-view--active", allowed === "packages");
+  $("view-canvas")?.setAttribute("aria-hidden", String(allowed !== "canvas"));
+  $("view-stats")?.setAttribute("aria-hidden", String(allowed !== "stats"));
+  $("view-packages")?.setAttribute("aria-hidden", String(allowed !== "packages"));
+  $("tab-canvas")?.classList.toggle("main-tabs__btn--active", allowed === "canvas");
+  $("tab-stats")?.classList.toggle("main-tabs__btn--active", allowed === "stats");
+  $("tab-packages")?.classList.toggle("main-tabs__btn--active", allowed === "packages");
+  $("tab-canvas")?.setAttribute("aria-selected", String(allowed === "canvas"));
+  $("tab-stats")?.setAttribute("aria-selected", String(allowed === "stats"));
+  $("tab-packages")?.setAttribute("aria-selected", String(allowed === "packages"));
 }
 
 function clearStatsFetchDebounce() {
@@ -5030,12 +5388,17 @@ function bindEvents() {
 
   initCatalogSearch();
   bindTemplateEvents();
+  bindPackagesEvents();
 
   $("tab-canvas")?.addEventListener("click", () => setMainView("canvas"));
   $("tab-stats")?.addEventListener("click", () => {
     setMainView("stats");
     renderStatsPanel();
     void ensureStatsLoaded();
+  });
+  $("tab-packages")?.addEventListener("click", () => {
+    setMainView("packages");
+    void refreshPackagesView();
   });
 
   $("catalog-status-filter")?.addEventListener("click", (ev) => {
@@ -5159,10 +5522,18 @@ async function init() {
     void copyPanel.loadMeta(state.selectedDomain);
     bindEvents();
     renderStatsPanel();
+    renderPackagesList();
+    void refreshGraphicAuthUi();
     setMainView("canvas");
     applyViewportTransform();
     updateCounters();
     updateCanvasSelectionUI();
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "local") return;
+      if (!changes[STORAGE_KEYS.GRAPHIC_AUTH] && !changes[STORAGE_KEYS.GRAPHIC_BASE_URL]) return;
+      if (state.currentMainView === "packages") void refreshPackagesView();
+      else void refreshGraphicAuthUi();
+    });
     if (!state.domains.length) {
       setStatus("Нет сохранённых доменов. Добавьте админку в popup.", true);
       return;

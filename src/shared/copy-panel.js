@@ -144,12 +144,28 @@ function sectionMarkup(section) {
   const openClass = section.open ? " copy-panel__section--open" : "";
   return `
     <section class="copy-panel__section${openClass}" data-section="${section.id}">
-      <button class="copy-panel__section-header" type="button" aria-expanded="${section.open}">
-        <span class="copy-panel__section-title">${section.title}</span>
-        <span class="copy-panel__section-chevron" aria-hidden="true"></span>
-      </button>
-      <div class="copy-panel__section-body">
-        ${sectionBodies[section.id] || ""}
+      <div class="copy-panel__section-card">
+        <div class="copy-panel__section-header-row">
+          <button class="copy-panel__section-header" type="button" aria-expanded="${section.open}">
+            <span class="copy-panel__section-title">${section.title}</span>
+            <span class="copy-panel__section-chevron" aria-hidden="true"></span>
+          </button>
+          <span class="copy-panel__section-hint-anchor" hidden>
+            <button
+              type="button"
+              class="copy-panel__section-hint-badge"
+              aria-expanded="false"
+              aria-label="Бриф из графика"
+            >Бриф</button>
+            <aside class="copy-panel__section-hint" data-section-hint="${section.id}">
+              <div class="copy-panel__section-hint-title">Бриф из графика</div>
+              <pre class="copy-panel__section-hint-text"></pre>
+            </aside>
+          </span>
+        </div>
+        <div class="copy-panel__section-body">
+          ${sectionBodies[section.id] || ""}
+        </div>
       </div>
     </section>
   `;
@@ -596,6 +612,75 @@ export function formToDurationMinutes(value, infinite) {
   return Math.round(num);
 }
 
+function fillHintBox(box, items, fallbackTitle) {
+  if (!box) return false;
+  const titleEl = box.querySelector(".copy-panel__planner-hint-title, .copy-panel__section-hint-title");
+  const textEl = box.querySelector(".copy-panel__planner-hint-text, .copy-panel__section-hint-text");
+  if (!items?.length) {
+    if (textEl) textEl.textContent = "";
+    box.hidden = true;
+    return false;
+  }
+  const title = items.length === 1 && items[0].title ? items[0].title : fallbackTitle;
+  const bodyParts = items.map((item) => {
+    const body = Array.isArray(item.body) ? item.body.join("\n") : String(item.body || "");
+    if (items.length > 1 && item.title && item.title !== title) {
+      return `${item.title}\n${body}`.trim();
+    }
+    return body.trim();
+  });
+  if (titleEl) titleEl.textContent = title;
+  if (textEl) textEl.textContent = bodyParts.filter(Boolean).join("\n\n");
+  box.hidden = false;
+  return true;
+}
+
+function isLowValueLeftoverItem(item) {
+  const title = String(item?.title || "").trim();
+  const body = (Array.isArray(item?.body) ? item.body : [item?.body])
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  if (!body) return true;
+  if ((title === "Прочее" || !title) && /^Порядок в пакете:\s*\S+$/.test(body)) return true;
+  return false;
+}
+
+function applyPlannerHint(root, task) {
+  const panel = root.querySelector(".copy-panel") || root;
+  const structured = task?._plannerHints;
+  const sectionMap =
+    structured?.sections && typeof structured.sections === "object" ? structured.sections : null;
+  const leftoverItems = (Array.isArray(structured?.leftover) ? structured.leftover : []).filter(
+    (item) => !isLowValueLeftoverItem(item)
+  );
+  const topBox = root.querySelector("#copy-planner-hint");
+  let hasSectionHint = false;
+
+  for (const el of root.querySelectorAll("[data-section-hint]")) {
+    const id = el.getAttribute("data-section-hint");
+    const items = sectionMap?.[id];
+    const shown = fillHintBox(el, Array.isArray(items) ? items : [], "Бриф из графика");
+    const anchor = el.closest(".copy-panel__section-hint-anchor");
+    if (anchor) anchor.hidden = !shown;
+    const badge = anchor?.querySelector(".copy-panel__section-hint-badge");
+    if (badge) badge.setAttribute("aria-expanded", "false");
+    el.closest(".copy-panel__section")?.classList.remove("copy-panel__section--hint-open");
+    if (shown) hasSectionHint = true;
+  }
+
+  if (sectionMap) {
+    fillHintBox(topBox, leftoverItems, "Бриф из графика");
+  } else {
+    const hint = String(task?._plannerNote || "").trim();
+    const textEl = topBox?.querySelector(".copy-panel__planner-hint-text");
+    if (textEl) textEl.textContent = hint;
+    if (topBox) topBox.hidden = !hint;
+  }
+
+  panel?.classList.toggle("copy-panel--has-planner-hints", hasSectionHint);
+}
+
 export function fillCopyForm(root, task, { mode = "copy" } = {}) {
   const isEdit = mode === "edit";
   field(root, "sourceId").value = String(task.id ?? "");
@@ -678,6 +763,8 @@ export function fillCopyForm(root, task, { mode = "copy" } = {}) {
   if (root.__notificationEventsCombobox) {
     root.__notificationEventsCombobox.setValue(notificationEvents);
   }
+
+  applyPlannerHint(root, task);
 }
 
 export function buildCopyPayload(root, sourceTask) {
@@ -759,6 +846,10 @@ export function getCopyPanelMarkup({
       <span class="copy-panel__meta-status-text">Загрузка справочников…</span>
     </div>
     <div id="copy-panel-status" class="copy-panel__status">Загрузите исходную задачу</div>
+    <aside id="copy-planner-hint" class="copy-panel__planner-hint" hidden>
+      <div class="copy-panel__planner-hint-title">Бриф из графика</div>
+      <pre class="copy-panel__planner-hint-text"></pre>
+    </aside>
     <div class="copy-panel__sections">
       ${SECTIONS.map(sectionMarkup).join("")}
     </div>
@@ -784,6 +875,14 @@ export function getCopyPanelMarkup({
   `;
 }
 
+function closePlannerHintPopovers(root, exceptSection = null) {
+  for (const section of root.querySelectorAll(".copy-panel__section--hint-open")) {
+    if (section === exceptSection) continue;
+    section.classList.remove("copy-panel__section--hint-open");
+    section.querySelector(".copy-panel__section-hint-badge")?.setAttribute("aria-expanded", "false");
+  }
+}
+
 function bindSectionToggles(root) {
   for (const header of root.querySelectorAll(".copy-panel__section-header")) {
     header.addEventListener("click", () => {
@@ -793,6 +892,25 @@ function bindSectionToggles(root) {
       header.setAttribute("aria-expanded", String(open));
     });
   }
+}
+
+function bindSectionHintPopovers(root) {
+  for (const badge of root.querySelectorAll(".copy-panel__section-hint-badge")) {
+    badge.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const section = badge.closest(".copy-panel__section");
+      if (!section) return;
+      const willOpen = !section.classList.contains("copy-panel__section--hint-open");
+      closePlannerHintPopovers(root, willOpen ? section : null);
+      section.classList.toggle("copy-panel__section--hint-open", willOpen);
+      badge.setAttribute("aria-expanded", String(willOpen));
+    });
+  }
+  root.addEventListener("click", (ev) => {
+    if (ev.target.closest(".copy-panel__section-hint-anchor")) return;
+    closePlannerHintPopovers(root);
+  });
 }
 
 function updateMetaStatusEl(root, { loading = false, error = false, text = "" } = {}) {
@@ -1093,6 +1211,7 @@ export function mountCopyPanel(root, options = {}) {
   infiniteEl?.addEventListener("change", syncDurationDisabled);
 
   bindSectionToggles(root);
+  bindSectionHintPopovers(root);
   syncDurationDisabled();
 
   const repeatMount = field(root, "repeatSchedule");
