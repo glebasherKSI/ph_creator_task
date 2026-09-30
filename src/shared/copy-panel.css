@@ -229,17 +229,27 @@
 
 .copy-panel__section {
   position: relative;
-  z-index: 0;
   overflow: visible;
   background: transparent;
   border: 0;
   box-shadow: none;
 }
 
+/* Keep brief popovers above neighbors without trapping every section's menus. */
 .copy-panel__section:has(.copy-panel__section-hint-anchor:hover),
 .copy-panel__section:has(.copy-panel__section-hint-anchor:focus-within),
 .copy-panel__section--hint-open {
   z-index: 4;
+}
+
+/* Open section with an active field/menu must sit above following accordion cards. */
+.copy-panel__section--open:focus-within,
+.copy-panel__section--open:has(.multi-combobox__dropdown:not(.multi-combobox__dropdown--hidden)),
+.copy-panel__section--open:has(.country-selector__dropdown:not(.country-selector__dropdown--hidden)),
+.copy-panel__section--open:has(
+  .conditions-builder__picker-popover:not(.conditions-builder__picker-popover--hidden)
+) {
+  z-index: 6;
 }
 
 .copy-panel__section-card {

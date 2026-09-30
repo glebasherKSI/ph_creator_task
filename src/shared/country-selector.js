@@ -360,7 +360,11 @@ export function mountCountrySelector(container, initial = {}) {
   }
 
   function getCountryByCode(code) {
-    return data?.countries?.find((item) => item.code === code) ?? null;
+    const needle = String(code || "").trim().toUpperCase();
+    if (!needle || !data?.countries?.length) return null;
+    return (
+      data.countries.find((item) => String(item.code || "").trim().toUpperCase() === needle) ?? null
+    );
   }
 
   function getFilteredCountries() {
@@ -876,9 +880,20 @@ export function mountCountrySelector(container, initial = {}) {
     matchingType =
       COUNTRIES_MATCHING_TYPES.some((item) => item.id === mt) ? mt : "countries";
 
-    const countryCodes = (countries || []).map((item) => String(item).toUpperCase());
-    allCountriesSelected = countryCodes.length === 1 && countryCodes[0] === "ALL";
-    selectedCountries = new Set(allCountriesSelected ? [] : countryCodes);
+    const countryCodes = (countries || [])
+      .map((item) => String(item ?? "").trim())
+      .filter(Boolean);
+    const normalized = countryCodes.map((code) => code.toUpperCase());
+    allCountriesSelected =
+      normalized.length > 0 && normalized.every((code) => code === "ALL");
+    selectedCountries = new Set(
+      allCountriesSelected
+        ? []
+        : normalized.filter((code) => code !== "ALL").map((code) => {
+            const known = getCountryByCode(code);
+            return known?.code || code;
+          })
+    );
     selectedLists = new Set((countriesLists || []).map(String));
 
     syncMatchingRadios();

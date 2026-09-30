@@ -683,8 +683,13 @@ function applyPlannerHint(root, task) {
 
 export function fillCopyForm(root, task, { mode = "copy" } = {}) {
   const isEdit = mode === "edit";
+  const keepNameAsIs = isEdit || task?._plannerTaskId != null;
   field(root, "sourceId").value = String(task.id ?? "");
-  field(root, "name").value = isEdit ? task.name || "" : task.name ? `${task.name}_copy` : "";
+  field(root, "name").value = keepNameAsIs
+    ? task.name || ""
+    : task.name
+      ? `${task.name}_copy`
+      : "";
   field(root, "frontendIdentifier").value = task.frontend_identifier || "";
   fillLocales(root, task.locales);
   field(root, "hidden").checked = boolValue(task.hidden, false);

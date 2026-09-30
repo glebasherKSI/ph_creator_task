@@ -38,11 +38,16 @@ import { getTaskChartsMarkup, groupStatsRowsByTask, mountTaskCharts } from "../s
 import {
   GRAPHIC_DEFAULT_BASE_URL,
   graphicApiGet,
+  graphicApiPost,
   graphicLoginFromPage,
   graphicLogoutFromPage,
   graphicStatusFromPage,
 } from "../shared/graphic-api.js";
-import { mapPlannerTaskToDraft } from "../shared/graphic-task-map.js";
+import {
+  getPlannerPhBackendId,
+  mapPlannerTaskToDraft,
+  mergeBackendTaskWithPlannerBrief,
+} from "../shared/graphic-task-map.js";
 const CARD_W = 220;
 const CARD_H = 110;
 const CARD_MIN_H = CARD_H;
@@ -2814,6 +2819,26 @@ async function openEditPanel(taskId) {
   return openTaskPanel(id, "edit");
 }
 
+function plannerTaskIdFromCanvasTask(task) {
+  if (!task || typeof task !== "object") return null;
+  const raw = task._plannerTaskId ?? task._full?._plannerTaskId;
+  if (raw == null || raw === "") return null;
+  const num = Number(raw);
+  return Number.isInteger(num) && num > 0 ? num : null;
+}
+
+async function notifyGraphicBackendCreated(sourceTask, phBackendId) {
+  const plannerId = plannerTaskIdFromCanvasTask(sourceTask);
+  if (!plannerId || !phBackendId) return;
+  try {
+    await graphicApiPost(`/api/promohub-planner/tasks/${plannerId}/mark-backend-created`, {
+      ph_backend_id: String(phBackendId),
+    });
+  } catch (err) {
+    console.warn("[graphic] mark-backend-created failed:", err?.message || err);
+  }
+}
+
 async function handleCopyCreate(requestBody) {
   const crossDomain = copyCrossDomainTarget
     ? normalizeDomainOrEmpty(copyCrossDomainTarget)
@@ -2906,6 +2931,7 @@ async function handleCopyCreate(requestBody) {
       ? `Локальный черновик сохранён на бэк как #${newIdStr}`
       : `Создана задача #${newIdStr} — карточка добавлена на канву`
   );
+  void notifyGraphicBackendCreated(source, newIdStr);
   return response;
 }
 
@@ -2972,6 +2998,11 @@ async function handleCopyCreateToDomain(requestBody, targetDomain) {
       ? `Задача #${newId} создана на ${targetDomain}`
       : `Задача создана на ${targetDomain}, но id не найден`
   );
+  if (newId != null) {
+    const sourceId = copyPanelSourceId;
+    const source = sourceId ? state.canvas.get(sourceId) : null;
+    void notifyGraphicBackendCreated(source, newId);
+  }
   return response;
 }
 
@@ -3021,12 +3052,13 @@ async function handleEditUpdate(requestBody) {
 
   const local = state.canvas.get(taskId);
   if (local) {
+    const brief = pickPlannerBriefFields(local._full);
     state.canvas.set(taskId, {
       ...local,
       name,
       frontend_identifier: frontendIdentifier,
       conditions,
-      _full: updated,
+      _full: { ...updated, ...brief },
     });
   }
 
@@ -3297,6 +3329,20 @@ function writeCachedTaskFull(taskId, full) {
   });
 }
 
+function pickPlannerBriefFields(source) {
+  if (!source || typeof source !== "object") return {};
+  const out = {};
+  for (const key of [
+    "_plannerNote",
+    "_plannerHints",
+    "_plannerTaskId",
+    "_plannerPrerequisiteId",
+  ]) {
+    if (source[key] !== undefined) out[key] = source[key];
+  }
+  return out;
+}
+
 function applyFullTaskToCanvas(taskId, full) {
   const id = String(taskId);
   const existing = state.canvas.get(id);
@@ -3306,7 +3352,8 @@ function applyFullTaskToCanvas(taskId, full) {
     existing.conditions = Array.isArray(full.conditions) ? full.conditions : [];
     importGraphFromConditions([id]);
   }
-  existing._full = full;
+  const brief = pickPlannerBriefFields(existing._full);
+  existing._full = { ...full, ...brief };
   existing.name = full.name || existing.name;
   existing.frontend_identifier = full.frontend_identifier || existing.frontend_identifier;
   syncCatalogTaskMeta(id, full);
@@ -3374,6 +3421,46 @@ function placeLocalDraftOnCanvas(id, layout, body) {
     localOnly: true,
     ...(headerColor ? { headerColor } : {}),
   });
+  return true;
+}
+
+/** Задача уже есть на бэке (ph_backend_id) — карточка с реальным id, сохранение через PATCH. */
+function placeLinkedBackendTaskOnCanvas(backendId, layout, body) {
+  const id = String(backendId);
+  const full = body && typeof body === "object" ? cloneJson(body) : {};
+  if (full.id == null) full.id = Number(backendId) || backendId;
+  const existing = state.canvas.get(id);
+  const headerColor = normalizeHeaderColorId(layout?.headerColor ?? existing?.headerColor);
+  const x = existing && Number.isFinite(Number(existing.x))
+    ? Number(existing.x)
+    : Number.isFinite(Number(layout?.x))
+      ? Number(layout.x)
+      : GRID_START_X;
+  const y = existing && Number.isFinite(Number(existing.y))
+    ? Number(existing.y)
+    : Number.isFinite(Number(layout?.y))
+      ? Number(layout.y)
+      : GRID_START_Y;
+
+  state.catalog.set(id, {
+    id,
+    name: full.name || existing?.name || "",
+    frontend_identifier: full.frontend_identifier || existing?.frontend_identifier || "",
+    state: String(full.state ?? "draft").toLowerCase(),
+  });
+
+  state.canvas.set(id, {
+    id,
+    name: full.name || "(без названия)",
+    frontend_identifier: full.frontend_identifier || "",
+    conditions: Array.isArray(full.conditions) ? full.conditions : [],
+    _full: full,
+    x,
+    y,
+    configuredOnBackend: true,
+    ...(headerColor ? { headerColor } : {}),
+  });
+  writeCachedTaskFull(id, full);
   return true;
 }
 
@@ -5090,37 +5177,95 @@ async function openPackageOnCanvas(packageId) {
       return;
     }
 
+    const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select")?.value);
+    const linkedTasks = tasks.filter((task) => getPlannerPhBackendId(task) != null);
+    if (linkedTasks.length && !domain) {
+      showToast("Выберите домен админки — без него нельзя подгрузить задачи с ph_backend_id", {
+        type: "warning",
+        durationMs: 7000,
+      });
+      return;
+    }
+    if (linkedTasks.length) {
+      await ensureAuthenticated(domain);
+    }
+
     const origin = nextDraftStackOrigin();
     const placed = [];
+    const linkedPlaced = [];
+    const loadErrors = [];
     const tasksById = new Map();
     for (const item of tasks) {
       if (!item || item.id == null) continue;
       tasksById.set(item.id, item);
       tasksById.set(String(item.id), item);
     }
-    tasks.forEach((task, index) => {
+
+    let slot = 0;
+    for (const task of tasks) {
+      const col = slot % GRID_COLS;
+      const row = Math.floor(slot / GRID_COLS);
+      const layout = {
+        x: origin.x + col * (CARD_W + GRID_GAP_X),
+        y: origin.y + row * (CARD_H + GRID_GAP_Y),
+      };
+      const phBackendId = getPlannerPhBackendId(task);
+
+      if (phBackendId != null) {
+        showCanvasLoading(`Загружаю с бэка #${phBackendId}…`);
+        try {
+          const data = await callApi(`/admin/api/gamification/tasks/${phBackendId}?locale=ru`);
+          const backendTask = taskFromResponse(data);
+          if (!backendTask) {
+            throw new Error(`API не вернул задачу #${phBackendId}`);
+          }
+          const body = mergeBackendTaskWithPlannerBrief(backendTask, task, { tasksById });
+          placeLinkedBackendTaskOnCanvas(phBackendId, layout, body);
+          placed.push(String(phBackendId));
+          linkedPlaced.push(String(phBackendId));
+          slot += 1;
+        } catch (err) {
+          const label = task.name_backend || task.name_internal || task.id || phBackendId;
+          loadErrors.push(`#${phBackendId} (${label}): ${err?.message || err}`);
+        }
+        continue;
+      }
+
       const body = mapPlannerTaskToDraft(task, { tasksById });
       const draftId = newLocalDraftId();
-      const col = index % GRID_COLS;
-      const row = Math.floor(index / GRID_COLS);
-      placeLocalDraftOnCanvas(
-        draftId,
-        {
-          x: origin.x + col * (CARD_W + GRID_GAP_X),
-          y: origin.y + row * (CARD_H + GRID_GAP_Y),
-        },
-        body
-      );
+      placeLocalDraftOnCanvas(draftId, layout, body);
       placed.push(draftId);
-    });
+      slot += 1;
+    }
 
+    if (linkedPlaced.length) {
+      importGraphFromConditions(linkedPlaced);
+    }
     renderCards();
     updateCounters();
     void persistCanvasPositions();
-    showToast(
-      `На канву добавлено ${placed.length} черновиков из «${pkg.name || id}». ПКМ → Изменить — сохранение на бэк вручную.`,
-      { durationMs: 7000 }
-    );
+
+    if (loadErrors.length) {
+      showToast(
+        `Не удалось загрузить с бэка ${loadErrors.length} задач(и). Они не добавлены — настройки из графика не подставлялись.\n${loadErrors.slice(0, 3).join("\n")}`,
+        { type: "warning", durationMs: 10000 }
+      );
+    }
+
+    const draftCount = placed.length - linkedPlaced.length;
+    const parts = [];
+    if (linkedPlaced.length) parts.push(`${linkedPlaced.length} с бэка`);
+    if (draftCount > 0) parts.push(`${draftCount} черновиков`);
+    if (placed.length) {
+      showToast(
+        `На канву: ${parts.join(", ")} из «${pkg.name || id}».${
+          linkedPlaced.length ? " Связанные задачи — ПКМ → Изменить (PATCH)." : " ПКМ → Изменить — сохранение на бэк."
+        }`,
+        { durationMs: 7000 }
+      );
+    } else if (!loadErrors.length) {
+      showToast("На канву ничего не добавлено", { type: "warning" });
+    }
   } catch (err) {
     showToast(err?.message || String(err), { type: "warning" });
   } finally {

@@ -96,8 +96,11 @@ function mapCountries(raw) {
   const list = asArray(raw)
     .map((item) => String(item || "").trim())
     .filter(Boolean);
-  if (!list.length || list.some((code) => code.toLowerCase() === "all")) {
+  if (!list.length) {
     return { countries: [], countries_matching_type: "countries", countries_lists: [] };
+  }
+  if (list.some((code) => code.toLowerCase() === "all")) {
+    return { countries: ["all"], countries_matching_type: "countries", countries_lists: [] };
   }
   return { countries: list, countries_matching_type: "countries", countries_lists: [] };
 }
@@ -129,16 +132,45 @@ function mapTime(task) {
   };
 }
 
-function buildVisibleName(task) {
-  const base = String(task.name_backend || task.name_internal || "Задача").trim() || "Задача";
-  const bits = [];
-  if (task.reward_points != null && task.reward_points !== "") bits.push(`${task.reward_points} pts`);
-  if (task.secondary_reward_points != null && task.secondary_reward_points !== "") {
-    bits.push(`sec ${task.secondary_reward_points} pts`);
+function backendTaskName(task) {
+  const fromBackend = String(task.name_backend ?? "").trim();
+  if (fromBackend) return fromBackend;
+  const fromInternal = String(task.name_internal ?? "").trim();
+  if (fromInternal) return fromInternal;
+  return "Задача";
+}
+
+/** Обязательные boolean-условия для новых черновиков из графика (не для ph_backend_id). */
+const DEFAULT_DRAFT_CONDITION_FLAGS = [
+  ["no_bonus", false],
+  ["no_bonus_sport", false],
+  ["fraud", false],
+  ["gambling_addict", false],
+];
+
+/**
+ * API-формат conditions: [{ no_bonus: false }, ...].
+ * Уже присутствующие ключи не дублируются и не перезаписываются.
+ * @param {unknown} existing
+ * @returns {object[]}
+ */
+function mergeDefaultDraftConditions(existing) {
+  const out = [];
+  const present = new Set();
+
+  for (const entry of asArray(existing)) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const keys = Object.keys(entry);
+    if (!keys.length) continue;
+    out.push({ ...entry });
+    for (const key of keys) present.add(key);
   }
-  const extra = String(asObject(task.targeting).extra || "").trim();
-  if (extra) bits.push(extra.length > 80 ? `${extra.slice(0, 77)}…` : extra);
-  return bits.length ? `${base} [${bits.join("; ")}]` : base;
+
+  for (const [key, value] of DEFAULT_DRAFT_CONDITION_FLAGS) {
+    if (present.has(key)) continue;
+    out.push({ [key]: value });
+  }
+  return out;
 }
 
 const MAPPED_PLANNER_KEYS = new Set([
@@ -179,6 +211,8 @@ const MAPPED_PLANNER_KEYS = new Set([
   "button_text",
   "targeting",
   "sort_order",
+  "ph_backend_id",
+  "conditions",
 ]);
 
 const KNOWN_TARGETING_KEYS = new Set([
@@ -374,6 +408,60 @@ function buildPlannerHints(task, leftoverNotes, context = {}) {
 }
 
 /**
+ * @param {object} task
+ * @returns {number|null}
+ */
+export function getPlannerPhBackendId(task) {
+  const raw = asObject(task).ph_backend_id;
+  if (raw == null || raw === "") return null;
+  const num = Number(raw);
+  return Number.isInteger(num) && num > 0 ? num : null;
+}
+
+/**
+ * Только бриф/мета планировщика — без полей формы PromoHub.
+ * @param {object} task
+ * @param {{ tasksById?: Map<*, object>|Record<string, object> }} [context]
+ */
+export function buildPlannerBriefOverlay(task, context = {}) {
+  const source = asObject(task);
+  const targeting = asObject(source.targeting);
+  const main = mapActionList(source.main_actions);
+  const secondary = mapActionList(source.secondary_actions);
+  const leftoverNotes = [...main.leftoverNotes, ...secondary.leftoverNotes];
+  const hints = buildPlannerHints(source, leftoverNotes, context);
+  return {
+    _plannerNote: hints.note,
+    _plannerHints: { sections: hints.sections, leftover: hints.leftover },
+    _plannerTaskId: source.id ?? null,
+    _plannerPrerequisiteId: targeting.prerequisite_task_id ?? null,
+  };
+}
+
+/**
+ * База = задача с бэка PromoHub; сверху только бриф из графика.
+ * @param {object} backendTask
+ * @param {object} graphicTask
+ * @param {{ tasksById?: Map<*, object>|Record<string, object> }} [context]
+ */
+export function mergeBackendTaskWithPlannerBrief(backendTask, graphicTask, context = {}) {
+  const base = clonePlain(backendTask);
+  return {
+    ...base,
+    ...buildPlannerBriefOverlay(graphicTask, context),
+  };
+}
+
+function clonePlain(value) {
+  if (value == null || typeof value !== "object") return {};
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return { ...value };
+  }
+}
+
+/**
  * Планировщик → тело локального черновика для fillFromTask / buildCreatePayload.
  * @param {object} task
  * @param {{ tasksById?: Map<*, object>|Record<string, object> }} [context]
@@ -385,13 +473,12 @@ export function mapPlannerTaskToDraft(task, context = {}) {
   const events = asArray(source.events).map(String).filter(Boolean);
   const main = mapActionList(source.main_actions);
   const secondary = mapActionList(source.secondary_actions);
-  const leftoverNotes = [...main.leftoverNotes, ...secondary.leftoverNotes];
   const countries = mapCountries(source.countries);
   const time = mapTime(source);
-  const hints = buildPlannerHints(source, leftoverNotes, context);
+  const brief = buildPlannerBriefOverlay(source, context);
 
   return {
-    name: buildVisibleName(source),
+    name: backendTaskName(source),
     frontend_identifier: String(source.frontend_identifier || "").trim(),
     type: mapType(source.task_type),
     player_consent_required: Boolean(source.player_consent_required),
@@ -408,14 +495,11 @@ export function mapPlannerTaskToDraft(task, context = {}) {
     secondary_actions_sequential: false,
     main_bonus_group_id: null,
     secondary_bonus_group_id: null,
-    conditions: [],
+    conditions: mergeDefaultDraftConditions(source.conditions),
     hidden: false,
     state: "draft",
     filter_id: null,
     tag_id: null,
-    _plannerNote: hints.note,
-    _plannerHints: { sections: hints.sections, leftover: hints.leftover },
-    _plannerTaskId: source.id ?? null,
-    _plannerPrerequisiteId: targeting.prerequisite_task_id ?? null,
+    ...brief,
   };
 }

@@ -1113,6 +1113,9 @@ export function mountConditionsBuilder(container, options = {}) {
     shell.querySelector('[data-action="toggle-picker"]')?.addEventListener("click", () => {
       pickerOpen = !pickerOpen;
       render();
+      if (pickerOpen) {
+        shell.querySelector("[data-picker-search]")?.focus();
+      }
     });
 
     shell.querySelector("[data-picker-search]")?.addEventListener("input", (ev) => {
