@@ -41,40 +41,57 @@
       </section>
 
       <section class="card">
-        <h2 class="card__title">Promo Graphic</h2>
-        <p id="graphic-popup-status" class="auth-hint">Вход не выполнен</p>
-        <label class="field-label" for="graphic-popup-url">API</label>
-        <input
-          id="graphic-popup-url"
-          class="graphic-input"
-          type="url"
-          placeholder="http://127.0.0.1:8000"
-          spellcheck="false"
-          autocomplete="off"
-        />
-        <div id="graphic-popup-login">
-          <label class="field-label" for="graphic-popup-login-input">Логин / email</label>
-          <input
-            id="graphic-popup-login-input"
-            class="graphic-input"
-            type="text"
-            autocomplete="username"
-            spellcheck="false"
-          />
-          <label class="field-label" for="graphic-popup-password">Пароль</label>
-          <input
-            id="graphic-popup-password"
-            class="graphic-input"
-            type="password"
-            autocomplete="current-password"
-          />
-          <button id="btn-graphic-popup-login" class="btn btn--secondary btn--block auth-btn" type="button">
-            Войти в Graphic
-          </button>
+        <div class="card__head">
+          <h2 class="card__title">Promo Graphic</h2>
+          <span id="graphic-popup-badge" class="badge">Не в сети</span>
         </div>
-        <button id="btn-graphic-popup-logout" class="btn btn--outline btn--block" type="button" hidden>
-          Выйти из Graphic
-        </button>
+
+        <div id="graphic-popup-session" class="graphic-session" hidden>
+          <span id="graphic-popup-avatar" class="graphic-session__avatar" aria-hidden="true"></span>
+          <div class="graphic-session__info">
+            <div id="graphic-popup-user" class="graphic-session__name"></div>
+            <div id="graphic-popup-host" class="graphic-session__host"></div>
+          </div>
+          <button id="btn-graphic-popup-logout" class="btn btn--ghost" type="button">Выйти</button>
+        </div>
+
+        <form id="graphic-popup-login" class="graphic-form" novalidate>
+          <div class="graphic-form__row">
+            <input
+              id="graphic-popup-login-input"
+              class="graphic-input"
+              type="text"
+              placeholder="Логин"
+              autocomplete="username"
+              spellcheck="false"
+              aria-label="Логин или email"
+            />
+            <input
+              id="graphic-popup-password"
+              class="graphic-input"
+              type="password"
+              placeholder="Пароль"
+              autocomplete="current-password"
+              aria-label="Пароль"
+            />
+          </div>
+          <details class="graphic-server">
+            <summary>Сервер: <span id="graphic-popup-server"></span></summary>
+            <input
+              id="graphic-popup-url"
+              class="graphic-input"
+              type="url"
+              placeholder="http://127.0.0.1:8000"
+              spellcheck="false"
+              autocomplete="off"
+              aria-label="Адрес API Graphic"
+            />
+          </details>
+          <p id="graphic-popup-error" class="graphic-error" role="alert" hidden></p>
+          <button id="btn-graphic-popup-login" class="btn btn--secondary btn--block" type="submit">
+            Войти
+          </button>
+        </form>
       </section>
 
       <p id="status" class="status" hidden></p>

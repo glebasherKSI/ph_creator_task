@@ -251,30 +251,149 @@ body {
   opacity: 0.7;
 }
 
-.field-label {
-  display: block;
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 500;
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.card__head .card__title {
+  margin: 0;
+}
+
+.badge {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--muted);
+  background: #f3f4f6;
+  border-radius: 999px;
+}
+
+.badge--ok {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.graphic-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.graphic-session[hidden],
+.graphic-form[hidden] {
+  display: none;
+}
+
+.graphic-session__avatar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  background: #eff6ff;
+  border-radius: 50%;
+}
+
+.graphic-session__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.graphic-session__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.graphic-session__host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.btn--ghost {
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn--ghost:hover {
+  background: #f3f4f6;
+  color: var(--text);
+}
+
+.graphic-form__row {
+  display: flex;
+  gap: 8px;
 }
 
 .graphic-input {
   display: block;
   width: 100%;
-  margin-bottom: 10px;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 12px;
   font-family: inherit;
   background: #fafafa;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .graphic-input:focus {
   outline: none;
   border-color: #93c5fd;
   background: #fff;
+}
+
+.graphic-server {
+  margin: 8px 0 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.graphic-server summary {
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graphic-server summary:hover {
+  color: var(--text);
+}
+
+.graphic-server .graphic-input {
+  margin-top: 6px;
+}
+
+.graphic-error {
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: #991b1b;
+  background: #fef2f2;
+  border-radius: 6px;
+}
+
+.graphic-error[hidden] {
+  display: none;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .auth-status {

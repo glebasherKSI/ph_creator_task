@@ -276,7 +276,8 @@ function sectionForUnmappedPlannerKey(key) {
   if (/available_|duration|infinite|cron|repeat|max_rep/.test(k)) return "availability";
   if (/action/.test(k)) return "actions";
   if (/reward|bonus|points/.test(k)) return "rewards";
-  if (/description|button_text|condition_text|locale|name_/.test(k)) return "basic";
+  if (/description|condition_text/.test(k)) return "actions";
+  if (/button_text|locale|name_/.test(k)) return "basic";
   return null;
 }
 
@@ -386,7 +387,8 @@ function buildPlannerHints(task, leftoverNotes, context = {}) {
     textLines.push(`Условие для игрока: ${String(task.condition_text).trim()}`);
   }
   if (isPresent(task.button_text)) textLines.push(`Текст кнопки: ${formatHintValue(task.button_text)}`);
-  if (textLines.length) add("basic", "Описания", textLines);
+  // Описание и условие для игрока описывают, что сделать, — показываем у целевых действий.
+  if (textLines.length) add("actions", "Описания", textLines);
 
   if (leftoverNotes.length) {
     add("actions", "Действия", [leftoverNotes.join("; ")]);
@@ -416,6 +418,70 @@ export function getPlannerPhBackendId(task) {
   if (raw == null || raw === "") return null;
   const num = Number(raw);
   return Number.isInteger(num) && num > 0 ? num : null;
+}
+
+/**
+ * id задачи графика, после которой идёт эта (targeting.prerequisite_task_id).
+ * @param {object} task
+ * @returns {number|null}
+ */
+export function getPlannerPrerequisiteId(task) {
+  const source = asObject(task);
+  const raw = asObject(source.targeting).prerequisite_task_id ?? source.prerequisite_task_id;
+  if (raw == null || raw === "") return null;
+  const num = Number(raw);
+  return Number.isInteger(num) && num > 0 && num !== Number(source.id) ? num : null;
+}
+
+/**
+ * Порядок задач пакета по цепочкам графика: предшественник всегда раньше последователя
+ * (тогда при создании на бэке его id уже известен). depth — колонка на канве.
+ * Внутри колонки — рядом с предшественником, дальше по sort_order графика.
+ * @param {object[]} tasks
+ * @returns {{ task: object, depth: number }[]}
+ */
+export function orderPlannerTasksByChain(tasks) {
+  const list = asArray(tasks).filter((task) => task && task.id != null);
+  const byId = new Map(list.map((task) => [Number(task.id), task]));
+  const indexOf = new Map(list.map((task, index) => [Number(task.id), index]));
+  const sortKey = (task) => {
+    const order = Number(task.sort_order);
+    return Number.isFinite(order) ? order : Number.MAX_SAFE_INTEGER;
+  };
+
+  const depthById = new Map();
+  function depthOf(task, seen = new Set()) {
+    const id = Number(task.id);
+    if (depthById.has(id)) return depthById.get(id);
+    const prereq = byId.get(getPlannerPrerequisiteId(task));
+    // Цикл в графике (A → B → A) — рвём на текущей задаче.
+    const path = new Set(seen).add(id);
+    const depth = prereq && !path.has(Number(prereq.id)) ? depthOf(prereq, path) + 1 : 0;
+    depthById.set(id, depth);
+    return depth;
+  }
+  for (const task of list) depthOf(task);
+
+  const rowById = new Map();
+  const ordered = [];
+  const maxDepth = Math.max(0, ...depthById.values());
+  for (let depth = 0; depth <= maxDepth; depth += 1) {
+    const level = list
+      .filter((task) => depthById.get(Number(task.id)) === depth)
+      .sort((a, b) => {
+        const parentA = rowById.get(getPlannerPrerequisiteId(a)) ?? -1;
+        const parentB = rowById.get(getPlannerPrerequisiteId(b)) ?? -1;
+        if (parentA !== parentB) return parentA - parentB;
+        const orderDiff = sortKey(a) - sortKey(b);
+        if (orderDiff) return orderDiff;
+        return indexOf.get(Number(a.id)) - indexOf.get(Number(b.id));
+      });
+    level.forEach((task, row) => {
+      rowById.set(Number(task.id), row);
+      ordered.push({ task, depth });
+    });
+  }
+  return ordered;
 }
 
 /**

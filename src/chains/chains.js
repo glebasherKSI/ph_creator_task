@@ -39,12 +39,12 @@ import {
   GRAPHIC_DEFAULT_BASE_URL,
   graphicApiGet,
   graphicApiPost,
-  graphicLoginFromPage,
-  graphicLogoutFromPage,
   graphicStatusFromPage,
 } from "../shared/graphic-api.js";
 import {
   getPlannerPhBackendId,
+  getPlannerPrerequisiteId,
+  orderPlannerTasksByChain,
   mapPlannerTaskToDraft,
   mergeBackendTaskWithPlannerBrief,
 } from "../shared/graphic-task-map.js";
@@ -300,7 +300,9 @@ function buildGtValueForTarget(targetId) {
   const task = state.canvas.get(targetKey);
   const gt = getGtBlock(task?.conditions);
   const conditionList = Array.isArray(gt?.list) ? gt.list.map((id) => String(id)) : [];
-  const offCanvasPreserved = conditionList.filter((id) => !state.canvas.has(id));
+  const offCanvasPreserved = conditionList.filter(
+    (id) => !state.canvas.has(id) && !id.startsWith("local_")
+  );
   const sources = [...new Set([...edgeSources, ...offCanvasPreserved])];
   const cfg = state.targetConfigs.get(targetKey) || defaultGtConfig();
   return {
@@ -317,6 +319,24 @@ function syncTargetConfigList(targetId) {
     const existing = state.targetConfigs.get(targetId) || defaultGtConfig();
     state.targetConfigs.set(targetId, { ...existing, ...gt, list: gt.list });
   }
+}
+
+/** Локальный черновик (ещё нет id на бэке) — в conditions бэка его id отправлять нельзя. */
+function isLocalCanvasId(id) {
+  const key = String(id);
+  return key.startsWith("local_") || isTaskLocalOnly(state.canvas.get(key));
+}
+
+/**
+ * Убирает id локальных черновиков из gamification_tasks перед отправкой на бэк.
+ * Локально они остаются: связь с черновиком подставится, когда его создадут.
+ */
+function stripLocalTaskIdsFromConditions(conditions) {
+  const gt = getGtBlock(conditions);
+  if (!gt || !Array.isArray(gt.list)) return conditions;
+  const list = gt.list.filter((id) => !isLocalCanvasId(id));
+  if (list.length === gt.list.length) return conditions;
+  return mergeGamificationTasks(conditions, list.length ? { ...gt, list } : null);
 }
 
 function syncLocalConditionsFromEdges(targetId) {
@@ -1395,7 +1415,8 @@ function importGraphFromConditions(onlyTaskIds = null) {
     if (onlySet && state.dirtyTargets.has(targetId)) continue;
 
     if (onlySet) {
-      state.edges = state.edges.filter((e) => e.to !== targetId);
+      // Связь от локального черновика есть только на канве — бэк о ней не знает.
+      state.edges = state.edges.filter((e) => e.to !== targetId || isLocalCanvasId(e.from));
       state.targetConfigs.delete(targetId);
     }
 
@@ -2758,7 +2779,11 @@ function setCopyPanelChrome(mode) {
 async function loadFullTaskForCopy(taskId) {
   const id = String(taskId);
   const canvasTask = state.canvas.get(id);
-  if (isTaskLocalOnly(canvasTask) && canvasTask?._full) return canvasTask._full;
+  if (isTaskLocalOnly(canvasTask) && canvasTask?._full) {
+    // Связи с канвы живут в canvasTask.conditions; в форму — только id, уже созданные на бэке.
+    const conditions = canvasTask.conditions ?? canvasTask._full.conditions ?? [];
+    return { ...canvasTask._full, conditions: stripLocalTaskIdsFromConditions(conditions) };
+  }
   if (canvasTask?._full && !isTaskLocalOnly(canvasTask)) return canvasTask._full;
   if (isTaskLocalOnly(canvasTask)) {
     throw new Error("У локального черновика нет данных задачи");
@@ -2792,6 +2817,14 @@ async function openTaskPanel(taskId, mode = "copy") {
     copyPanel.fillFromTask(task);
     copyPanel.printResult(task);
     copyPanel.setStatus(`Задача #${id}. ${submitHint}`);
+    const pendingSources = state.edges
+      .filter((e) => e.to === id && isLocalCanvasId(e.from))
+      .map((e) => state.canvas.get(e.from)?.name || "черновик");
+    if (pendingSources.length) {
+      copyPanel.setStatus(
+        `Задача #${id}. ${submitHint}\nПредшественник ещё не на бэке: ${pendingSources.join(", ")} — связь подвяжется автоматически, когда его создадут.`
+      );
+    }
     if (promotingLocalDraftId || isTaskLocalOnly(state.canvas.get(id))) {
       showToast(
         "Черновик с другого проекта: проверьте группы, теги и бонус-группы перед сохранением на бэк",
@@ -2913,6 +2946,7 @@ async function handleCopyCreate(requestBody) {
 
   promotingLocalDraftId = null;
   importGraphFromConditions([newIdStr]);
+  const relinkedOnBackend = promoteLocal ? relinkFollowersOfCreatedTask(newIdStr) : [];
   await persistCanvasPositions();
   renderCards();
   renderTaskList();
@@ -2932,7 +2966,35 @@ async function handleCopyCreate(requestBody) {
       : `Создана задача #${newIdStr} — карточка добавлена на канву`
   );
   void notifyGraphicBackendCreated(source, newIdStr);
+  if (relinkedOnBackend.length) {
+    // Последователи уже на бэке ждали этот черновик — дописываем им связь сразу.
+    await saveChanges(relinkedOnBackend);
+  }
   return response;
+}
+
+/**
+ * Черновик стал задачей на бэке: последователи получают его настоящий id в conditions.
+ * Черновикам-последователям хватает локальных conditions (уйдут при их создании),
+ * задачам с бэка нужен PATCH — их id возвращаются.
+ * @param {string} createdId
+ * @returns {string[]}
+ */
+function relinkFollowersOfCreatedTask(createdId) {
+  const from = String(createdId);
+  const backendTargets = [];
+  for (const edge of state.edges) {
+    if (edge.from !== from) continue;
+    const target = state.canvas.get(edge.to);
+    if (!target) continue;
+    if (!state.targetConfigs.has(edge.to)) state.targetConfigs.set(edge.to, defaultGtConfig());
+    syncLocalConditionsFromEdges(edge.to);
+    if (!isTaskLocalOnly(target)) {
+      markDirtyTarget(edge.to);
+      backendTargets.push(edge.to);
+    }
+  }
+  return backendTargets;
 }
 
 /** Переносит рёбра/конфиги/выделение с локального id на реальный после POST. */
@@ -3682,7 +3744,7 @@ function appendSaveLog(text, kind = "pending") {
   li.scrollIntoView({ block: "nearest" });
 }
 
-async function saveChanges() {
+async function saveChanges(onlyIds = null) {
   if (!state.dirtyTargets.size) return;
 
   $("save-log-list").innerHTML = "";
@@ -3691,7 +3753,8 @@ async function saveChanges() {
   updateSaveButton();
   setButtonLoading("btn-save", true);
 
-  const targets = [...state.dirtyTargets].filter((id) => {
+  const pool = onlyIds ? onlyIds.map(String).filter((id) => state.dirtyTargets.has(id)) : [...state.dirtyTargets];
+  const targets = pool.filter((id) => {
     const task = state.canvas.get(id);
     return task && !isTaskLocalOnly(task);
   });
@@ -3710,7 +3773,7 @@ async function saveChanges() {
           ? mergeGamificationTasks(full.conditions || [], gtValue)
           : mergeGamificationTasks(full.conditions || [], null);
 
-      const payload = buildPatchPayload(full, mergedConditions);
+      const payload = buildPatchPayload(full, stripLocalTaskIdsFromConditions(mergedConditions));
       appendSaveLog(`#${targetId}: сохранение...`, "pending");
       await callApi(`/admin/api/gamification/tasks/${targetId}?locale=ru`, "PATCH", payload);
 
@@ -5015,27 +5078,40 @@ function graphicUserLabel(user) {
   return String(user.username || user.email || user.login || "").trim();
 }
 
-function setGraphicAuthStatus(text, kind = "") {
-  const el = $("graphic-auth-status");
-  if (!el) return;
-  el.textContent = text || "";
-  el.classList.toggle("packages-auth__status--ok", kind === "ok");
-  el.classList.toggle("packages-auth__status--error", kind === "error");
+function graphicHostLabel(baseUrl) {
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return String(baseUrl || "");
+  }
 }
 
+/** Вход в Graphic — только во всплывающем окне расширения; здесь лишь статус. */
 function applyGraphicAuthToForm(status) {
   state.graphicAuthenticated = Boolean(status?.authenticated);
   state.graphicUser = status?.user || null;
   state.graphicBaseUrl = status?.baseUrl || GRAPHIC_DEFAULT_BASE_URL;
-  const urlEl = $("graphic-base-url");
-  if (urlEl && !urlEl.value) urlEl.value = state.graphicBaseUrl;
-  if (urlEl && status?.baseUrl) urlEl.value = status.baseUrl;
-  $("btn-graphic-logout")?.toggleAttribute("hidden", !state.graphicAuthenticated);
   const name = graphicUserLabel(state.graphicUser);
-  if (state.graphicAuthenticated) {
-    setGraphicAuthStatus(name ? `Вход выполнен: ${name}` : "Вход выполнен", "ok");
-  } else {
-    setGraphicAuthStatus("Вход в Graphic не выполнен");
+  const host = graphicHostLabel(state.graphicBaseUrl);
+
+  const statusEl = $("graphic-auth-status");
+  if (statusEl) {
+    statusEl.textContent = state.graphicAuthenticated
+      ? `Promo Graphic: ${name || "вход выполнен"} · ${host}`
+      : "Promo Graphic: вход не выполнен — войдите в окне расширения";
+    statusEl.classList.toggle("packages-auth__status--ok", state.graphicAuthenticated);
+  }
+  $("graphic-auth-dot")?.classList.toggle("packages-auth__dot--ok", state.graphicAuthenticated);
+  $("btn-graphic-open-popup")?.toggleAttribute("hidden", state.graphicAuthenticated);
+}
+
+async function openGraphicLoginPopup() {
+  try {
+    await chrome.action.openPopup();
+  } catch {
+    showToast("Нажмите на иконку расширения на панели браузера и войдите в Promo Graphic", {
+      durationMs: 6000,
+    });
   }
 }
 
@@ -5159,6 +5235,96 @@ function nextDraftStackOrigin() {
   return { x: GRID_START_X, y };
 }
 
+/**
+ * Связь «A → B» графика (B.prerequisite_task_id = A) → ребро канвы / gamification_tasks у B.
+ * @returns {"linked" | "exists" | "skip"}
+ */
+function linkPlannerPrerequisite(sourceId, targetId) {
+  const from = String(sourceId);
+  const to = String(targetId);
+  const target = state.canvas.get(to);
+  if (!target || from === to) return "skip";
+
+  if (state.canvas.has(from)) {
+    if (state.edges.some((e) => e.from === from && e.to === to)) return "exists";
+    state.edges.push({ from, to });
+  } else {
+    // Предшественник есть на бэке, но не на канве — пишем id прямо в conditions.
+    const gt = getGtBlock(target.conditions);
+    const list = Array.isArray(gt?.list) ? gt.list.map(String) : [];
+    if (list.includes(from)) return "exists";
+    const cfg = state.targetConfigs.get(to) || defaultGtConfig();
+    target.conditions = mergeGamificationTasks(target.conditions || [], {
+      ...cfg,
+      ...(gt || {}),
+      list: [...list, from],
+    });
+  }
+
+  if (!state.targetConfigs.has(to)) state.targetConfigs.set(to, defaultGtConfig());
+  syncLocalConditionsFromEdges(to);
+  // От черновика на бэк сохранять нечего — PATCH сделает relinkFollowersOfCreatedTask.
+  if (!isTaskLocalOnly(target) && !isLocalCanvasId(from)) markDirtyTarget(to);
+  return "linked";
+}
+
+/**
+ * Переносит связи из графика на канву. Предшественник из другого пакета
+ * берётся по его ph_backend_id (GET /tasks/{id} графика).
+ * @param {{ task: object }[]} ordered
+ * @param {Map<number, string>} canvasIdByPlannerId
+ * @param {Map<*, object>} tasksById
+ */
+async function transferPlannerLinks(ordered, canvasIdByPlannerId, tasksById) {
+  const result = { linked: 0, backendDirty: 0, unresolved: [] };
+  const outsideCache = new Map();
+
+  const depthByPlannerId = new Map(ordered.map(({ task, depth }) => [Number(task.id), depth]));
+
+  for (const { task, depth } of ordered) {
+    const prereqId = getPlannerPrerequisiteId(task);
+    if (prereqId == null) continue;
+    const targetLabel = task.name_backend || task.name_internal || `#${task.id}`;
+    // Цикл в графике (A → B → A): замыкающую связь не переносим.
+    if (depthByPlannerId.has(prereqId) && depthByPlannerId.get(prereqId) >= depth) {
+      result.unresolved.push(`${targetLabel}: цикл связей в графике`);
+      continue;
+    }
+    const targetId = canvasIdByPlannerId.get(Number(task.id));
+    if (!targetId) continue;
+
+    let sourceId = canvasIdByPlannerId.get(prereqId) ?? null;
+    let prereqTask = tasksById.get(prereqId) || null;
+    if (!sourceId && !prereqTask) {
+      if (!outsideCache.has(prereqId)) {
+        outsideCache.set(
+          prereqId,
+          await graphicApiGet(`/api/promohub-planner/tasks/${prereqId}`).catch(() => null)
+        );
+      }
+      prereqTask = outsideCache.get(prereqId);
+    }
+    if (!sourceId) {
+      const backendId = getPlannerPhBackendId(prereqTask);
+      if (backendId != null) sourceId = String(backendId);
+    }
+
+    if (!sourceId) {
+      const prereqLabel =
+        prereqTask?.name_backend || prereqTask?.name_internal || `задача графика #${prereqId}`;
+      result.unresolved.push(`${prereqLabel} → ${targetLabel}`);
+      continue;
+    }
+
+    const wasDirty = state.dirtyTargets.has(targetId);
+    if (linkPlannerPrerequisite(sourceId, targetId) === "linked") {
+      result.linked += 1;
+      if (!wasDirty && state.dirtyTargets.has(targetId)) result.backendDirty += 1;
+    }
+  }
+  return result;
+}
+
 async function openPackageOnCanvas(packageId) {
   const id = Number(packageId);
   if (!Number.isInteger(id) || id <= 0) return;
@@ -5201,12 +5367,16 @@ async function openPackageOnCanvas(packageId) {
       tasksById.set(String(item.id), item);
     }
 
-    let slot = 0;
-    for (const task of tasks) {
-      const col = slot % GRID_COLS;
-      const row = Math.floor(slot / GRID_COLS);
+    // Порядок цепочек графика: предшественник левее и создаётся раньше последователя.
+    const ordered = orderPlannerTasksByChain(tasks);
+    const rowsByDepth = new Map();
+    /** planner id → id карточки на канве (id бэка или local_*) */
+    const canvasIdByPlannerId = new Map();
+
+    for (const { task, depth } of ordered) {
+      const row = rowsByDepth.get(depth) ?? 0;
       const layout = {
-        x: origin.x + col * (CARD_W + GRID_GAP_X),
+        x: origin.x + depth * (CARD_W + COL_GAP),
         y: origin.y + row * (CARD_H + GRID_GAP_Y),
       };
       const phBackendId = getPlannerPhBackendId(task);
@@ -5223,7 +5393,8 @@ async function openPackageOnCanvas(packageId) {
           placeLinkedBackendTaskOnCanvas(phBackendId, layout, body);
           placed.push(String(phBackendId));
           linkedPlaced.push(String(phBackendId));
-          slot += 1;
+          canvasIdByPlannerId.set(Number(task.id), String(phBackendId));
+          rowsByDepth.set(depth, row + 1);
         } catch (err) {
           const label = task.name_backend || task.name_internal || task.id || phBackendId;
           loadErrors.push(`#${phBackendId} (${label}): ${err?.message || err}`);
@@ -5235,15 +5406,24 @@ async function openPackageOnCanvas(packageId) {
       const draftId = newLocalDraftId();
       placeLocalDraftOnCanvas(draftId, layout, body);
       placed.push(draftId);
-      slot += 1;
+      canvasIdByPlannerId.set(Number(task.id), draftId);
+      rowsByDepth.set(depth, row + 1);
     }
 
     if (linkedPlaced.length) {
       importGraphFromConditions(linkedPlaced);
     }
+    const links = await transferPlannerLinks(ordered, canvasIdByPlannerId, tasksById);
     renderCards();
     updateCounters();
     void persistCanvasPositions();
+
+    if (links.unresolved.length) {
+      showToast(
+        `Не перенесено связей: ${links.unresolved.length}. Предшественник не создан на бэке или не загрузился:\n${links.unresolved.slice(0, 3).join("\n")}`,
+        { type: "warning", durationMs: 10000 }
+      );
+    }
 
     if (loadErrors.length) {
       showToast(
@@ -5259,9 +5439,13 @@ async function openPackageOnCanvas(packageId) {
     if (placed.length) {
       showToast(
         `На канву: ${parts.join(", ")} из «${pkg.name || id}».${
-          linkedPlaced.length ? " Связанные задачи — ПКМ → Изменить (PATCH)." : " ПКМ → Изменить — сохранение на бэк."
+          links.linked ? ` Связей из графика: ${links.linked}.` : ""
+        }${
+          draftCount > 0 ? " Создавайте черновики слева направо — связи подвяжутся сами." : ""
+        }${
+          links.backendDirty ? ` У ${links.backendDirty} задач(и) с бэка новая связь — нажмите «Сохранить».` : ""
         }`,
-        { durationMs: 7000 }
+        { durationMs: 9000 }
       );
     } else if (!loadErrors.length) {
       showToast("На канву ничего не добавлено", { type: "warning" });
@@ -5273,49 +5457,8 @@ async function openPackageOnCanvas(packageId) {
   }
 }
 
-async function handleGraphicLogin() {
-  const login = $("graphic-login")?.value.trim() || "";
-  const password = $("graphic-password")?.value || "";
-  const baseUrl = $("graphic-base-url")?.value.trim() || GRAPHIC_DEFAULT_BASE_URL;
-  if (!login || !password) {
-    setGraphicAuthStatus("Укажите логин и пароль", "error");
-    return;
-  }
-  $("btn-graphic-login")?.setAttribute("disabled", "true");
-  setGraphicAuthStatus("Вхожу…");
-  try {
-    const status = await graphicLoginFromPage(login, password, baseUrl);
-    if ($("graphic-password")) $("graphic-password").value = "";
-    applyGraphicAuthToForm(status);
-    await loadGraphicPackages();
-  } catch (err) {
-    setGraphicAuthStatus(err?.message || String(err), "error");
-  } finally {
-    $("btn-graphic-login")?.removeAttribute("disabled");
-  }
-}
-
-async function handleGraphicLogout() {
-  try {
-    const status = await graphicLogoutFromPage();
-    applyGraphicAuthToForm(status);
-    state.packagesItems = [];
-    state.packagesError = "";
-    renderPackagesList();
-  } catch (err) {
-    setGraphicAuthStatus(err?.message || String(err), "error");
-  }
-}
-
 function bindPackagesEvents() {
-  $("btn-graphic-login")?.addEventListener("click", () => void handleGraphicLogin());
-  $("btn-graphic-logout")?.addEventListener("click", () => void handleGraphicLogout());
-  $("graphic-password")?.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter") {
-      ev.preventDefault();
-      void handleGraphicLogin();
-    }
-  });
+  $("btn-graphic-open-popup")?.addEventListener("click", () => void openGraphicLoginPopup());
   $("btn-packages-refresh")?.addEventListener("click", () => void refreshPackagesView());
   $("packages-status-filter")?.addEventListener("change", (ev) => {
     state.packagesStatusFilter = String(ev.target?.value || "");

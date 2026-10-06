@@ -426,38 +426,14 @@
       <div class="packages-panel">
         <h2>Пакеты Promo Graphic</h2>
         <p class="packages-panel__hint">
-          Вход в Graphic отдельно от админки PromoHub. Пакет открывается на канве как локальные
-          черновики — в админку ничего не отправляется, пока не нажмёте ПКМ → «Изменить».
+          Пакет открывается на канве как локальные черновики — в админку ничего не отправляется,
+          пока не нажмёте ПКМ → «Изменить».
         </p>
 
         <div class="packages-auth">
-          <div class="packages-auth__row">
-            <label class="packages-field packages-field--wide">
-              <span>API Graphic</span>
-              <input
-                id="graphic-base-url"
-                type="url"
-                placeholder="http://127.0.0.1:8000"
-                spellcheck="false"
-                autocomplete="off"
-              />
-            </label>
-          </div>
-          <div class="packages-auth__row">
-            <label class="packages-field">
-              <span>Логин / email</span>
-              <input id="graphic-login" type="text" autocomplete="username" spellcheck="false" />
-            </label>
-            <label class="packages-field">
-              <span>Пароль</span>
-              <input id="graphic-password" type="password" autocomplete="current-password" />
-            </label>
-            <div class="packages-auth__actions">
-              <button id="btn-graphic-login" class="btn btn--primary" type="button">Войти</button>
-              <button id="btn-graphic-logout" class="btn" type="button" hidden>Выйти</button>
-            </div>
-          </div>
+          <span id="graphic-auth-dot" class="packages-auth__dot" aria-hidden="true"></span>
           <p id="graphic-auth-status" class="packages-auth__status" aria-live="polite"></p>
+          <button id="btn-graphic-open-popup" class="btn" type="button" hidden>Войти</button>
         </div>
 
         <div class="packages-toolbar">
