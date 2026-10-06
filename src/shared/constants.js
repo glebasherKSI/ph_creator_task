@@ -7,6 +7,8 @@ export const STORAGE_KEYS = {
   CAPTURE_ENABLED: "ph_capture_enabled",
   MAX_REQUESTS: "ph_max_requests",
   CANVAS_TEMPLATES: "ph_canvas_templates",
+  GRAPHIC_AUTH: "ph_graphic_auth",
+  GRAPHIC_BASE_URL: "ph_graphic_base_url",
 };
 
 /** Cookie сессии PromoHub admin (Rails). */
@@ -98,6 +100,10 @@ export const STRIP_FROM_CREATE = new Set([
   "secondary_actions",
   "locale",
   "locales_list",
+  "_plannerNote",
+  "_plannerHints",
+  "_plannerTaskId",
+  "_plannerPrerequisiteId",
 ]);
 
 export const CONTENT_SCRIPT_PATH = "src/inject/content.js";

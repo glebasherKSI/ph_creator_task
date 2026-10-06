@@ -1,4 +1,10 @@
 import { STORAGE_KEYS } from "../shared/constants.js";
+import {
+  GRAPHIC_DEFAULT_BASE_URL,
+  graphicLoginFromPage,
+  graphicLogoutFromPage,
+  graphicStatusFromPage,
+} from "../shared/graphic-api.js";
 
 import {
 
@@ -206,21 +212,25 @@ async function refreshAuthStatuses() {
 
   authStatuses = {};
 
-  for (const host of domains) {
+  await Promise.all(
 
-    try {
+    domains.map(async (host) => {
 
-      const response = await sendAuthMessage("PH_AUTH_STATUS", { domain: host });
+      try {
 
-      if (response?.ok !== false) authStatuses[host] = response;
+        const response = await sendAuthMessage("PH_AUTH_STATUS", { domain: host });
 
-    } catch {
+        if (response?.ok !== false) authStatuses[host] = response;
 
-      authStatuses[host] = { authenticated: false, pendingOtp: false };
+      } catch {
 
-    }
+        authStatuses[host] = { authenticated: false, pendingOtp: false };
 
-  }
+      }
+
+    })
+
+  );
 
   renderDomains();
 
@@ -354,6 +364,93 @@ async function openConstructor() {
 
 
 
+function graphicUserLabel(user) {
+  if (!user || typeof user !== "object") return "";
+  return String(user.username || user.email || user.login || "").trim();
+}
+
+function graphicHostLabel(baseUrl) {
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return String(baseUrl || "");
+  }
+}
+
+function setGraphicPopupError(text) {
+  const el = $("graphic-popup-error");
+  el.textContent = text || "";
+  el.hidden = !text;
+}
+
+function applyGraphicPopupStatus(status) {
+  const authenticated = Boolean(status?.authenticated);
+  const baseUrl = status?.baseUrl || GRAPHIC_DEFAULT_BASE_URL;
+  const host = graphicHostLabel(baseUrl);
+  const name = graphicUserLabel(status?.user) || "Вход выполнен";
+
+  const badge = $("graphic-popup-badge");
+  badge.textContent = authenticated ? "Подключено" : "Не в сети";
+  badge.classList.toggle("badge--ok", authenticated);
+
+  $("graphic-popup-session").hidden = !authenticated;
+  $("graphic-popup-login").hidden = authenticated;
+  $("graphic-popup-user").textContent = name;
+  $("graphic-popup-avatar").textContent = name.charAt(0).toUpperCase();
+  $("graphic-popup-host").textContent = host;
+  $("graphic-popup-server").textContent = host;
+
+  const urlEl = $("graphic-popup-url");
+  if (authenticated || !urlEl.value) urlEl.value = baseUrl;
+}
+
+async function refreshGraphicPopup() {
+  const status = await graphicStatusFromPage();
+  applyGraphicPopupStatus(status);
+}
+
+async function handleGraphicPopupLogin(ev) {
+  ev?.preventDefault();
+  const login = $("graphic-popup-login-input").value.trim();
+  const password = $("graphic-popup-password").value;
+  const baseUrl = $("graphic-popup-url").value.trim() || GRAPHIC_DEFAULT_BASE_URL;
+  if (!login || !password) {
+    setGraphicPopupError("Укажите логин и пароль");
+    (login ? $("graphic-popup-password") : $("graphic-popup-login-input")).focus();
+    return;
+  }
+
+  const btn = $("btn-graphic-popup-login");
+  btn.disabled = true;
+  btn.textContent = "Вхожу…";
+  setGraphicPopupError("");
+  try {
+    const status = await graphicLoginFromPage(login, password, baseUrl);
+    $("graphic-popup-password").value = "";
+    applyGraphicPopupStatus(status);
+  } catch (err) {
+    const message = err?.message || String(err);
+    setGraphicPopupError(message);
+    // Сервер недоступен — сразу раскрываем поле с адресом.
+    if (/fetch|network|сервер|адрес|url/i.test(message)) {
+      $("graphic-popup-login").querySelector(".graphic-server").open = true;
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Войти";
+  }
+}
+
+async function handleGraphicPopupLogout() {
+  try {
+    const status = await graphicLogoutFromPage();
+    applyGraphicPopupStatus(status);
+    setGraphicPopupError("");
+  } catch (err) {
+    setGraphicPopupError(err?.message || String(err));
+  }
+}
+
 async function init() {
 
   const manifest = chrome.runtime.getManifest();
@@ -371,6 +468,8 @@ async function init() {
   renderDomains();
 
   await refreshAuthStatuses();
+
+  await refreshGraphicPopup();
 
 }
 
@@ -408,6 +507,10 @@ $("btn-add-tab").addEventListener("click", addCurrentTabDomain);
 
 $("btn-open-constructor").addEventListener("click", openConstructor);
 
+$("graphic-popup-login").addEventListener("submit", (ev) => void handleGraphicPopupLogin(ev));
+
+$("btn-graphic-popup-logout").addEventListener("click", () => void handleGraphicPopupLogout());
+
 
 
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -436,6 +539,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
     return;
 
+  }
+
+  if (changes[STORAGE_KEYS.GRAPHIC_AUTH] || changes[STORAGE_KEYS.GRAPHIC_BASE_URL]) {
+    void refreshGraphicPopup();
   }
 
 

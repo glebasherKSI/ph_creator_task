@@ -296,6 +296,10 @@ export async function syncSessionFromBrowser(domainInput, _options = {}) {
  * @param {string} domainInput
  */
 export async function ensureBrowserSessionCookie(domainInput) {
+  // Живую cookie браузера не трогаем: Rails перевыпускает _casino_session,
+  // и запись сохранённого (старого) значения затирала бы актуальную сессию.
+  const existing = await readBrowserSessionCookie(domainInput);
+  if (existing?.value) return true;
   const stored = await getStoredAuthSession(domainInput);
   if (!stored?.value) return false;
   await writeBrowserSessionCookie(domainInput, stored.value);
@@ -336,12 +340,20 @@ export const AUTH_FETCH_ERRORS = {
   SSL_ERROR: "AUTH_SSL_ERROR",
   SCRIPT_FAILED: "AUTH_SCRIPT_FAILED",
   TAB_ERROR_PAGE: "AUTH_TAB_ERROR_PAGE",
+  TAB_UNRESPONSIVE: "AUTH_TAB_UNRESPONSIVE",
 };
 
 const TRANSIENT_AUTH_ERRORS = new Set([
   AUTH_FETCH_ERRORS.TAB_ERROR_PAGE,
   AUTH_FETCH_ERRORS.TAB_REQUIRED,
+  AUTH_FETCH_ERRORS.TAB_UNRESPONSIVE,
 ]);
+
+/** Сколько ждём ответа от «пустого» скрипта во вкладке, прежде чем считать её замороженной. */
+const TAB_PING_TIMEOUT_MS = 3_000;
+const TAB_LOAD_TIMEOUT_MS = 15_000;
+/** @type {Map<number, Promise<void>>} — один reload на вкладку при параллельных запросах */
+const inflightTabWakeups = new Map();
 
 function shouldCacheCurrentUserFailure(error) {
   const code = String(error?.message || error || "");
@@ -418,19 +430,101 @@ async function validateAdminTab(tabId) {
     throw new Error(AUTH_FETCH_ERRORS.TAB_ERROR_PAGE);
   }
 
-  if (tab.status && tab.status !== "complete") {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    try {
-      tab = await chrome.tabs.get(tabId);
-    } catch {
-      throw new Error(AUTH_FETCH_ERRORS.TAB_REQUIRED);
-    }
-    if (isChromeErrorPageUrl(tab.url)) {
-      throw new Error(AUTH_FETCH_ERRORS.TAB_ERROR_PAGE);
-    }
+  // Фоновая вкладка может быть выгружена (Memory Saver) или заморожена Chrome —
+  // тогда executeScript висит, пока пользователь сам не откроет/обновит вкладку.
+  if (tab.discarded || tab.frozen) {
+    await wakeAdminTab(tabId);
+  } else if (tab.status && tab.status !== "complete") {
+    await waitForTabComplete(tabId, TAB_LOAD_TIMEOUT_MS);
+  } else if (!(await pingTab(tabId))) {
+    await wakeAdminTab(tabId);
+  }
+
+  try {
+    tab = await chrome.tabs.get(tabId);
+  } catch {
+    throw new Error(AUTH_FETCH_ERRORS.TAB_REQUIRED);
+  }
+  if (isChromeErrorPageUrl(tab.url)) {
+    throw new Error(AUTH_FETCH_ERRORS.TAB_ERROR_PAGE);
+  }
+
+  // Не даём Chrome снова выгрузить вкладку, через которую идут запросы.
+  if (tab.autoDiscardable !== false) {
+    chrome.tabs.update(tabId, { autoDiscardable: false }).catch(() => {});
   }
 
   return tab;
+}
+
+/**
+ * @param {number} tabId
+ * @returns {Promise<boolean>}
+ */
+async function pingTab(tabId) {
+  try {
+    await withTimeout(
+      chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", func: () => true }),
+      TAB_PING_TIMEOUT_MS
+    );
+    return true;
+  } catch (err) {
+    if (isTabErrorPageExecuteScriptError(err)) {
+      throw new Error(AUTH_FETCH_ERRORS.TAB_ERROR_PAGE);
+    }
+    return false;
+  }
+}
+
+/**
+ * @param {number} tabId
+ * @param {number} timeoutMs
+ */
+function waitForTabComplete(tabId, timeoutMs, { checkCurrent = true } = {}) {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      resolve(undefined);
+    };
+    const onUpdated = (id, changeInfo) => {
+      if (id === tabId && changeInfo.status === "complete") done();
+    };
+    const timer = setTimeout(done, timeoutMs);
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    if (!checkCurrent) return;
+    chrome.tabs.get(tabId).then(
+      (tab) => {
+        if (tab.status === "complete" && !tab.discarded) done();
+      },
+      done
+    );
+  });
+}
+
+/**
+ * Перезагружает зависшую/выгруженную вкладку админки (то, что раньше приходилось делать руками).
+ * @param {number} tabId
+ */
+async function wakeAdminTab(tabId) {
+  let wakeup = inflightTabWakeups.get(tabId);
+  if (!wakeup) {
+    wakeup = (async () => {
+      // Слушатель ставим до reload: старый статус «complete» не должен засчитаться.
+      const loaded = waitForTabComplete(tabId, TAB_LOAD_TIMEOUT_MS, { checkCurrent: false });
+      try {
+        await chrome.tabs.reload(tabId);
+      } catch {
+        throw new Error(AUTH_FETCH_ERRORS.TAB_REQUIRED);
+      }
+      await loaded;
+      if (!(await pingTab(tabId))) {
+        throw new Error(AUTH_FETCH_ERRORS.TAB_UNRESPONSIVE);
+      }
+    })().finally(() => inflightTabWakeups.delete(tabId));
+    inflightTabWakeups.set(tabId, wakeup);
+  }
+  await wakeup;
 }
 
 function isSslOrNetworkError(err) {
@@ -458,6 +552,8 @@ export function formatAuthFetchError(err, domainInput) {
       `Вкладка админки показывает страницу ошибки (например, не принят SSL-сертификат). Откройте ${adminUrl} в браузере, примите сертификат, дождитесь загрузки страницы (не страницы ошибки) и повторите вход.`,
     [AUTH_FETCH_ERRORS.SCRIPT_FAILED]:
       `Не удалось выполнить запрос на вкладке админки. Обновите страницу ${adminUrl} и повторите попытку.`,
+    [AUTH_FETCH_ERRORS.TAB_UNRESPONSIVE]:
+      `Вкладка ${adminUrl} не отвечает даже после перезагрузки. Откройте её, дождитесь загрузки и повторите попытку.`,
   };
 
   if (byCode[code]) return byCode[code];

@@ -40,6 +40,9 @@
           <button id="tab-stats" class="main-tabs__btn" type="button" role="tab" aria-selected="false">
             Статистика
           </button>
+          <button id="tab-packages" class="main-tabs__btn" type="button" role="tab" aria-selected="false">
+            Пакеты
+          </button>
         </nav>
       </div>
       <div id="status" class="status">Выберите домен и загрузите задачи</div>
@@ -452,6 +455,38 @@
 
     <section id="view-stats" class="main-view" aria-hidden="true">
       <div id="stats-panel-mount"></div>
+    </section>
+
+    <section id="view-packages" class="main-view" aria-hidden="true">
+      <div class="packages-panel">
+        <h2>Пакеты Promo Graphic</h2>
+        <p class="packages-panel__hint">
+          Пакет открывается на канве как локальные черновики — в админку ничего не отправляется,
+          пока не нажмёте ПКМ → «Изменить».
+        </p>
+
+        <div class="packages-auth">
+          <span id="graphic-auth-dot" class="packages-auth__dot" aria-hidden="true"></span>
+          <p id="graphic-auth-status" class="packages-auth__status" aria-live="polite"></p>
+          <button id="btn-graphic-open-popup" class="btn" type="button" hidden>Войти</button>
+        </div>
+
+        <div class="packages-toolbar">
+          <label class="packages-field">
+            <span>Статус</span>
+            <select id="packages-status-filter" class="packages-select">
+              <option value="ready" selected>Готово для бэка</option>
+              <option value="">Все</option>
+              <option value="draft">Черновик</option>
+              <option value="archived">Архив</option>
+            </select>
+          </label>
+          <button id="btn-packages-refresh" class="btn btn--primary" type="button">Обновить</button>
+        </div>
+
+        <p id="packages-error" class="packages-error" hidden></p>
+        <ul id="packages-list" class="packages-list"></ul>
+      </div>
     </section>
 
     <div id="copy-panel-overlay" class="copy-panel-overlay copy-panel-overlay--hidden" aria-hidden="true">

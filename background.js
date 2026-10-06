@@ -23,6 +23,10 @@ import {
   SET_ACTIVE_PROJECT_ENDPOINT,
   REPORTS_STATE_ENDPOINT,
 } from "./src/shared/reports.js";
+import {
+  handleGraphicAuthMessage,
+  handleGraphicFetchMessage,
+} from "./src/shared/graphic-api.js";
 
 async function getDomains() {
   return loadDomainsFromStorage();
@@ -427,6 +431,20 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     logoutAdmin(msg.payload?.domain)
       .then((result) => sendResponse(result))
       .catch((err) => sendResponse(authErrorResponse(err, msg.payload?.domain)));
+    return true;
+  }
+
+  if (msg.action === "PH_GRAPHIC_AUTH") {
+    handleGraphicAuthMessage(msg.payload)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
+
+  if (msg.action === "PH_GRAPHIC_FETCH") {
+    handleGraphicFetchMessage(msg.payload)
+      .then((result) => sendResponse(result))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
     return true;
   }
 });

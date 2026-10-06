@@ -63,6 +63,42 @@
   border-color: var(--form-danger-border);
 }
 
+.copy-panel__planner-hint {
+  position: static;
+  z-index: auto;
+  margin: 0 0 var(--form-space-4);
+  padding: var(--form-space-2) var(--form-space-3);
+  max-height: 140px;
+  overflow: auto;
+  background: var(--form-warning-subtle);
+  border: 1px solid var(--form-warning-border);
+  border-left: 4px solid var(--form-warning-text);
+  border-radius: var(--form-radius-md);
+  color: var(--form-warning-text);
+}
+
+.copy-panel__planner-hint[hidden] {
+  display: none;
+}
+
+.copy-panel__planner-hint-title {
+  margin: 0 0 var(--form-space-2);
+  font-size: var(--form-text-sm);
+  font-weight: var(--form-weight-semibold);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.copy-panel__planner-hint-text {
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  line-height: var(--form-line-normal);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--form-text);
+}
+
 .copy-panel__meta-status {
   display: inline-flex;
   align-items: center;
@@ -192,25 +228,78 @@
 }
 
 .copy-panel__section {
+  position: relative;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+/* Keep brief popovers above neighbors without trapping every section's menus. */
+.copy-panel__section:has(.copy-panel__section-hint-anchor:hover),
+.copy-panel__section:has(.copy-panel__section-hint-anchor:focus-within),
+.copy-panel__section--hint-open {
+  z-index: 4;
+}
+
+/* Open section with an active field/menu must sit above following accordion cards. */
+.copy-panel__section--open:focus-within,
+.copy-panel__section--open:has(.multi-combobox__dropdown:not(.multi-combobox__dropdown--hidden)),
+.copy-panel__section--open:has(.country-selector__dropdown:not(.country-selector__dropdown--hidden)),
+.copy-panel__section--open:has(
+  .conditions-builder__picker-popover:not(.conditions-builder__picker-popover--hidden)
+) {
+  z-index: 6;
+}
+
+.copy-panel__section-card {
+  min-width: 0;
   border: 1px solid var(--form-border);
   border-radius: var(--form-radius-lg);
   background: var(--form-surface);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: var(--form-shadow-sm);
   transition: box-shadow var(--form-transition-normal);
 }
 
-.copy-panel__section--open {
+.copy-panel__section--open .copy-panel__section-card {
   box-shadow: var(--form-shadow-md);
 }
 
+.copy-panel__section-header-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+  position: relative;
+  background: var(--form-surface-subtle);
+  border-radius: var(--form-radius-lg);
+}
+
+.copy-panel__section-header-row:hover {
+  background: var(--form-surface-muted);
+}
+
+.copy-panel__section--open .copy-panel__section-header-row {
+  background: var(--form-surface);
+  border-bottom: 1px solid var(--form-border);
+  border-radius: var(--form-radius-lg) var(--form-radius-lg) 0 0;
+}
+
+.copy-panel__section--open .copy-panel__section-header-row:hover {
+  background: var(--form-surface-muted);
+}
+
 .copy-panel__section-header {
+  grid-column: 1 / -1;
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  width: auto;
   border: 0;
-  background: var(--form-surface-subtle);
+  background: transparent;
   padding: var(--form-space-3) var(--form-space-4);
   cursor: pointer;
   text-align: left;
@@ -221,17 +310,106 @@
   transition: background var(--form-transition-fast);
 }
 
+.copy-panel__section-hint-anchor {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  align-self: center;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  margin-right: 40px;
+}
+
+.copy-panel__section-hint-anchor[hidden] {
+  display: none;
+}
+
+.copy-panel__section-hint-badge {
+  appearance: none;
+  border: 1px solid var(--form-warning-border);
+  background: var(--form-warning-subtle);
+  color: var(--form-warning-text);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: var(--form-text-xs);
+  font-weight: var(--form-weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.copy-panel__section-hint-badge:hover,
+.copy-panel__section--hint-open .copy-panel__section-hint-badge {
+  border-color: var(--form-warning-text);
+}
+
+.copy-panel__section-hint {
+  display: none;
+  position: absolute;
+  top: calc(100% - 2px);
+  right: 0;
+  z-index: 8;
+  width: 280px;
+  max-width: min(280px, calc(100vw - 48px));
+  margin: 0;
+  padding: var(--form-space-2) var(--form-space-3);
+  overflow: visible;
+  background: var(--form-warning-subtle);
+  border: 1px solid var(--form-warning-border);
+  border-left: 3px solid var(--form-warning-text);
+  border-radius: var(--form-radius-md);
+  color: var(--form-warning-text);
+  box-shadow: var(--form-shadow-lg);
+}
+
+.copy-panel__section-hint[hidden] {
+  display: none;
+}
+
+.copy-panel__section-hint-anchor:hover .copy-panel__section-hint:not([hidden]),
+.copy-panel__section-hint-anchor:focus-within .copy-panel__section-hint:not([hidden]),
+.copy-panel__section--hint-open .copy-panel__section-hint:not([hidden]) {
+  display: block;
+}
+
+.copy-panel__section-hint-title {
+  margin: 0 0 var(--form-space-1);
+  font-size: var(--form-text-xs);
+  font-weight: var(--form-weight-semibold);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.copy-panel__section-hint-text {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  font-family: inherit;
+  font-size: var(--form-text-sm);
+  line-height: var(--form-line-tight);
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--form-text);
+}
+
 .copy-panel__section-header:hover {
-  background: var(--form-surface-muted);
+  background: transparent;
 }
 
 .copy-panel__section--open .copy-panel__section-header {
-  background: var(--form-surface);
-  border-bottom: 1px solid var(--form-border);
+  background: transparent;
 }
 
 .copy-panel__section-title {
   flex: 1;
+}
+
+.copy-panel__section:has(.copy-panel__section-hint-anchor:not([hidden])) .copy-panel__section-title {
+  padding-right: 52px;
 }
 
 .copy-panel__section-chevron {
@@ -268,6 +446,7 @@
   display: none;
   padding: var(--form-space-4);
   background: var(--form-surface);
+  border-radius: 0 0 var(--form-radius-lg) var(--form-radius-lg);
 }
 
 .copy-panel__section--open .copy-panel__section-body {
@@ -740,5 +919,12 @@
 
   .copy-panel-slide__body {
     padding: var(--form-space-4);
+  }
+
+  .copy-panel__section-hint {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
   }
 }
