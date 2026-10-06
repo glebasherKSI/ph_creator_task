@@ -25,7 +25,8 @@ import {
   buildCreatePayload,
 } from "./tasks.js";
 
-const KNOWN_LOCALE_CODES = ["de", "en", "es", "fr", "it", "pt", "ru"];
+/** Запасной список языков — используется, пока реальные языки проекта (constants.locales) не загружены. */
+const FALLBACK_LOCALE_CODES = ["de", "en", "es", "fr", "it", "pt", "ru"];
 
 const FIELD_IDS = {
   sourceId: "copy-source-id",
@@ -110,7 +111,7 @@ function metaSlot(fieldKey, fallbackHtml) {
 }
 
 function localesBlockMarkup() {
-  const fields = KNOWN_LOCALE_CODES.map(
+  const fields = FALLBACK_LOCALE_CODES.map(
     (code) => `
       <label class="copy-panel__field copy-panel__locales-field">
         <span class="copy-panel__field-label">${code}</span>
@@ -125,6 +126,55 @@ function localesBlockMarkup() {
       <div class="copy-panel__locales-grid">${fields}</div>
     </details>
   `;
+}
+
+/**
+ * Перестраивает сетку полей языков под реальный список языков проекта (constants.locales).
+ * Сохраняет уже введённые значения (по коду языка) при перестройке.
+ */
+function renderLocaleFields(root, codes) {
+  const grid = root.querySelector(".copy-panel__locales-grid");
+  if (!grid) return;
+
+  const list = Array.isArray(codes) && codes.length ? codes : FALLBACK_LOCALE_CODES;
+  const previous = {};
+  for (const input of grid.querySelectorAll("[data-locale-input]")) {
+    previous[input.dataset.localeInput] = input.value;
+  }
+  const taskData = root.__localesLastTaskData || {};
+
+  grid.innerHTML = list
+    .map((code) => {
+      const value = previous[code] ?? taskData[code] ?? "";
+      return `
+        <label class="copy-panel__field copy-panel__locales-field">
+          <span class="copy-panel__field-label">${escapeHtml(code)}</span>
+          <input type="text" data-locale-input="${escapeHtml(code)}" value="${escapeHtml(value)}" />
+        </label>
+      `;
+    })
+    .join("");
+
+  root.__localeCodes = list;
+  updateLocalesSummary(root);
+}
+
+/** Обновляет заголовок секции: какие языки есть на проекте и какие поля из них реально заполнены. */
+function updateLocalesSummary(root) {
+  const summaryEl = root.querySelector(".copy-panel__locales-summary");
+  if (!summaryEl) return;
+
+  const codes = root.__localeCodes || FALLBACK_LOCALE_CODES;
+  const filled = codes.filter((code) => {
+    const input = root.querySelector(`[data-locale-input="${code}"]`);
+    return !!input?.value.trim();
+  });
+  const extra = Object.keys(root.__localesExtraData || {});
+
+  let text = `Названия по языкам — на проекте: ${codes.join(", ") || "—"}`;
+  text += ` · заполнено (${filled.length}/${codes.length})${filled.length ? `: ${filled.join(", ")}` : ""}`;
+  if (extra.length) text += ` · вне списка проекта: ${extra.join(", ")}`;
+  summaryEl.textContent = text;
 }
 
 function textMetaField({ fieldKey, id, label, inputType = "text", placeholder = "", number = false }) {
@@ -499,19 +549,32 @@ function readTagRaw(root) {
 
 function fillLocales(root, locales) {
   const data = locales && typeof locales === "object" && !Array.isArray(locales) ? locales : {};
+  root.__localesLastTaskData = data;
 
-  for (const code of KNOWN_LOCALE_CODES) {
+  const codes = root.__localeCodes || FALLBACK_LOCALE_CODES;
+  for (const code of codes) {
     const input = root.querySelector(`[data-locale-input="${code}"]`);
     if (input) input.value = data[code] ?? "";
   }
+
+  // Значения языков задачи, которых нет в текущем списке языков проекта — не рисуем поле,
+  // но сохраняем, чтобы не потерять данные при отправке payload.
+  root.__localesExtraData = Object.fromEntries(
+    Object.entries(data).filter(([code, value]) => value && !codes.includes(code))
+  );
+  updateLocalesSummary(root);
 }
 
 function readLocales(root) {
   const locales = {};
 
-  for (const code of KNOWN_LOCALE_CODES) {
-    const value = root.querySelector(`[data-locale-input="${code}"]`)?.value.trim() ?? "";
-    if (value) locales[code] = value;
+  for (const input of root.querySelectorAll("[data-locale-input]")) {
+    const value = input.value.trim();
+    if (value) locales[input.dataset.localeInput] = value;
+  }
+
+  for (const [code, value] of Object.entries(root.__localesExtraData || {})) {
+    if (value && !(code in locales)) locales[code] = value;
   }
 
   return locales;
@@ -936,6 +999,7 @@ export function mountCopyPanel(root, options = {}) {
       root.__countrySelector.setData(countriesData);
       root.__countrySelector.setMode("ui");
       root.__countrySelector.setDisabled(false);
+      renderLocaleFields(root, countriesData.locales);
 
       const taskToFill = pendingTask || sourceTask;
       if (taskToFill) {
@@ -944,12 +1008,14 @@ export function mountCopyPanel(root, options = {}) {
           countries: taskToFill.countries || [],
           countriesLists: taskToFill.countries_lists || [],
         });
+        fillLocales(root, taskToFill.locales);
       }
       return { ok: true, data: countriesData };
     } catch (err) {
       if (token !== countriesLoadToken) return { ok: false, reason: "stale" };
       root.__countrySelector.setMode("fallback");
       root.__countrySelector.setDisabled(false);
+      renderLocaleFields(root, FALLBACK_LOCALE_CODES);
 
       const taskToFill = pendingTask || sourceTask;
       if (taskToFill) {
@@ -958,6 +1024,7 @@ export function mountCopyPanel(root, options = {}) {
           countries: taskToFill.countries || [],
           countriesLists: taskToFill.countries_lists || [],
         });
+        fillLocales(root, taskToFill.locales);
       }
       return { ok: false, reason: "error", error: err };
     }
@@ -1094,6 +1161,12 @@ export function mountCopyPanel(root, options = {}) {
 
   bindSectionToggles(root);
   syncDurationDisabled();
+
+  root.__localeCodes = FALLBACK_LOCALE_CODES;
+  root.querySelector(".copy-panel__locales")?.addEventListener("input", (ev) => {
+    if (ev.target.matches("[data-locale-input]")) updateLocalesSummary(root);
+  });
+  updateLocalesSummary(root);
 
   const repeatMount = field(root, "repeatSchedule");
   root.__repeatSchedule = mountRepeatSchedule(repeatMount, { onChange: () => {} });

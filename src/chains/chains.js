@@ -32,9 +32,11 @@ import {
   inferProjectIdFromDomain,
   normalizeProjectId,
   normalizeReportRows,
+  normalizeTaskNameForMatch,
   reportTaskNamesMatch,
 } from "../shared/reports.js";
 import { getTaskChartsMarkup, groupStatsRowsByTask, mountTaskCharts } from "../shared/stats-charts.js";
+import { readXlsxSheets } from "../shared/xlsx-lite.js";
 const CARD_W = 220;
 const CARD_H = 110;
 const CARD_MIN_H = CARD_H;
@@ -77,6 +79,8 @@ const state = {
   edges: [],
   targetConfigs: new Map(),
   dirtyTargets: new Set(),
+  /** @type {Map<string, Record<string,string>>} taskId → отложенные (не сохранённые) правки locales из Excel-импорта */
+  dirtyLocales: new Map(),
   offset: 0,
   hasMore: false,
   loading: false,
@@ -317,6 +321,15 @@ function markDirtyTarget(targetId) {
   updateSaveButton();
 }
 
+/** Откладывает правки locales для реальной (не локальной) задачи до общей кнопки «Сохранить». */
+function markTaskLocalesDirty(taskId, localeUpdates) {
+  const id = String(taskId);
+  const existing = state.dirtyLocales.get(id) || {};
+  state.dirtyLocales.set(id, { ...existing, ...localeUpdates });
+  state.dirtyTargets.add(id);
+  updateSaveButton();
+}
+
 function updateSaveButton() {
   $("btn-save").disabled = state.dirtyTargets.size === 0 || state.loading;
 }
@@ -351,6 +364,17 @@ function updateCounters() {
   if (fitBtn) fitBtn.disabled = state.canvas.size === 0 && state.labels.length === 0;
   const saveTemplateBtn = $("btn-save-template");
   if (saveTemplateBtn) saveTemplateBtn.disabled = state.canvas.size === 0 || state.loading;
+  const importLocalesBtn = $("btn-import-locales");
+  if (importLocalesBtn) importLocalesBtn.disabled = state.canvas.size === 0 || state.loading;
+  const importLocalesStagedBtn = $("btn-import-locales-staged");
+  if (importLocalesStagedBtn) {
+    importLocalesStagedBtn.disabled = state.canvas.size === 0 || state.loading;
+  }
+  const saveAllBtn = $("btn-save-all");
+  if (saveAllBtn) {
+    const hasRealTasks = [...state.canvas.values()].some((task) => !isTaskLocalOnly(task));
+    saveAllBtn.disabled = !hasRealTasks || state.loading;
+  }
   updateCanvasSelectionUI();
 }
 
@@ -1537,6 +1561,7 @@ function removeMultipleFromCanvas(taskIds, { skipConfirm = false, single = false
     state.edges = state.edges.filter((e) => e.from !== id && e.to !== id);
     state.targetConfigs.delete(id);
     state.dirtyTargets.delete(id);
+    state.dirtyLocales.delete(id);
 
     if (state.linkSourceId === id) state.linkSourceId = null;
     if (state.selectedTargetId === id || state.selectedEdgeKey?.includes(id)) {
@@ -2893,6 +2918,11 @@ function remapCanvasTaskId(fromId, toId) {
     state.dirtyTargets.add(to);
   }
 
+  if (state.dirtyLocales.has(from)) {
+    state.dirtyLocales.set(to, state.dirtyLocales.get(from));
+    state.dirtyLocales.delete(from);
+  }
+
   if (state.canvasSelected.has(from)) {
     state.canvasSelected.delete(from);
     state.canvasSelected.add(to);
@@ -2994,6 +3024,7 @@ async function handleEditUpdate(requestBody) {
   }
 
   state.dirtyTargets.delete(taskId);
+  state.dirtyLocales.delete(taskId);
   importGraphFromConditions([taskId]);
   renderCards();
   renderTaskList();
@@ -3506,6 +3537,40 @@ function appendSaveLog(text, kind = "pending") {
   li.scrollIntoView({ block: "nearest" });
 }
 
+/**
+ * Отправляет на бэк ВСЕ задачи на канве (не только изменённые), как принудительный ресинк:
+ * помечает их все "грязными" и переиспользует обычный saveChanges().
+ */
+async function saveAllCanvasTasks() {
+  if (state.loading) return;
+
+  const realIds = [...state.canvas.keys()].filter((id) => !isTaskLocalOnly(state.canvas.get(id)));
+  if (!realIds.length) {
+    showToast("На канве нет задач для отправки на бэк (только локальные черновики)", {
+      type: "warning",
+    });
+    return;
+  }
+
+  if (
+    !confirm(
+      `Отправить обновление на бэк для всех задач на канве (${realIds.length})?\n` +
+        "Будут сохранены текущие связи/условия и отложенные правки названий по языкам."
+    )
+  ) {
+    return;
+  }
+
+  for (const id of realIds) state.dirtyTargets.add(id);
+  updateSaveButton();
+  setButtonLoading("btn-save-all", true);
+  try {
+    await saveChanges();
+  } finally {
+    setButtonLoading("btn-save-all", false);
+  }
+}
+
 async function saveChanges() {
   if (!state.dirtyTargets.size) return;
 
@@ -3534,13 +3599,22 @@ async function saveChanges() {
           ? mergeGamificationTasks(full.conditions || [], gtValue)
           : mergeGamificationTasks(full.conditions || [], null);
 
+      const pendingLocales = state.dirtyLocales.get(targetId);
+      if (pendingLocales) {
+        full.locales = { ...(full.locales || {}), ...pendingLocales };
+      }
+
       const payload = buildPatchPayload(full, mergedConditions);
       appendSaveLog(`#${targetId}: сохранение...`, "pending");
       await callApi(`/admin/api/gamification/tasks/${targetId}?locale=ru`, "PATCH", payload);
 
       const local = state.canvas.get(targetId);
-      if (local) local.conditions = mergedConditions;
+      if (local) {
+        local.conditions = mergedConditions;
+        if (pendingLocales && local._full) local._full.locales = full.locales;
+      }
       state.dirtyTargets.delete(targetId);
+      state.dirtyLocales.delete(targetId);
       okCount += 1;
       appendSaveLog(`#${targetId}: OK`, "ok");
     } catch (err) {
@@ -3564,6 +3638,343 @@ async function saveChanges() {
       : `Сохранено ${okCount} задач`,
     errCount > 0
   );
+}
+
+/** Ключ для регистронезависимого сравнения front_id (на канве и в файле регистр может отличаться). */
+function normalizeFrontIdKey(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+/**
+ * Разбирает листы .xlsx (каждый лист — локаль, напр. "RU"/"EN") в карту
+ * front_id → (код локали → название). Первый столбец листа — front_id, второй — название.
+ * Сопоставление по front_id регистронезависимое; исходное написание из файла сохраняется
+ * отдельно — для сообщений в логе.
+ */
+function buildLocaleUpdatesFromSheets(sheets) {
+  /** @type {Map<string, { frontId: string, locales: Map<string, string> }>} ключ — normalizeFrontIdKey */
+  const byFrontId = new Map();
+  let totalRows = 0;
+  let skippedEmptyRows = 0;
+
+  for (const sheet of sheets) {
+    const localeCode = String(sheet.name || "").trim().toLowerCase();
+    if (!localeCode) continue;
+
+    for (const row of sheet.rows || []) {
+      const frontId = String(row[0] ?? "").trim();
+      if (!frontId) continue;
+      const key = normalizeFrontIdKey(frontId);
+      const name = String(row[1] ?? "").trim();
+      totalRows += 1;
+      if (!name) {
+        skippedEmptyRows += 1;
+        continue;
+      }
+      if (!byFrontId.has(key)) byFrontId.set(key, { frontId, locales: new Map() });
+      byFrontId.get(key).locales.set(localeCode, name);
+    }
+  }
+
+  return { byFrontId, totalRows, skippedEmptyRows };
+}
+
+/** normalizeFrontIdKey(frontend_identifier) → множество id задач на канве с таким front_id (обычно одно). */
+function buildCanvasFrontIdIndex() {
+  const index = new Map();
+  for (const [id, task] of state.canvas.entries()) {
+    const frontId = String(task.frontend_identifier || "").trim();
+    if (!frontId) continue;
+    const key = normalizeFrontIdKey(frontId);
+    if (!index.has(key)) index.set(key, new Set());
+    index.get(key).add(id);
+  }
+  return index;
+}
+
+/** Применяет обновления locales к одной задаче на канве сразу: локально для черновика, PATCH — для реальной. */
+async function applyLocalesImportForTask(taskId, localeUpdates) {
+  const task = state.canvas.get(taskId);
+  if (!task) throw new Error("задачи нет на канве");
+
+  if (isTaskLocalOnly(task)) {
+    const full = task._full && typeof task._full === "object" ? task._full : {};
+    full.locales = { ...(full.locales || {}), ...localeUpdates };
+    task._full = full;
+    return { local: true };
+  }
+
+  const full = (await fetchTaskConditions(taskId)) || task._full;
+  if (!full) throw new Error("не удалось получить задачу");
+
+  full.locales = { ...(full.locales || {}), ...localeUpdates };
+  const payload = buildPatchPayload(full, full.conditions || []);
+  await callApi(`/admin/api/gamification/tasks/${taskId}?locale=ru`, "PATCH", payload);
+  task._full = full;
+  return { local: false };
+}
+
+/**
+ * Откладывает обновления locales до общей кнопки «Сохранить»: правит только карточку на канве
+ * (и кэш _full, чтобы «Изменить» сразу показывало новые значения), без запроса на сервер.
+ * Для локального черновика PATCH всё равно не нужен — там нет отдельного шага сохранения.
+ */
+async function stageLocalesImportForTask(taskId, localeUpdates) {
+  const task = state.canvas.get(taskId);
+  if (!task) throw new Error("задачи нет на канве");
+
+  if (isTaskLocalOnly(task)) {
+    const full = task._full && typeof task._full === "object" ? task._full : {};
+    full.locales = { ...(full.locales || {}), ...localeUpdates };
+    task._full = full;
+    return { local: true, staged: false };
+  }
+
+  const full = (await fetchTaskConditions(taskId)) || task._full;
+  if (!full) throw new Error("не удалось получить задачу");
+
+  markTaskLocalesDirty(taskId, localeUpdates);
+  full.locales = { ...(full.locales || {}), ...state.dirtyLocales.get(String(taskId)) };
+  task._full = full;
+  return { local: false, staged: true };
+}
+
+/** Читает .xlsx и сопоставляет строки (front_id → название по локали) с задачами на канве. */
+async function readAndMatchLocalesFile(file) {
+  const buffer = await file.arrayBuffer();
+  const sheets = await readXlsxSheets(buffer);
+  if (!sheets.length) throw new Error("В файле нет листов");
+
+  const { byFrontId, skippedEmptyRows } = buildLocaleUpdatesFromSheets(sheets);
+  if (!byFrontId.size) {
+    throw new Error(
+      "В файле не найдено строк с front_id и названием (1-й столбец — front_id, 2-й — название)"
+    );
+  }
+
+  const canvasIndex = buildCanvasFrontIdIndex();
+  /** @type {Map<string, Map<string, string>>} taskId → (код локали → название) */
+  const matchedTasks = new Map();
+  const notFound = [];
+  const ambiguous = [];
+
+  for (const [key, entry] of byFrontId.entries()) {
+    const candidates = canvasIndex.get(key);
+    if (!candidates || !candidates.size) {
+      notFound.push(entry.frontId);
+      continue;
+    }
+    if (candidates.size > 1) {
+      ambiguous.push(entry.frontId);
+      continue;
+    }
+    const taskId = [...candidates][0];
+    if (!matchedTasks.has(taskId)) matchedTasks.set(taskId, new Map());
+    for (const [code, name] of entry.locales.entries()) {
+      matchedTasks.get(taskId).set(code, name);
+    }
+  }
+
+  const localeCodesUsed = [
+    ...new Set(sheets.map((s) => String(s.name || "").trim().toLowerCase()).filter(Boolean)),
+  ];
+
+  // Задачи на канве, для которых в файле не нашлось ни одной строки (по front_id,
+  // регистронезависимо) — их язык импорт не тронул.
+  const missingFromFile = [];
+  for (const [taskId, task] of state.canvas.entries()) {
+    const frontId = String(task.frontend_identifier || "").trim();
+    if (frontId && byFrontId.has(normalizeFrontIdKey(frontId))) continue;
+    missingFromFile.push({ taskId, frontId, name: task.name || "" });
+  }
+
+  return { matchedTasks, notFound, ambiguous, missingFromFile, localeCodesUsed, skippedEmptyRows };
+}
+
+/**
+ * Печатает в save-log список того, на что импорт не применился:
+ * - front_id из файла, для которых нет (или неоднозначна) карточка на канве;
+ * - задачи на канве, для которых в файле не нашлось строки (front_id).
+ */
+function logSkippedLocalesImportEntries(notFound, ambiguous, missingFromFile = []) {
+  for (const frontId of notFound) {
+    appendSaveLog(`${frontId}: не найдено на канве — изменение не применено`, "warn");
+  }
+  for (const frontId of ambiguous) {
+    appendSaveLog(
+      `${frontId}: несколько задач с этим front_id на канве — изменение не применено`,
+      "warn"
+    );
+  }
+  for (const { taskId, frontId, name } of missingFromFile) {
+    const label = frontId || "(без front_id)";
+    appendSaveLog(
+      `${label} (#${taskId}${name ? `, "${name}"` : ""}): нет строки в файле — язык не обновлён`,
+      "warn"
+    );
+  }
+}
+
+/**
+ * Импортирует названия по языкам из .xlsx для задач на канве (сопоставление по front_id).
+ * @param {File} file
+ * @param {{ immediate?: boolean }} [options] immediate=true — сразу PATCH на сервер (как раньше);
+ *   immediate=false — только на канву, без сохранения (проверяется вручную, отправка — общей кнопкой «Сохранить»).
+ */
+async function handleImportLocalesFile(file, { immediate = true } = {}) {
+  if (!file) return;
+  if (!state.canvas.size) {
+    showToast("На канве нет задач — импортировать некуда", { type: "warning" });
+    return;
+  }
+
+  const btnId = immediate ? "btn-import-locales" : "btn-import-locales-staged";
+  setButtonLoading(btnId, true);
+  showCanvasLoading("Читаю Excel-файл…");
+
+  let matchResult;
+  try {
+    matchResult = await readAndMatchLocalesFile(file);
+  } catch (err) {
+    hideCanvasLoading();
+    setButtonLoading(btnId, false);
+    showToast(`Не удалось прочитать файл: ${err.message || err}`, {
+      type: "warning",
+      durationMs: 7000,
+    });
+    return;
+  }
+  hideCanvasLoading();
+  setButtonLoading(btnId, false);
+
+  const { matchedTasks, notFound, ambiguous, missingFromFile, localeCodesUsed, skippedEmptyRows } =
+    matchResult;
+
+  if (!matchedTasks.size) {
+    $("save-log-list").innerHTML = "";
+    showSaveLog();
+    logSkippedLocalesImportEntries(notFound, ambiguous, missingFromFile);
+    showToast("Совпадений с задачами на канве не найдено — список ниже в логе", {
+      type: "warning",
+      durationMs: 7000,
+    });
+    return;
+  }
+
+  const confirmParts = immediate
+    ? [
+        `Импортировать и сразу сохранить на сервер названия по языкам для ${matchedTasks.size} задач на канве?`,
+        `Листы (языки): ${localeCodesUsed.join(", ") || "—"}`,
+      ]
+    : [
+        `Загрузить названия по языкам для ${matchedTasks.size} задач на канву БЕЗ сохранения на сервер?`,
+        `Листы (языки): ${localeCodesUsed.join(", ") || "—"}`,
+        "Изменения появятся только на канве — проверьте их (например, кнопкой «Изменить» на карточке) и нажмите общую «Сохранить», когда всё в порядке.",
+      ];
+  if (notFound.length) confirmParts.push(`Не найдено на канве: ${notFound.length} front_id`);
+  if (ambiguous.length) {
+    confirmParts.push(`Неоднозначно (несколько задач с одним front_id на канве): ${ambiguous.length}`);
+  }
+  if (missingFromFile.length) {
+    confirmParts.push(`Задач на канве без строки в файле (не будут обновлены): ${missingFromFile.length}`);
+  }
+  if (skippedEmptyRows) confirmParts.push(`Пропущено пустых ячеек с названием: ${skippedEmptyRows}`);
+
+  if (!confirm(confirmParts.join("\n"))) return;
+
+  $("save-log-list").innerHTML = "";
+  showSaveLog();
+  state.loading = true;
+  updateSaveButton();
+  setButtonLoading(btnId, true);
+
+  let okCount = 0;
+  let errCount = 0;
+
+  for (const [taskId, localeMap] of matchedTasks.entries()) {
+    const task = state.canvas.get(taskId);
+    const frontId = task?.frontend_identifier || taskId;
+    const localeUpdates = Object.fromEntries(localeMap.entries());
+    const codesLabel = Object.keys(localeUpdates).join(", ");
+    appendSaveLog(
+      immediate
+        ? `${frontId} (#${taskId}): сохранение [${codesLabel}]...`
+        : `${frontId} (#${taskId}): загрузка на канву [${codesLabel}]...`,
+      "pending"
+    );
+    try {
+      const result = immediate
+        ? await applyLocalesImportForTask(taskId, localeUpdates)
+        : await stageLocalesImportForTask(taskId, localeUpdates);
+      okCount += 1;
+      appendSaveLog(
+        immediate
+          ? `${frontId} (#${taskId}): OK`
+          : `${frontId} (#${taskId}): ${
+              result.local ? "OK (черновик)" : "загружено на канву, ждёт «Сохранить»"
+            }`,
+        "ok"
+      );
+    } catch (err) {
+      errCount += 1;
+      appendSaveLog(`${frontId} (#${taskId}): ${err.message || err}`, "err");
+    }
+  }
+
+  logSkippedLocalesImportEntries(notFound, ambiguous, missingFromFile);
+
+  state.loading = false;
+  updateSaveButton();
+  updateCounters();
+  renderCards();
+  setButtonLoading(btnId, false);
+
+  const notAppliedCount = errCount + notFound.length + ambiguous.length + missingFromFile.length;
+  const summaryParts = immediate
+    ? [`Импорт завершён: ${okCount} задач обновлено`]
+    : [`Загружено на канву: ${okCount} задач (не сохранено)`];
+  if (errCount) summaryParts.push(`${errCount} ошибок`);
+  if (notFound.length) summaryParts.push(`${notFound.length} front_id не найдено на канве`);
+  if (ambiguous.length) summaryParts.push(`${ambiguous.length} неоднозначно`);
+  if (missingFromFile.length) {
+    summaryParts.push(`${missingFromFile.length} задач на канве без строки в файле`);
+  }
+  if (!immediate && okCount) summaryParts.push('нажмите «Сохранить», чтобы отправить на сервер');
+  if (notAppliedCount) summaryParts.push("список не применённых — в логе ниже");
+  setStatus(summaryParts.join(", "), errCount > 0);
+  showToast(summaryParts.join(", "), {
+    type: errCount ? "warning" : notAppliedCount ? "warning" : "success",
+    durationMs: 8000,
+  });
+}
+
+function bindImportLocalesTrigger(btnId, inputId, options) {
+  const btn = $(btnId);
+  const input = $(inputId);
+  if (!btn || !input) return;
+
+  btn.addEventListener("click", () => {
+    if (state.loading) return;
+    if (!state.canvas.size) {
+      showToast("На канве нет задач — импортировать некуда", { type: "warning" });
+      return;
+    }
+    input.value = "";
+    input.click();
+  });
+
+  input.addEventListener("change", () => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (file) void handleImportLocalesFile(file, options);
+  });
+}
+
+function bindImportLocalesEvents() {
+  bindImportLocalesTrigger("btn-import-locales", "import-locales-file", { immediate: true });
+  bindImportLocalesTrigger("btn-import-locales-staged", "import-locales-staged-file", {
+    immediate: false,
+  });
 }
 
 function selectAllVisible(checked) {
@@ -3654,6 +4065,215 @@ function countTemplateLocalDrafts(template) {
     ...Object.keys(canvas).filter((id) => canvas[id]?.localOnly === true),
   ]);
   return ids.size;
+}
+
+/** Черновики шаблона (localOnly-задачи без реального id) с их именами из taskBodies. */
+function getTemplateDraftEntries(template) {
+  const canvas = template?.canvas && typeof template.canvas === "object" ? template.canvas : {};
+  const bodies =
+    template?.taskBodies && typeof template.taskBodies === "object" ? template.taskBodies : {};
+  const ids = new Set([
+    ...Object.keys(bodies),
+    ...Object.keys(canvas).filter((id) => canvas[id]?.localOnly === true),
+  ]);
+  return [...ids].map((id) => ({ id, name: String(bodies[id]?.name || "").trim() }));
+}
+
+/**
+ * Разбирает маркер сезона в конце имени задачи, например «Ивент, лутбоксы Season 3» →
+ * { base: "Ивент, лутбоксы", season: 3 }. Маркер должен идти самым последним словом в имени.
+ */
+function parseTaskNameSeason(name) {
+  const raw = String(name || "").trim();
+  const match = raw.match(/^(.*?)\s*season\s*(\d+)\s*$/i);
+  if (!match) return null;
+  const base = match[1].trim();
+  const season = Number(match[2]);
+  if (!base || !Number.isFinite(season)) return null;
+  return { base, season };
+}
+
+/** Ищет в загруженном каталоге домена задачу с точно таким же (нормализованным) именем. */
+function findCatalogMatchByName(name) {
+  const target = normalizeTaskNameForMatch(name);
+  if (!target) return { status: "unmatched" };
+  const matches = [...state.catalog.values()].filter(
+    (meta) => normalizeTaskNameForMatch(meta.name) === target
+  );
+  if (!matches.length) return { status: "unmatched" };
+  if (matches.length > 1) return { status: "ambiguous" };
+  return { status: "matched", id: matches[0].id };
+}
+
+/**
+ * Если имя черновика оканчивается на «… Season N» — ищет в каталоге задачи с тем же базовым
+ * именем (без учёта номера сезона в самом черновике) и берёт ту, у которой номер сезона
+ * максимальный (последний добавленный сезон). Если маркера сезона нет — обычное сравнение
+ * по полному имени (findCatalogMatchByName).
+ */
+function findCatalogMatchForDraftName(name) {
+  const seasonInfo = parseTaskNameSeason(name);
+  if (!seasonInfo) return findCatalogMatchByName(name);
+
+  const targetBase = normalizeTaskNameForMatch(seasonInfo.base);
+  if (!targetBase) return { status: "unmatched" };
+
+  const bySeason = new Map();
+  for (const meta of state.catalog.values()) {
+    const metaSeasonInfo = parseTaskNameSeason(meta.name);
+    if (!metaSeasonInfo) continue;
+    if (normalizeTaskNameForMatch(metaSeasonInfo.base) !== targetBase) continue;
+    const list = bySeason.get(metaSeasonInfo.season) || [];
+    list.push(meta.id);
+    bySeason.set(metaSeasonInfo.season, list);
+  }
+
+  if (!bySeason.size) return { status: "unmatched" };
+
+  const maxSeason = Math.max(...bySeason.keys());
+  const candidates = bySeason.get(maxSeason);
+  if (candidates.length > 1) return { status: "ambiguous" };
+  return { status: "matched", id: candidates[0], season: maxSeason };
+}
+
+/**
+ * Сопоставляет локальные черновики шаблона с уже созданными на бэке задачами по имени
+ * (с учётом маркера «Season N» — см. findCatalogMatchForDraftName).
+ * Возвращает matched (можно заменить), ambiguous (несколько кандидатов) и unmatched.
+ */
+function buildTemplateDraftMatches(template) {
+  const canvas = template?.canvas && typeof template.canvas === "object" ? template.canvas : {};
+  const drafts = getTemplateDraftEntries(template);
+  const matched = [];
+  const ambiguous = [];
+  const unmatched = [];
+  const usedTargets = new Set();
+
+  for (const draft of drafts) {
+    if (!draft.name) {
+      unmatched.push(draft);
+      continue;
+    }
+    const result = findCatalogMatchForDraftName(draft.name);
+    if (result.status !== "matched") {
+      if (result.status === "ambiguous") ambiguous.push(draft);
+      else unmatched.push(draft);
+      continue;
+    }
+    // На канве уже есть карточка с этим реальным id — заменять черновик им нельзя (коллизия id).
+    if ((canvas[result.id] && result.id !== draft.id) || usedTargets.has(result.id)) {
+      unmatched.push(draft);
+      continue;
+    }
+    usedTargets.add(result.id);
+    matched.push({
+      oldId: draft.id,
+      newId: result.id,
+      name: draft.name,
+      season: result.season ?? null,
+    });
+  }
+
+  return { matched, ambiguous, unmatched };
+}
+
+/** Возвращает копию шаблона, в которой указанные черновики заменены реальными id задач. */
+function applyTemplateDraftMatches(template, matches) {
+  if (!matches.length) return template;
+  const idMap = new Map(matches.map((m) => [m.oldId, m.newId]));
+
+  const canvas = {};
+  for (const [id, layout] of Object.entries(template.canvas || {})) {
+    const newId = idMap.get(id);
+    if (!newId) {
+      canvas[id] = layout;
+      continue;
+    }
+    const next = { ...layout };
+    delete next.localOnly;
+    delete next.configuredOnBackend;
+    canvas[newId] = next;
+  }
+
+  const taskBodies = {};
+  for (const [id, body] of Object.entries(template.taskBodies || {})) {
+    if (!idMap.has(id)) taskBodies[id] = body;
+  }
+
+  const edges = (Array.isArray(template.edges) ? template.edges : []).map((e) => ({
+    from: idMap.get(e.from) || e.from,
+    to: idMap.get(e.to) || e.to,
+  }));
+
+  const targetConfigs = {};
+  for (const [id, cfg] of Object.entries(template.targetConfigs || {})) {
+    targetConfigs[idMap.get(id) || id] = cfg;
+  }
+
+  const next = { ...template, canvas, edges, targetConfigs, updatedAt: new Date().toISOString() };
+  if (Object.keys(taskBodies).length) next.taskBodies = taskBodies;
+  else delete next.taskBodies;
+  return next;
+}
+
+/** Находит шаблон по id, сопоставляет его черновики с каталогом и после подтверждения обновляет хранилище. */
+async function handleMatchTemplateDrafts(templateId) {
+  const domain = getCurrentDomain();
+  if (!domain || !templateId) return;
+
+  const templates = await getDomainCanvasTemplates(domain);
+  const template = templates.find((t) => t.id === templateId);
+  if (!template) return;
+
+  if (!state.catalog.size) {
+    showToast("Сначала загрузите задачи для домена — кнопка «Загрузить задачи»", {
+      type: "warning",
+      durationMs: 6000,
+    });
+    return;
+  }
+
+  const { matched, ambiguous, unmatched } = buildTemplateDraftMatches(template);
+
+  if (!matched.length) {
+    const reasonParts = [];
+    if (ambiguous.length) {
+      reasonParts.push(`${ambiguous.length} — несколько задач с таким именем`);
+    }
+    if (unmatched.length) reasonParts.push(`${unmatched.length} — совпадений не найдено`);
+    showToast(
+      reasonParts.length
+        ? `Не удалось сопоставить черновики: ${reasonParts.join(", ")}`
+        : "В шаблоне нет черновиков для сопоставления",
+      { type: "warning", durationMs: 6000 }
+    );
+    return;
+  }
+
+  const lines = matched.map(
+    (m) => `«${m.name}» → #${m.newId}${m.season != null ? ` (последний сезон: ${m.season})` : ""}`
+  );
+  const confirmParts = [
+    `Заменить ${matched.length} черновик${matched.length === 1 ? "" : "ов"} в шаблоне «${template.name}» на созданные задачи?`,
+    lines.slice(0, 10).join("\n") + (lines.length > 10 ? `\n…и ещё ${lines.length - 10}` : ""),
+  ];
+  if (ambiguous.length) confirmParts.push(`Пропущено (неоднозначно): ${ambiguous.length}`);
+  if (unmatched.length) confirmParts.push(`Пропущено (нет совпадений): ${unmatched.length}`);
+
+  if (!confirm(confirmParts.join("\n\n"))) return;
+
+  const updated = applyTemplateDraftMatches(template, matched);
+  try {
+    await upsertDomainCanvasTemplate(domain, updated);
+    await renderTemplateLoadList();
+    showToast(
+      `Шаблон «${template.name}»: заменено ${matched.length} черновик${
+        matched.length === 1 ? "" : "ов"
+      } на созданные задачи`
+    );
+  } catch (err) {
+    showToast(err.message || "Не удалось обновить шаблон", { type: "warning" });
+  }
 }
 
 function isTemplateModalOpen() {
@@ -3885,6 +4505,19 @@ async function renderTemplateLoadList() {
         <span class="template-list__meta">${taskCount} задач · ${edgeCount} связей${draftNote} · ${escapeHtml(formatTemplateDate(tpl.updatedAt || tpl.createdAt))}</span>
       </button>
       <div class="template-list__actions">
+        ${
+          draftCount
+            ? `<button
+          type="button"
+          class="btn btn--icon btn--ghost template-list__match-drafts"
+          data-template-id="${escapeHtml(tpl.id)}"
+          title="Заменить черновики на созданные задачи с таким же названием"
+          aria-label="Заменить черновики шаблона ${escapeHtml(tpl.name)} на созданные задачи"
+        >
+          <span class="material-symbols-outlined" aria-hidden="true">sync_alt</span>
+        </button>`
+            : ""
+        }
         <button
           type="button"
           class="btn btn--icon btn--ghost template-list__copy-project"
@@ -4634,6 +5267,13 @@ function bindTemplateEvents() {
       return;
     }
 
+    const matchDraftsBtn = ev.target.closest(".template-list__match-drafts");
+    if (matchDraftsBtn) {
+      ev.stopPropagation();
+      void handleMatchTemplateDrafts(matchDraftsBtn.dataset.templateId);
+      return;
+    }
+
     const loadBtn = ev.target.closest(".template-list__load");
     if (!loadBtn) return;
 
@@ -4975,6 +5615,7 @@ function bindEvents() {
   $("btn-select-all").addEventListener("click", () => selectAllVisible(true));
   $("btn-select-none").addEventListener("click", () => selectAllVisible(false));
   $("btn-save").addEventListener("click", () => saveChanges());
+  $("btn-save-all")?.addEventListener("click", () => void saveAllCanvasTasks());
   $("btn-close-panel").addEventListener("click", closePanel);
   $("btn-close-log").addEventListener("click", () => $("save-log").classList.add("save-log--hidden"));
   $("btn-close-copy-panel").addEventListener("click", closeCopyPanel);
@@ -5030,6 +5671,7 @@ function bindEvents() {
 
   initCatalogSearch();
   bindTemplateEvents();
+  bindImportLocalesEvents();
 
   $("tab-canvas")?.addEventListener("click", () => setMainView("canvas"));
   $("tab-stats")?.addEventListener("click", () => {

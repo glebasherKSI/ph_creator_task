@@ -264,6 +264,30 @@
               <span class="material-symbols-outlined" aria-hidden="true">folder_open</span>
               Загрузить шаблон
             </button>
+            <button
+              id="btn-import-locales"
+              class="btn btn--soft btn--template"
+              type="button"
+              disabled
+              title="Загрузить .xlsx с названиями по языкам и сразу сохранить на сервер: каждый лист — код локали (RU, EN, ...), 1-й столбец — front_id, 2-й — название"
+              aria-label="Импортировать названия по языкам из Excel и сохранить сразу"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
+              Импорт названий (Excel)
+            </button>
+            <input id="import-locales-file" type="file" accept=".xlsx" hidden />
+            <button
+              id="btn-import-locales-staged"
+              class="btn btn--soft btn--template"
+              type="button"
+              disabled
+              title="Загрузить .xlsx с названиями по языкам БЕЗ сохранения на сервер — только на канву, для ручной проверки перед общей кнопкой «Сохранить»"
+              aria-label="Импортировать названия по языкам из Excel без сохранения"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">pending_actions</span>
+              Импорт без сохранения
+            </button>
+            <input id="import-locales-staged-file" type="file" accept=".xlsx" hidden />
           </div>
 
           <div class="toolbar__actions" role="group" aria-label="Действия">
@@ -276,6 +300,17 @@
               aria-label="Очистить канву"
             >
               <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+            </button>
+            <button
+              id="btn-save-all"
+              class="btn btn--soft"
+              type="button"
+              disabled
+              title="Отправить на бэк все задачи на канве (не только изменённые) — принудительный ресинк"
+              aria-label="Отправить все задачи на канве на бэк"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">sync</span>
+              Отправить все на бэк
             </button>
             <button id="btn-save" class="btn btn--primary btn--save" type="button" disabled>
               <span class="material-symbols-outlined" aria-hidden="true">check</span>
@@ -578,7 +613,7 @@
           <p id="auth-modal-domain" class="chains-modal__meta"></p>
           <p id="auth-modal-message" class="chains-modal__hint"></p>
 
-          <ol class="auth-stepper" aria-label="Шаги входа">
+          <ol id="auth-stepper" class="auth-stepper" aria-label="Шаги входа">
             <li class="auth-stepper__item auth-stepper__item--active" data-step="1">
               <span class="auth-stepper__num">1</span>
               <span class="auth-stepper__label">Email</span>
@@ -649,6 +684,9 @@
         <div class="chains-modal__foot chains-modal__foot--auth">
           <button id="btn-auth-open-admin" class="btn btn--soft" type="button" hidden>
             Открыть админку в браузере
+          </button>
+          <button id="btn-auth-retry-status" class="btn btn--soft" type="button" hidden>
+            Проверить снова
           </button>
           <button id="btn-cancel-auth-modal" class="btn" type="button">Отмена</button>
         </div>

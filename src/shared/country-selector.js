@@ -33,6 +33,7 @@ export const COUNTRIES_MATCHING_TYPES = [
  * @typedef {object} ParsedCountriesData
  * @property {CountryOption[]} countries
  * @property {CountryListOption[]} countriesLists
+ * @property {string[]} locales Языки, реально настроенные на проекте (constants.locales), нижний регистр.
  * @property {string} source
  */
 
@@ -86,7 +87,20 @@ export function parseCountriesData(raw, source = "unknown") {
     }).filter(Boolean);
   }
 
-  return { countries, countriesLists, source };
+  /** @type {string[]} */
+  const locales = [];
+  if (Array.isArray(constants.locales)) {
+    const seen = new Set();
+    for (const item of constants.locales) {
+      const code = String(item ?? "").trim().toLowerCase();
+      if (code && !seen.has(code)) {
+        seen.add(code);
+        locales.push(code);
+      }
+    }
+  }
+
+  return { countries, countriesLists, locales, source };
 }
 
 /**

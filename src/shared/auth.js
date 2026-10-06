@@ -620,18 +620,20 @@ async function adminApiFetchViaServiceWorker(url, httpMethod, headers, fetchBody
 
 async function resolveAdminApiTransport(domain) {
   const tab = await findAdminTab(domain);
-  if (tab?.id) {
+  // Вкладка есть, но показывает страницу ошибки (старая/непринятый сертификат и т.п.) —
+  // не форсим её: пробуем сначала обычный fetch из service worker (часто и так работает,
+  // если исключение сертификата уже принято раньше на уровне профиля браузера).
+  if (tab?.id && isAdminTabUsable(tab)) {
     return { mode: "tab", tabId: tab.id };
-  }
-  if (isPrivateAdminDomain(domain)) {
-    throw new Error(AUTH_FETCH_ERRORS.TAB_REQUIRED);
   }
   return { mode: "service_worker" };
 }
 
 /**
- * Fetch к admin API: для *.private и при открытой вкладке админки — через tab context;
- * иначе через service worker с fallback на вкладку при SSL-ошибке.
+ * Fetch к admin API: при открытой вкладке админки — через tab context; иначе — напрямую
+ * из service worker (работает, если self-signed сертификат *.private уже принят браузером
+ * ранее — Chrome помнит exception на уровне профиля, вкладка для этого не обязательна) —
+ * с fallback на вкладку, если прямой fetch всё же упал по SSL/сети (сертификат ещё не приняли).
  * @param {string} domainInput
  * @param {string} path
  * @param {string} [method]
@@ -780,7 +782,13 @@ export async function getAuthStatus(domainInput, options = {}) {
 
   const hasSession = Boolean(cookie?.value || stored?.value);
 
-  const otpIncomplete = pendingOtp || stored?.verified === false;
+  // current_user может ответить успешно ещё до прохождения OTP (см. probeFullAuth ниже).
+  // Поэтому "не нужно перепроверять полный доступ" — это отдельный факт, который должен
+  // быть явно подтверждён (verified === true) предыдущей успешной проверкой, а не просто
+  // "мы ничего плохого не знаем". Иначе первая же проверка нового/чужого cookie (magic
+  // link принят, OTP ещё не введён) отрапортует authenticated:true.
+  const sessionChanged = Boolean(cookie?.value) && cookie.value !== stored?.value;
+  const otpIncomplete = pendingOtp || stored?.verified !== true || sessionChanged;
 
   if (hasSession) {
     try {
@@ -836,7 +844,11 @@ export async function getAuthStatus(domainInput, options = {}) {
           ? formatAuthFetchError(cachedResult.error, domain)
           : undefined;
 
-      if (otpIncomplete) {
+      // Здесь current_user не ответил успешно — это либо реальный разлогин (нет смысла
+      // предполагать OTP), либо действительно начатый magic-link flow (сам флаг pendingOtp).
+      // Широкий otpIncomplete тут не подходит — иначе любой первый неудачный запрос
+      // (истёкшая кука и т.п.) ошибочно покажет шаг OTP вместо формы входа.
+      if (pendingOtp) {
         return {
           domain,
           authenticated: false,
@@ -861,7 +873,7 @@ export async function getAuthStatus(domainInput, options = {}) {
       return {
         domain,
         authenticated: false,
-        pendingOtp: otpIncomplete && Boolean(stored?.value),
+        pendingOtp: pendingOtp && Boolean(stored?.value),
         awaitingMagicLink: false,
         email: stored?.email ?? null,
         error: formatAuthFetchError(err, domain),
@@ -869,7 +881,7 @@ export async function getAuthStatus(domainInput, options = {}) {
     }
   }
 
-  if (otpIncomplete) {
+  if (pendingOtp) {
     return {
       domain,
       authenticated: false,

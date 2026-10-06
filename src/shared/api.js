@@ -1,5 +1,6 @@
 import { normalizeDomainOrEmpty } from "./domains.js";
 import { AUTH_MESSAGE_TIMEOUT_MS, formatAuthFetchError, withTimeout } from "./auth.js";
+import { ensureAuthenticated } from "./auth-modal.js";
 
 export { withTimeout };
 export const API_REQUEST_TIMEOUT_MS = 30_000;
@@ -62,6 +63,19 @@ export async function resolveAdminTab(domainInput) {
   const authStatus = await queryAuthStatus(domain);
   if (authStatus?.authenticated) {
     return { domain, mode: "background" };
+  }
+
+  // На странице с модалкой входа (chains.html) не просто просим "нажмите «Загрузить
+  // задачи»" — сразу запускаем ту же проверку/вход, что и по этой кнопке. Иначе meta,
+  // страны, condition-схема и т.п. молча уходят в ручной режим до первой ручной загрузки
+  // задач, хотя пользователь может быть уже залогинен.
+  if (typeof document !== "undefined" && document.getElementById("auth-modal-overlay")) {
+    const authed = await ensureAuthenticated(domain, {
+      message: "Для загрузки справочников нужен вход в админку",
+    });
+    if (authed) {
+      return { domain, mode: "background" };
+    }
   }
 
   throw new Error(

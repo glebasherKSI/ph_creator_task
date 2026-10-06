@@ -60,6 +60,26 @@ function setOpenAdminButtonVisible(visible) {
   btn.hidden = !visible;
 }
 
+function setRetryButtonVisible(visible) {
+  const btn = $("btn-auth-retry-status");
+  if (!btn) return;
+  btn.hidden = !visible;
+}
+
+/**
+ * Скрывает шаги входа (email/magic link/OTP), когда проблема не в логине, а в транспорте
+ * (нет открытой вкладки админки / SSL) — пользователь уже вошёл, форма email тут не нужна
+ * и только путает: подсказывает открыть вкладку и повторить проверку.
+ */
+function showAuthSteps(visible) {
+  $("auth-stepper")?.classList.toggle("auth-modal-step--hidden", !visible);
+  if (!visible) {
+    $("auth-step-email")?.classList.add("auth-modal-step--hidden");
+    $("auth-step-token")?.classList.add("auth-modal-step--hidden");
+    $("auth-step-otp")?.classList.add("auth-modal-step--hidden");
+  }
+}
+
 function shouldOfferOpenAdmin(result) {
   const code = String(result?.errorCode || "");
   const text = String(result?.error || result?.message || result || "");
@@ -77,6 +97,7 @@ function setStatusLine(text, tone = "idle", options = {}) {
   el.textContent = text;
   el.className = `auth-modal-status auth-modal-status--${tone}`;
   setOpenAdminButtonVisible(Boolean(options.showOpenAdmin));
+  setRetryButtonVisible(Boolean(options.showOpenAdmin));
 }
 
 function setStepperActive(step) {
@@ -236,12 +257,14 @@ function applyModalStepFromStatus(status) {
   if (!domainLabel) return;
 
   if (modalFlow?.sentMagicLink && !modalFlow?.submittedMagicLogin) {
+    showAuthSteps(true);
     setStatusLine("Письмо отправлено. Откройте ссылку из email или вставьте token вручную.", "pending");
     showStepPanel(2);
     return;
   }
 
   if (status?.pendingOtp || modalFlow?.submittedMagicLogin) {
+    showAuthSteps(true);
     if (modalFlow) modalFlow.submittedMagicLogin = true;
     setStatusLine("Magic link принят — введите OTP из письма", "pending");
     showStepPanel(3);
@@ -251,13 +274,44 @@ function applyModalStepFromStatus(status) {
 
   if (status?.error && !status?.authenticated) {
     const formatted = formatAuthModalError(status, domainLabel);
-    setStatusLine(formatted.message, "error", { showOpenAdmin: formatted.showOpenAdmin });
+
+    if (formatted.showOpenAdmin) {
+      // Проблема транспортная (нет открытой вкладки админки / SSL), а не с логином —
+      // сессия может быть валидна. Форму email не показываем, чтобы не заставлять
+      // пользователя заново «входить», когда на самом деле нужно просто открыть вкладку
+      // и повторить проверку.
+      showAuthSteps(false);
+      setStatusLine(formatted.message, "error", { showOpenAdmin: true });
+      return;
+    }
+
+    showAuthSteps(true);
+    setStatusLine(formatted.message, "error", { showOpenAdmin: false });
     showStepPanel(1);
     return;
   }
 
+  showAuthSteps(true);
   setStatusLine(`Шаг 1: отправьте magic link на email (${domainLabel})`, "idle");
   showStepPanel(1);
+}
+
+/** Перепроверяет статус входа без пересоздания промиса ensureAuthenticated (кнопка «Проверить снова»). */
+async function retryAuthStatus() {
+  const domain = pending?.domain;
+  if (!domain) return;
+
+  setStatusLine("Проверяю вход…", "pending");
+  const status = await fetchAuthStatus(domain, { force: true });
+  if (!isPendingForDomain(domain)) return;
+
+  if (isAuthenticatedStatus(status)) {
+    setStatusLine(`Вход выполнен${status.email ? ` (${status.email})` : ""}`, "ok");
+    finish(true);
+    return;
+  }
+
+  applyModalStepFromStatus(status);
 }
 
 function reportAuthStepError(err, domain, fallbackMessage) {
@@ -390,6 +444,8 @@ function resetAuthFormFields() {
   $("auth-token").value = "";
   $("auth-otp").value = "";
   setOpenAdminButtonVisible(false);
+  setRetryButtonVisible(false);
+  showAuthSteps(true);
   setModalMessage("");
 }
 
@@ -444,6 +500,7 @@ export function mountAuthModal() {
   $("btn-auth-back-to-email")?.addEventListener("click", () => void backToEmailStep());
   $("btn-auth-verify-otp")?.addEventListener("click", () => void submitOtp());
   $("btn-auth-open-admin")?.addEventListener("click", () => void openAdminTab());
+  $("btn-auth-retry-status")?.addEventListener("click", () => void retryAuthStatus());
   $("btn-cancel-auth-modal")?.addEventListener("click", cancelAuth);
   $("btn-close-auth-modal")?.addEventListener("click", cancelAuth);
 
