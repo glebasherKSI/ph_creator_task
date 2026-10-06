@@ -725,6 +725,44 @@ function resetUiForDomainSwitch() {
   updateCounters();
 }
 
+/**
+ * Кнопка «Проверить вход»: лёгкая проверка статуса без принудительного логина —
+ * если сессия уже активна (например, вы уже были залогинены ранее), просто обновляет
+ * индикатор и показывает тост, не открывая модалку входа.
+ */
+async function handleCheckAuthClick() {
+  const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
+  if (!domain) {
+    showToast("Выберите домен админки", { type: "warning" });
+    return;
+  }
+
+  setButtonLoading("btn-check-auth", true);
+  try {
+    const status = await fetchAndUpdateDomainAuthIndicator(domain);
+    if (isDomainAuthenticated(status)) {
+      showToast(
+        status?.email ? `Вход выполнен: ${status.email}` : "Вход выполнен",
+        { type: "success" }
+      );
+    } else if (status?.pendingOtp) {
+      showToast("Magic link принят — осталось ввести OTP, кнопка «Завершить вход (OTP)»", {
+        type: "warning",
+        durationMs: 6000,
+      });
+    } else if (status?.awaitingMagicLink) {
+      showToast("Ожидание magic link — проверьте почту", { type: "warning" });
+    } else {
+      showToast(status?.error || "Вход не выполнен — нажмите «Загрузить задачи» для авторизации", {
+        type: "warning",
+        durationMs: 6000,
+      });
+    }
+  } finally {
+    setButtonLoading("btn-check-auth", false);
+  }
+}
+
 async function promptCompleteOtpAuth() {
   const domain = state.selectedDomain || normalizeDomainOrEmpty($("domain-select").value);
   if (!domain) {
@@ -754,6 +792,7 @@ function handleDomainSwitch() {
   }
 
   void copyPanel?.loadMeta(domain);
+  void fetchAndUpdateDomainAuthIndicator(domain);
   setStatus("Нажмите «Загрузить задачи»");
 }
 
@@ -6240,6 +6279,7 @@ function bindEvents() {
     }
   });
   $("btn-complete-auth-otp")?.addEventListener("click", () => void promptCompleteOtpAuth());
+  $("btn-check-auth")?.addEventListener("click", () => void handleCheckAuthClick());
 
   $("btn-load-tasks").addEventListener("click", () => loadTasks(true));
   $("btn-load-more").addEventListener("click", () => loadTasks(false, false));
@@ -6450,6 +6490,7 @@ async function init() {
     await loadDomains();
     state.statsProjectId = inferProjectIdFromDomain(state.selectedDomain);
     void copyPanel.loadMeta(state.selectedDomain);
+    void fetchAndUpdateDomainAuthIndicator(state.selectedDomain);
     bindEvents();
     renderStatsPanel();
     renderPackagesList();

@@ -73,6 +73,15 @@
               <select id="domain-select" class="toolbar__domain-select" aria-label="Домен"></select>
               <span id="domain-auth-indicator" class="toolbar__domain-auth" hidden aria-live="polite"></span>
               <button
+                id="btn-check-auth"
+                class="btn btn--icon btn--ghost toolbar__check-auth"
+                type="button"
+                title="Проверить, выполнен ли вход в выбранный домен (без запроса OTP, если сессия уже активна)"
+                aria-label="Проверить вход в выбранный домен"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">verified_user</span>
+              </button>
+              <button
                 id="btn-complete-auth-otp"
                 class="btn btn--soft btn--compact toolbar__complete-otp"
                 type="button"

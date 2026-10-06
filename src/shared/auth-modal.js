@@ -450,19 +450,26 @@ function resetAuthFormFields() {
 }
 
 /**
- * Сброс модалки при смене домена (не завершает вход на прежнем домене в storage).
+ * Сброс (отмена) текущего auth-флоу при смене домена — не завершает вход на прежнем
+ * домене в storage. Срабатывает даже если модалка ещё физически не открыта: пока
+ * ensureAuthenticated идёт через свои await (clearPendingOtpFlow/clearAwaitingMagicLink)
+ * до openOverlay(), pending уже указывает на старый домен — если не сбросить его здесь,
+ * тот отложенный вызов попадёт на `isPendingForDomain` позже и откроет модалку для уже
+ * не актуального домена (виден как «проверка входа» на старый проект после переключения).
  * @param {string} newDomain
  */
 export function resetAuthModalForDomainSwitch(newDomain) {
   const normalizedDomain = String(newDomain || "").trim();
-  if (!isAuthModalOpen() || !pending?.domain) return;
-  if (pending?.domain === normalizedDomain) return;
+  if (!pending?.domain || pending.domain === normalizedDomain) return;
 
+  const wasOpen = isAuthModalOpen();
   const prevCallback = pending?.onComplete;
   pending = null;
   modalFlow = null;
-  resetAuthFormFields();
-  closeOverlay();
+  if (wasOpen) {
+    resetAuthFormFields();
+    closeOverlay();
+  }
   prevCallback?.(false);
 }
 
@@ -540,7 +547,7 @@ export async function ensureAuthenticated(domain, options = {}) {
   const normalizedDomain = String(domain || "").trim();
   if (!normalizedDomain) return false;
 
-  if (isAuthModalOpen() && pending?.domain && pending.domain !== normalizedDomain) {
+  if (pending?.domain && pending.domain !== normalizedDomain) {
     resetAuthModalForDomainSwitch(normalizedDomain);
   }
 
