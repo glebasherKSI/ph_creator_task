@@ -1489,7 +1489,8 @@ function importGraphFromConditions(onlyTaskIds = null) {
     state.targetConfigs.set(targetId, {
       type: gt.type || "enabled",
       extra_type: gt.extra_type || "or",
-      only_completed: gt.only_completed !== false,
+      // Бэк не отдаёт only_completed, когда он false — отсутствие поля = false.
+      only_completed: gt.only_completed === true,
     });
 
     for (const rawSource of gt.list) {
@@ -2639,7 +2640,7 @@ function openTargetPanel(targetId, title) {
       state.targetConfigs.set(id, {
         type: gtFromConditions?.type || "enabled",
         extra_type: gtFromConditions?.extra_type || "or",
-        only_completed: gtFromConditions?.only_completed !== false,
+        only_completed: gtFromConditions ? gtFromConditions.only_completed === true : true,
       });
     }
   }

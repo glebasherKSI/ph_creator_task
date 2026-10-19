@@ -489,7 +489,7 @@ function renderWidgetBody(def, value, onUpdate, taskOptionsCtx) {
         widgetType === "gamification_task"
           ? `
       <label class="conditions-builder__checkbox-label">
-        <input type="checkbox" data-field="only_completed" ${v.only_completed !== false ? "checked" : ""} />
+        <input type="checkbox" data-field="only_completed" ${v.only_completed === true ? "checked" : ""} />
         Только выполненные
       </label>`
           : ""
