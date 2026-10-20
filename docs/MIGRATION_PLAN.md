@@ -144,7 +144,7 @@ SF Pro лицензионно только для устройств Apple — �
       `SEQUENCE_FIELD_OVERRIDES`, `normalizeGamificationTasksCondition`)
 - [x] `api.js`, `meta.js`, `reports.js`, `games-api.js`, `graphic-api.js`
 - [x] `conditions-schema.js` → `app/lib/conditions-schema.ts`
-- [ ] `actions-schema.js` → `app/lib/actions-schema.ts`
+- [x] `actions-schema.js` → `app/lib/actions-schema.ts` (154 теста паритета по всем таблицам и coercion-функциям)
 - [x] `graphic-task-map.js` → `app/lib/graphic-task-map.ts`
 - [x] `storage.js` → `app/lib/storage.ts`; `auth.js` → `app/lib/auth/{errors,session-store,admin-fetch,status}.ts`
       (`admin-fetch`/`status` — только для background). `messaging.ts` — транспорт RPC с таймаутом.
