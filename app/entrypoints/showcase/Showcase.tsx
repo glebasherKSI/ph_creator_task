@@ -7,7 +7,51 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Segmented } from "@/components/ui/segmented";
+import { DomainsCard } from "@/features/popup/DomainsCard";
+import { GraphicCard } from "@/features/popup/GraphicCard";
+import type { DomainsState } from "@/features/popup/useDomains";
+import type { GraphicState } from "@/features/popup/useGraphic";
 import { cn } from "@/lib/utils";
+
+const noop = async () => {};
+
+/** Моки состояния popup — карточки чистые, живут на props. */
+const POPUP_DOMAINS: DomainsState = {
+  domains: ["admin.crimson.lex.prd.maxbit.private", "admin.example.com", "admin.no-perm.io"],
+  permissions: {
+    "admin.crimson.lex.prd.maxbit.private": true,
+    "admin.example.com": true,
+    "admin.no-perm.io": false,
+  },
+  auth: {
+    "admin.crimson.lex.prd.maxbit.private": { authenticated: true, email: "g@x.io" },
+    "admin.example.com": { pendingOtp: true },
+  },
+  status: "Домен admin.example.com добавлен, доступ разрешён",
+  loading: false,
+  addDomain: async () => true,
+  addCurrentTab: noop,
+  removeDomain: noop,
+};
+
+const POPUP_GRAPHIC_ONLINE: GraphicState = {
+  status: {
+    ok: true,
+    authenticated: true,
+    user: { username: "gleb" },
+    baseUrl: "http://127.0.0.1:8000",
+  },
+  busy: false,
+  error: "",
+  login: async () => true,
+  logout: noop,
+};
+
+const POPUP_GRAPHIC_OFFLINE: GraphicState = {
+  ...POPUP_GRAPHIC_ONLINE,
+  status: { ok: true, authenticated: false, user: null, baseUrl: "http://127.0.0.1:8000" },
+  error: "Failed to fetch",
+};
 
 const SWATCHES = [
   { name: "background", cls: "bg-background" },
@@ -250,6 +294,21 @@ export function Showcase() {
           <TaskCardMock />
           <TaskCardMock selected />
           <TaskCardMock sequence />
+        </div>
+      </Section>
+
+      <Section title="Popup">
+        <div className="flex flex-wrap items-start gap-6">
+          <div className="flex w-[380px] flex-col gap-3 rounded-lg bg-background p-3 ring-1 ring-border">
+            <DomainsCard state={POPUP_DOMAINS} />
+            <GraphicCard state={POPUP_GRAPHIC_ONLINE} />
+            <Button variant="primary" size="lg">
+              Перейти в конструктор
+            </Button>
+          </div>
+          <div className="flex w-[380px] flex-col gap-3 rounded-lg bg-background p-3 ring-1 ring-border">
+            <GraphicCard state={POPUP_GRAPHIC_OFFLINE} />
+          </div>
         </div>
       </Section>
     </main>
