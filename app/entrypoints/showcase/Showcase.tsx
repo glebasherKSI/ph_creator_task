@@ -1,4 +1,4 @@
-import { Calendar, Clock, Plus, Search, X } from "lucide-react";
+import { Calendar, Clock, Coins, Plus, Search, X } from "lucide-react";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Segmented } from "@/components/ui/segmented";
+import { cn } from "@/lib/utils";
 
 const SWATCHES = [
   { name: "background", cls: "bg-background" },
@@ -28,18 +29,40 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-/** Макет карточки задачи на канве — проверка бейджей, выделения и мета-строки. */
+/** Подписанное поле в мета-блоке карточки: подпись сверху, значение снизу. */
+function MetaField({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="inline-flex items-center gap-1 text-caption text-muted-foreground">
+        <Icon className="size-3 shrink-0" />
+        {label}
+      </span>
+      <span className="truncate text-subhead tabular-nums text-foreground">{value}</span>
+    </div>
+  );
+}
+
+/** Макет карточки задачи на канве: шапка → тело → мета-сетка. */
 function TaskCardMock({ selected, sequence }: { selected?: boolean; sequence?: boolean }) {
   return (
     <div
-      className={[
-        "w-[260px] rounded-lg bg-surface transition-colors",
-        selected ? "border border-primary" : "border border-transparent",
-      ].join(" ")}
+      className={cn(
+        "w-[280px] overflow-hidden rounded-lg border bg-surface transition-colors",
+        selected ? "border-primary" : "border-transparent",
+      )}
     >
-      <div className="flex items-center justify-between gap-2 px-3 pt-3">
-        <div className="flex items-center gap-1.5">
-          <span className="text-caption font-semibold text-muted-foreground">#1456</span>
+      {/* Шапка: id + бейджи слева, закрыть справа */}
+      <div className="flex items-center justify-between gap-2 bg-black/25 py-1.5 pr-1.5 pl-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="font-mono text-caption text-muted-foreground">#1456</span>
           <Badge variant="accent">BE</Badge>
           {sequence ? <Badge variant="neutral">Цепочка</Badge> : null}
         </div>
@@ -47,19 +70,31 @@ function TaskCardMock({ selected, sequence }: { selected?: boolean; sequence?: b
           <X />
         </Button>
       </div>
-      <div className="flex flex-col gap-1.5 px-3 pb-3 pt-1">
-        <div className="text-headline">Хьюстон, у нас пополнение!</div>
-        <div className="text-caption text-muted-foreground">test_chains</div>
-        <div className="flex flex-col gap-1 pt-1 text-caption text-muted-foreground">
-          <span className="inline-flex items-center gap-1 whitespace-nowrap">
-            <Calendar className="size-3 shrink-0" /> 01.10.2026 15:39 — 31.10.2026 15:39
+
+      {/* Тело: название и frontend_identifier */}
+      <div className="px-3 pt-3 pb-2.5">
+        <div className="text-headline leading-tight">Хьюстон, у нас пополнение!</div>
+        <div className="mt-1 truncate font-mono text-caption text-muted-foreground">
+          test_chains
+        </div>
+      </div>
+
+      {/* Мета: подписанные поля в сетке 2×2 */}
+      <div className="mx-3 border-t border-border" />
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 px-3 py-3">
+        <MetaField icon={Calendar} label="Старт" value="01.10.2026 15:39" />
+        <MetaField icon={Calendar} label="Конец" value="31.10.2026 15:39" />
+        <MetaField icon={Clock} label="Время жизни" value="1440 мин" />
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="inline-flex items-center gap-1 text-caption text-muted-foreground">
+            <Coins className="size-3 shrink-0" />
+            Награда
           </span>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1">
-              <Clock className="size-3 shrink-0" /> 1440 мин
-            </span>
-            <span className="ml-auto font-semibold text-primary">5 б.</span>
-          </div>
+          <span>
+            <Badge variant="accent" className="px-2 text-subhead">
+              5 б.
+            </Badge>
+          </span>
         </div>
       </div>
     </div>
