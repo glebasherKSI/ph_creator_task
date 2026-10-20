@@ -112,3 +112,6 @@ export const STRIP_FROM_CREATE: ReadonlySet<string> = new Set([
 
 /** Тип задания-цепочки: у него нет событий, таргетинга, расписания, дат, стран и кампании. */
 export const SEQUENCE_TASK_TYPE = "sequence";
+
+/** Content-script вкладки админки (entrypoints/admin.content.ts, registration: runtime). */
+export const CONTENT_SCRIPT_PATH = "/content-scripts/admin.js";

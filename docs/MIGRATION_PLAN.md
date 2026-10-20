@@ -161,18 +161,28 @@ SF Pro лицензионно только для устройств Apple — �
 
 ### Этап 3. Background и content-скрипты
 
-- [ ] `background.js` → `entrypoints/background.ts` (обработчики `onMessage`, `onInstalled`, `tabs.onUpdated`, работа с cookies).
-- [ ] `src/inject/content.js` и `page-hook.js` → content-script и main-world entrypoints WXT.
-- [ ] Типизированные сообщения между страницами и background (один файл с типами сообщений).
+- [x] `background.js` → `app/entrypoints/background.ts`: роутер сообщений, `onInstalled`, `tabs.onUpdated`
+      (инъекция content-script + перехват magic link). Логика Reports вынесена в `app/lib/reports-fetch.ts`.
+- [x] `src/inject/content.js` → `app/entrypoints/admin.content.ts` (`registration: "runtime"`, в манифест не попадает,
+      инжектится в `content-scripts/admin.js`). `src/shared/content-script.js` → `app/lib/content-script.ts`.
+- [x] `page-hook.js` **не переносится**: это мёртвый код — его никто не инжектит, событие `ph-request-captured`
+      никто не слушает, popup список запросов не показывает. Ключи `ph_captured_requests` / `ph_capture_enabled`
+      остаются в storage как есть (экспорт/импорт их переносит, но не использует).
+- [x] Типизированные сообщения: `app/lib/messaging.ts` — реестр `MessageMap` / `TabMessageMap`, `sendMessage`,
+      `sendTabMessage`, `createMessageRouter` (общий для background и content-script).
+- [ ] Проверить вручную из новой сборки: `npm run dev` → добавить домен → `PH_AUTH_STATUS` → вход (magic link + OTP)
+      → `PH_ADMIN_API_FETCH` списка задач. Пока нет popup/страниц — через DevTools service worker
+      (`chrome.runtime.sendMessage({action:"PH_AUTH_STATUS", payload:{domain:"…"}})`).
 
-**Готово, когда:** авторизация по домену, перехват запросов и `PH_API_FETCH` работают из новой сборки.
+**Готово, когда:** авторизация по домену и `PH_ADMIN_API_FETCH` работают из новой сборки.
 
 ### Этап 4. Popup
 
 - [ ] Выбор и добавление доменов, запрос host-permissions.
 - [ ] Статус авторизации, вход (OTP / magic link).
-- [ ] Список перехваченных запросов (виртуализированный), включение/выключение перехвата.
-- [ ] Кнопки перехода в конструктор и редактор.
+- [ ] Вход в Promo Graphic (логин/пароль, адрес сервера).
+- [ ] Кнопка перехода в конструктор.
+- ~~Список перехваченных запросов~~ — перехват мёртв (см. этап 3), в новый popup не переносится.
 
 **Готово, когда:** popup полностью заменяет `src/sniffer/`, старый popup удалён.
 
