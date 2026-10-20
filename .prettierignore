@@ -1,0 +1,9 @@
+src/
+background.js
+.output/
+.wxt/
+exports/
+test_primer/
+tests/fixtures/
+node_modules/
+*.har

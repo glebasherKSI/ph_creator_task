@@ -31,11 +31,11 @@ ID: ebpabdcmngdgiallonghpgddgcedebka
 
 ## Что лежит в storage (переносится целиком)
 
-| Ключ | Содержимое |
-|---|---|
-| `ph_admin_domains` | список доменов админок |
-| `ph_auth_sessions` | сессии авторизации по доменам |
-| `ph_canvas_templates` | шаблоны канвы по доменам |
-| `ph_chains_layout_<domain>` | позиции карточек на канве |
-| `ph_captured_requests`, `ph_capture_enabled`, `ph_max_requests` | перехват запросов |
-| `ph_graphic_auth`, `ph_graphic_base_url` | авторизация Graphic API |
+| Ключ                                                            | Содержимое                    |
+| --------------------------------------------------------------- | ----------------------------- |
+| `ph_admin_domains`                                              | список доменов админок        |
+| `ph_auth_sessions`                                              | сессии авторизации по доменам |
+| `ph_canvas_templates`                                           | шаблоны канвы по доменам      |
+| `ph_chains_layout_<domain>`                                     | позиции карточек на канве     |
+| `ph_captured_requests`, `ph_capture_enabled`, `ph_max_requests` | перехват запросов             |
+| `ph_graphic_auth`, `ph_graphic_base_url`                        | авторизация Graphic API       |

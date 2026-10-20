@@ -1,0 +1,11 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "jsx": "react-jsx",
+    "skipLibCheck": true
+  },
+  "include": ["app", "tests", "wxt.config.ts", ".wxt/wxt.d.ts"]
+}

@@ -89,12 +89,12 @@ inject/content.js ──► inject/page-hook.js (web_accessible_resource)
 
 Action types с полным UI requirements (MVP):
 
-| action | Поля UI |
-|--------|---------|
-| `bet` | bets_count, bet_points_sum, duration, money_range, game_categories, bet_type (+ min_bet_amount из money_range) |
-| `deposit` | payments_count, payment_systems, duration, money_range, points_sum, min/max_points, child_systems |
-| `cashout` | как deposit |
-| `sport_bet` | sport_bets_count, sport_bet_points_sum, min_bet_amount, odd, result, sport_bet_types, sport_types |
+| action      | Поля UI                                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| `bet`       | bets_count, bet_points_sum, duration, money_range, game_categories, bet_type (+ min_bet_amount из money_range) |
+| `deposit`   | payments_count, payment_systems, duration, money_range, points_sum, min/max_points, child_systems              |
+| `cashout`   | как deposit                                                                                                    |
+| `sport_bet` | sport_bets_count, sport_bet_points_sum, min_bet_amount, odd, result, sport_bet_types, sport_types              |
 
 Остальные 12 типов (`email_confirmation`, `scheduler` как event не action, `achievement`, …) → **JSON textarea** для `requirements` внутри карточки. Неизвестные extra-ключи в handled actions → доп. JSON-блок в карточке.
 
@@ -111,15 +111,15 @@ Action types с полным UI requirements (MVP):
 
 Реализованные widget types (MVP):
 
-| type | Примеры conditions |
-|------|-------------------|
-| `boolean_checkboxes` | access_limit, self_exclusion |
-| `tags_extended` | user_id, account_id |
-| `select` | active_phones, gender |
-| `gamification_task` | gamification_tasks |
-| `groups` | groups |
-| `payment` | deposit, cashout |
-| `bet` | bets_count, bets_sum |
+| type                                          | Примеры conditions                     |
+| --------------------------------------------- | -------------------------------------- |
+| `boolean_checkboxes`                          | access_limit, self_exclusion           |
+| `tags_extended`                               | user_id, account_id                    |
+| `select`                                      | active_phones, gender                  |
+| `gamification_task`                           | gamification_tasks                     |
+| `groups`                                      | groups                                 |
+| `payment`                                     | deposit, cashout                       |
+| `bet`                                         | bets_count, bets_sum                   |
 | `boolean`, `boolean_tags`, `string`, `number` | fraud, address, chargeable_comp_points |
 
 Остальные ~40 типов → JSON textarea **внутри карточки** этого условия.
@@ -132,16 +132,16 @@ Action types с полным UI requirements (MVP):
 
 Поля со `<select>` при успешной загрузке meta:
 
-| Поле | Источник meta |
-|------|----------------|
-| `type` | types (fallback: interactive, informational, achievement) |
-| `filter_id` | filters |
-| `category` | categories (fallback из schema) |
-| `priority` | priorities (0–4) |
-| `tag` / `tag_id` | tags (в payload — объект tag + tag_id) |
-| `events` | events (multi-select) |
-| `main_bonus_group_id`, `secondary_bonus_group_id` | bonuses |
-| `notification_events` | notification_events (multi-select) |
+| Поле                                              | Источник meta                                             |
+| ------------------------------------------------- | --------------------------------------------------------- |
+| `type`                                            | types (fallback: interactive, informational, achievement) |
+| `filter_id`                                       | filters                                                   |
+| `category`                                        | categories (fallback из schema)                           |
+| `priority`                                        | priorities (0–4)                                          |
+| `tag` / `tag_id`                                  | tags (в payload — объект tag + tag_id)                    |
+| `events`                                          | events (multi-select)                                     |
+| `main_bonus_group_id`, `secondary_bonus_group_id` | bonuses                                                   |
+| `notification_events`                             | notification_events (multi-select)                        |
 
 **Страны (2.11.1):** модуль `country-selector.js` — `GET /admin/api/constants?locale=ru` (`countries.all`, `countries_lists`), fallback `test_primer/constant.json`. Toggle `countries_matching_type`: `countries` | `countries_lists`. Multi-select стран с поиском и опцией «Все страны» → `["all"]`; при `countries_lists` — multi-select уровней.
 
@@ -169,13 +169,13 @@ Action types с полным UI requirements (MVP):
 
 **Стек bundle:**
 
-| Слой | Технология |
-|------|------------|
-| Bundler | Vite (`__vite__mapDeps`, dynamic `import("./form-….js")`) |
-| UI | Vue 3 SFC + Ant Design Vue (`AConfigProvider`, `ALayout`, `AInput`, `ACollapsePanel`) |
-| State / routing | Pinia (`auth`, `constants`, `settings`) + Vue Router |
-| HTTP | Axios `baseURL: "/admin/api"` — request → snake_case, response → camelCase |
-| i18n | vue-i18n, ключи `gamification_tasks.*`, `filters.inputs.*` |
+| Слой            | Технология                                                                            |
+| --------------- | ------------------------------------------------------------------------------------- |
+| Bundler         | Vite (`__vite__mapDeps`, dynamic `import("./form-….js")`)                             |
+| UI              | Vue 3 SFC + Ant Design Vue (`AConfigProvider`, `ALayout`, `AInput`, `ACollapsePanel`) |
+| State / routing | Pinia (`auth`, `constants`, `settings`) + Vue Router                                  |
+| HTTP            | Axios `baseURL: "/admin/api"` — request → snake_case, response → camelCase            |
+| i18n            | vue-i18n, ключи `gamification_tasks.*`, `filters.inputs.*`                            |
 
 **Маршруты gamification tasks** (строки ~113042–113055):
 
@@ -195,22 +195,22 @@ Action types с полным UI requirements (MVP):
 
 **Сравнение с `copy-panel.js`:**
 
-| Блок | Админка | copy-panel (2.8.0) |
-|------|---------|-------------------|
-| Секции | 7 (+ targeting внутри формы) | 9 (явный «Таргетинг», «Прочие») |
-| filter_id, events, tags, bonuses | select из meta | select (Phase 1) |
-| conditions | conditions-builder (Phase 2) | виджеты + JSON fallback |
-| actions | actions builder (Phase 3) | actions-builder (виджеты + JSON fallback) |
-| cron | cron-input widget | text |
+| Блок                             | Админка                      | copy-panel (2.8.0)                        |
+| -------------------------------- | ---------------------------- | ----------------------------------------- |
+| Секции                           | 7 (+ targeting внутри формы) | 9 (явный «Таргетинг», «Прочие»)           |
+| filter_id, events, tags, bonuses | select из meta               | select (Phase 1)                          |
+| conditions                       | conditions-builder (Phase 2) | виджеты + JSON fallback                   |
+| actions                          | actions builder (Phase 3)    | actions-builder (виджеты + JSON fallback) |
+| cron                             | cron-input widget            | text                                      |
 
 **Рекомендация:**
 
-| Подход | Оценка |
-|--------|--------|
-| Встроить admin bundle в extension | ❌ — ~4.4 MB, auth/session, CSP, Vue+Ant Design |
-| Извлечь переиспользуемую schema без bundle | ✅ — meta API + `conditions.json` + i18n-ключи из bundle |
+| Подход                                     | Оценка                                                           |
+| ------------------------------------------ | ---------------------------------------------------------------- |
+| Встроить admin bundle в extension          | ❌ — ~4.4 MB, auth/session, CSP, Vue+Ant Design                  |
+| Извлечь переиспользуемую schema без bundle | ✅ — meta API + `conditions.json` + i18n-ключи из bundle         |
 | Сохранить lazy chunks (`form-Bg1PQAgX.js`) | ⏸️ — даст точную разметку секций, но дублирует API-driven schema |
-| Постепенно улучшать `copy-panel` | ✅ — контролируемо, без зависимости от админки |
+| Постепенно улучшать `copy-panel`           | ✅ — контролируемо, без зависимости от админки                   |
 
 **Извлечённая schema:** [`exports/panel_schema_extracted.json`](exports/panel_schema_extracted.json) — секции, поля с UI-типами, 52 condition widget types, action builder structure, meta endpoints, сравнение с copy-panel.
 
