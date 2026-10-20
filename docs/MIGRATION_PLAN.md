@@ -197,14 +197,26 @@ SF Pro лицензионно только для устройств Apple — �
 
 ### Этап 5. Общие компоненты формы задачи
 
-- [ ] `MultiCombobox` (замена `multi-combobox.js`) на базе shadcn Command + Popover, с виртуализацией.
-- [ ] `CountrySelector` (страны + списки стран, режимы matching type).
-- [ ] `RepeatSchedule` (cron-расписание).
-- [ ] `ConditionsBuilder`: схема с бэка → виджеты (`gamification_task`, `groups`, `tags_extended`, `payment`, `bet`, `number`, `boolean*`, `select`, `countries_with_lists`, JSON-fallback).
-- [ ] `ActionsBuilder`: main/secondary действия, requirements/conditions, sequential.
-- [ ] `TaskForm` (замена `copy-panel.js`): секции, React Hook Form + Zod, режимы copy/edit, бриф из графика, превью payload.
-- [ ] Для `sequence` форма сама скрывает лишние секции по схеме.
-- [ ] `AuthModal` (замена `auth-modal.js`).
+- [x] Примитивы shadcn-стиля на Radix (`app/components/ui`): popover, dialog/sheet, select, checkbox, switch,
+      textarea, tooltip, collapsible, command (cmdk). Конвенции — `app/components/README.md`.
+- [x] `MultiCombobox` (`app/components/multi-combobox.tsx`) на cmdk + Popover: чипы, поиск, «Все», удалённый поиск
+      с debounce. Без виртуализации — списки до нескольких сотен позиций, не требуется.
+- [x] `CountrySelector` + `country-selector.ts` (загрузка стран, конвертеры условий, 79 тестов паритета).
+- [x] `RepeatSchedule` + `repeat-schedule.ts` (`parseCron`/`buildCron`, паритет со старым кодом).
+- [x] `ConditionsBuilder` + `conditions-builder.ts`: все виджеты из `HANDLED_WIDGET_TYPES`, пикер условий,
+      UI/JSON-режим, `countries_with_lists` через `CountrySelector` (110 тестов). Исправлен баг старого кода:
+      период `duration` писался в ключ `"duration.period"` верхнего уровня.
+- [x] `ActionsBuilder` + `actions-builder.ts` поверх `app/lib/actions-schema.ts` (25 тестов).
+- [x] `TaskForm` + `task-form.ts` + `hooks.ts`: секции-карточки, react-hook-form (резолвер Zod свой —
+      `@hookform/resolvers` конфликтует с zod 4), режимы copy/edit, meta/ручной ввод, бриф по секциям,
+      превью payload. Roundtrip «задача → форма → payload» совпадает с `buildCreatePayload` на фикстурах.
+- [x] Для `sequence` форма скрывает «Начало работы», «Таргетинг», страны, кампанию, расписание, даты, лимит
+      повторов и шлёт эти поля пустыми (`SEQUENCE_FIELD_OVERRIDES`).
+- [x] `AuthModal` → `app/features/auth/` (`AuthProvider` + `useAuth().ensureAuthenticated`, 43 теста).
+      Новое: модалка сама переходит к OTP, когда background принял magic link.
+- [x] Форма на витрине (`showcase.html`, секция «Форма задачи») на фикстурах #1454 и #1456; SSR-смоук в тестах.
+- [ ] Проверить форму вживую на домене: копия обычной задачи и цепочки, «Показать payload» vs старое расширение.
+- [ ] Решить про `manual_reward`, `cross_project`, `shared_projects` (админка шлёт, расширение — нет).
 
 **Готово, когда:** `TaskForm` собирает тот же payload, что старая форма, на эталонных задачах.
 

@@ -14,7 +14,17 @@ import { StatusTabs } from "@/features/popup/StatusTabs";
 import type { DomainsState } from "@/features/popup/useDomains";
 import type { GraphicState } from "@/features/popup/useGraphic";
 import type { ReportsState } from "@/features/popup/useReports";
+import { TaskForm } from "@/features/task-form/TaskForm";
+import type { TaskLike } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+import taskInteractiveFixture from "../../../tests/fixtures/har/task-interactive-1454.json";
+import taskSequenceFixture from "../../../tests/fixtures/har/task-sequence-1456.json";
+
+const TASK_FIXTURES: Record<string, TaskLike> = {
+  interactive: taskInteractiveFixture as TaskLike,
+  sequence: taskSequenceFixture as TaskLike,
+};
 
 const noop = async () => {};
 
@@ -169,6 +179,7 @@ export function Showcase() {
   const [type, setType] = useState<"enabled" | "disabled">("enabled");
   const [logic, setLogic] = useState<"and" | "or">("or");
   const [ready, setReady] = useState(false);
+  const [formFixture, setFormFixture] = useState<"interactive" | "sequence">("interactive");
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-12 px-6 py-10">
@@ -338,6 +349,31 @@ export function Showcase() {
             <GraphicCard state={POPUP_GRAPHIC_OFFLINE} />
             <ReportsCard state={POPUP_REPORTS} />
           </div>
+        </div>
+      </Section>
+
+      <Section title="Форма задачи">
+        <p className="text-subhead text-muted-foreground">
+          Без домена: справочники в режиме ручного ввода, схема условий и страны — из фикстур.
+          Отправка только показывает payload.
+        </p>
+        <Segmented
+          aria-label="Фикстура"
+          size="sm"
+          value={formFixture}
+          onValueChange={setFormFixture}
+          options={[
+            { value: "interactive", label: "Обычная задача #1454" },
+            { value: "sequence", label: "Цепочка #1456" },
+          ]}
+        />
+        <div className="max-w-3xl rounded-lg bg-background p-4 ring-1 ring-border">
+          <TaskForm
+            mode="copy"
+            domain=""
+            sourceTask={TASK_FIXTURES[formFixture] ?? null}
+            onSubmit={async (payload) => ({ echo: payload.gamification_task.name })}
+          />
         </div>
       </Section>
     </main>
