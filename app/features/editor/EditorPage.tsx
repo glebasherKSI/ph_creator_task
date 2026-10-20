@@ -142,7 +142,7 @@ export function EditorPage() {
           disabled={!domain}
         />
 
-        <main className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-lg bg-surface p-4">
+        <main className="flex min-h-0 flex-col gap-3 overflow-y-auto rounded-lg bg-background p-4 ring-1 ring-border">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Segmented<MainView>
               value={view}
