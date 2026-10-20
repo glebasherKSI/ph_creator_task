@@ -6,10 +6,7 @@ import { cn } from "@/lib/utils";
 const Collapsible = CollapsiblePrimitive.Root;
 const CollapsibleTrigger = CollapsiblePrimitive.Trigger;
 
-/**
- * Контент с плавным раскрытием: Radix даёт высоту в CSS-переменной,
- * анимируем её и прозрачность (см. @keyframes collapsible-* в globals.css).
- */
+/** Контент секции: без анимации раскрытия — открывается и закрывается мгновенно. */
 function CollapsibleContent({
   className,
   ...props
@@ -17,10 +14,7 @@ function CollapsibleContent({
   return (
     <CollapsiblePrimitive.Content
       data-slot="collapsible-content"
-      className={cn(
-        "overflow-hidden data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up",
-        className,
-      )}
+      className={cn("overflow-hidden", className)}
       {...props}
     />
   );
