@@ -568,6 +568,36 @@ function eventsIncludeScheduler(rootOrEvents) {
   return events.includes("scheduler");
 }
 
+const SEQUENCE_TYPE = "sequence";
+
+/** Поля, которые админка не заполняет у заданий-цепочек (type: "sequence"). */
+const SEQUENCE_HIDDEN_FIELD_KEYS = [
+  "countrySelector",
+  "category",
+  "repeatSchedule",
+  "availableFrom",
+  "availableTill",
+  "maxRepetitions",
+];
+const SEQUENCE_HIDDEN_SECTIONS = ["startup", "targeting"];
+
+function isSequenceType(root) {
+  return String(field(root, "type")?.value || "").trim() === SEQUENCE_TYPE;
+}
+
+function syncSequenceVisibility(root) {
+  const hide = isSequenceType(root);
+  for (const key of SEQUENCE_HIDDEN_FIELD_KEYS) {
+    const el = field(root, key);
+    const wrap = el?.closest(".copy-panel__field") || el;
+    if (wrap) wrap.style.display = hide ? "none" : "";
+  }
+  for (const id of SEQUENCE_HIDDEN_SECTIONS) {
+    const section = root.querySelector(`[data-section="${id}"]`);
+    if (section) section.style.display = hide ? "none" : "";
+  }
+}
+
 function syncRepeatScheduleVisibility(root) {
   const mount = field(root, "repeatSchedule");
   const fieldWrap = mount?.closest(".copy-panel__field");
@@ -770,6 +800,7 @@ export function fillCopyForm(root, task, { mode = "copy" } = {}) {
   }
 
   applyPlannerHint(root, task);
+  syncSequenceVisibility(root);
 }
 
 export function buildCopyPayload(root, sourceTask) {
@@ -833,6 +864,23 @@ export function buildCopyPayload(root, sourceTask) {
     notification_events: readNotificationEvents(root),
     __tagRaw: readTagRaw(root),
   };
+
+  if (overrides.type === SEQUENCE_TYPE) {
+    // Как в админке: у цепочек нет событий запуска, таргетинга, расписания, дат, лимита повторов, стран и кампании.
+    Object.assign(overrides, {
+      conditions: [],
+      category: null,
+      events: [],
+      repeatable: false,
+      cron: null,
+      available_from: null,
+      available_till: null,
+      max_repetitions: null,
+      countries: [],
+      countries_matching_type: null,
+      countries_lists: [],
+    });
+  }
 
   return { gamification_task: buildCreatePayload(sourceTask, overrides) };
 }
@@ -1218,6 +1266,11 @@ export function mountCopyPanel(root, options = {}) {
   bindSectionToggles(root);
   bindSectionHintPopovers(root);
   syncDurationDisabled();
+
+  // Селект типа пересоздаётся после загрузки meta — слушаем делегированно.
+  root.addEventListener("change", (ev) => {
+    if (ev.target?.id === FIELD_IDS.type) syncSequenceVisibility(root);
+  });
 
   const repeatMount = field(root, "repeatSchedule");
   root.__repeatSchedule = mountRepeatSchedule(repeatMount, { onChange: () => {} });

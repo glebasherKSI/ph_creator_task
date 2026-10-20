@@ -5,7 +5,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 /** @type {Map<string, { data: ParsedTaskMeta, expiresAt: number }>} */
 const cache = new Map();
 
-export const DEFAULT_TASK_TYPES = ["interactive", "informational", "achievement"];
+export const DEFAULT_TASK_TYPES = ["interactive", "informational", "achievement", "sequence"];
 export const DEFAULT_CATEGORIES = ["basic", "beginning", "passive", "progressive", "sequence"];
 export const DEFAULT_PRIORITIES = [0, 1, 2, 3, 4];
 
