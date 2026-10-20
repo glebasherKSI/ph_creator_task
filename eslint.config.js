@@ -14,6 +14,7 @@ export default tseslint.config(
       ".wxt/**",
       "exports/**",
       "test_primer/**",
+      "public/**",
       "node_modules/**",
     ],
   },
