@@ -275,19 +275,27 @@ function Group({
   children: React.ReactNode;
   className?: string;
 }) {
+  const titleId = React.useId();
   return (
-    <fieldset
+    <div
+      role="group"
+      aria-labelledby={titleId}
       className={cn(
         "flex min-w-0 flex-col gap-3 rounded-md bg-background/60 p-3 ring-1 ring-border",
         className,
       )}
     >
-      <legend className="px-1 text-caption font-semibold tracking-wide text-muted-foreground uppercase">
-        {title}
-      </legend>
-      {hint ? <p className="-mt-1 text-caption text-muted-foreground">{hint}</p> : null}
+      <div className="flex flex-col gap-0.5">
+        <div
+          id={titleId}
+          className="text-caption font-semibold tracking-wide text-muted-foreground uppercase"
+        >
+          {title}
+        </div>
+        {hint ? <p className="text-caption text-muted-foreground">{hint}</p> : null}
+      </div>
       {children}
-    </fieldset>
+    </div>
   );
 }
 

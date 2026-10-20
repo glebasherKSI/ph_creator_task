@@ -514,6 +514,7 @@ function FieldColumn({
   onRemove: (key: string) => void;
   onFields: (key: string, next: ActionFields) => void;
 }) {
+  const titleId = React.useId();
   const isCondition = role === "condition";
   const available = allFields.filter((field) => !visibleKeys.includes(field.key));
   const rows = visibleKeys
@@ -521,15 +522,24 @@ function FieldColumn({
     .filter((def): def is RequirementFieldDef => def !== null);
 
   return (
-    <fieldset className="flex min-w-0 flex-col gap-2 rounded-md bg-surface/70 p-3 ring-1 ring-border">
-      <legend className="px-1 text-caption font-semibold tracking-wide text-muted-foreground uppercase">
-        {isCondition ? "Условия" : "Атрибуты"}
-      </legend>
-      <p className="text-caption text-muted-foreground">
-        {isCondition
-          ? "Что игрок должен сделать, чтобы действие засчиталось"
-          : "Какие действия учитывать (фильтры)"}
-      </p>
+    <div
+      role="group"
+      aria-labelledby={titleId}
+      className="flex min-w-0 flex-col gap-2 rounded-md bg-surface/70 p-3 ring-1 ring-border"
+    >
+      <div className="flex flex-col gap-0.5">
+        <div
+          id={titleId}
+          className="text-caption font-semibold tracking-wide text-muted-foreground uppercase"
+        >
+          {isCondition ? "Условия" : "Атрибуты"}
+        </div>
+        <p className="text-caption text-muted-foreground">
+          {isCondition
+            ? "Что игрок должен сделать, чтобы действие засчиталось"
+            : "Какие действия учитывать (фильтры)"}
+        </p>
+      </div>
       {rows.length ? (
         <div className="flex flex-col divide-y divide-border/70">
           {rows.map((def) => (
@@ -555,7 +565,7 @@ function FieldColumn({
           onAdd={onAdd}
         />
       </div>
-    </fieldset>
+    </div>
   );
 }
 
