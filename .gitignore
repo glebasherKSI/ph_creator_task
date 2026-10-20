@@ -47,3 +47,9 @@ coverage/
 .tmp/
 temp/
 tmp/
+# WXT build / cache
+.output/
+.wxt/
+
+# Extension signing key (public part lives in docs/EXTENSION_ID.md)
+extension-key.pem

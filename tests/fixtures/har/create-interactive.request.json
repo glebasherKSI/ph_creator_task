@@ -1,0 +1,60 @@
+{
+  "gamification_task": {
+    "countries_matching_type": "countries",
+    "events": [
+      "scheduler",
+      "deposit"
+    ],
+    "countries": [
+      "all"
+    ],
+    "countries_lists": [],
+    "locales": {
+      "en": "test",
+      "ru": "test",
+      "es": "test",
+      "pt": "test"
+    },
+    "conditions": [
+      {
+        "fraud": false
+      }
+    ],
+    "type": "interactive",
+    "category": "basic",
+    "player_consent_required": true,
+    "priority": 3,
+    "serialized_main_actions": [
+      {
+        "action": "deposit",
+        "requirements": {
+          "payments_count": "1"
+        },
+        "conditions": {
+          "min_points": "1"
+        }
+      }
+    ],
+    "serialized_secondary_actions": [],
+    "main_actions_sequential": false,
+    "secondary_actions_sequential": false,
+    "main_bonus_group_id": "gamification_award:GAMIFICATION BONUS POINTS 5:GAMIFICATION BONUS POINTS 5",
+    "secondary_bonus_group_id": null,
+    "manual_reward": false,
+    "notification_events": [
+      "main_bonus_issue",
+      "secondary_bonus_issue"
+    ],
+    "infinite": false,
+    "name": "test",
+    "frontend_identifier": "test_11111",
+    "tag_id": 20213,
+    "cron": "0 0 1 * *",
+    "available_from": "2026-10-01 15:39:11",
+    "available_till": "2026-10-31 15:39:15",
+    "max_repetitions": "1",
+    "duration": "111",
+    "cross_project": false,
+    "shared_projects": []
+  }
+}

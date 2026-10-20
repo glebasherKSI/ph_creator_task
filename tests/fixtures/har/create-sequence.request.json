@@ -1,0 +1,46 @@
+{
+  "gamification_task": {
+    "countries_lists": [],
+    "locales": {
+      "en": "123123",
+      "ru": "123123"
+    },
+    "conditions": [],
+    "type": "sequence",
+    "category": null,
+    "player_consent_required": true,
+    "priority": 2,
+    "serialized_main_actions": [
+      {
+        "action": "deposit",
+        "requirements": {
+          "payments_count": "1"
+        },
+        "conditions": {
+          "min_points": "1"
+        }
+      }
+    ],
+    "serialized_secondary_actions": [],
+    "main_actions_sequential": false,
+    "secondary_actions_sequential": false,
+    "main_bonus_group_id": "gamification_award:GAMIFICATION BONUS POINTS 5:GAMIFICATION BONUS POINTS 5",
+    "secondary_bonus_group_id": null,
+    "manual_reward": false,
+    "notification_events": [
+      "main_bonus_issue",
+      "secondary_bonus_issue",
+      "secondary_actions_done"
+    ],
+    "infinite": false,
+    "name": "123213",
+    "frontend_identifier": "test_chains",
+    "cron": null,
+    "repeatable": false,
+    "tag_id": 20213,
+    "duration": "1440",
+    "countries": [],
+    "cross_project": false,
+    "shared_projects": []
+  }
+}

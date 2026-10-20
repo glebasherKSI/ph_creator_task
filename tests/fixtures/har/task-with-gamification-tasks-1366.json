@@ -1,0 +1,112 @@
+{
+  "id": 1366,
+  "name": "Экспресс-вечеринка SEASON 7_v2",
+  "locales": {
+    "de": "Kombi-Party",
+    "en": "Acca Party",
+    "es": "Combo-locura",
+    "fr": "Fête combinée",
+    "it": "Acca Party",
+    "pt": "Acumuladores Show",
+    "ru": "Экспресс-вечеринка"
+  },
+  "hidden": false,
+  "frontend_identifier": "Default_sport_task8",
+  "countries_lists": [],
+  "countries_matching_type": "countries",
+  "type": "interactive",
+  "player_consent_required": true,
+  "repeatable": true,
+  "countries": [
+    "all"
+  ],
+  "category": "basic",
+  "priority": 3,
+  "tag_id": 20956,
+  "filter_id": null,
+  "events": [
+    "scheduler",
+    "task_completed"
+  ],
+  "cron": "0 0 1 * *",
+  "max_repetitions": 1,
+  "state": "active",
+  "duration": 44640,
+  "available_from": "2026-09-30T23:59:00.000Z",
+  "available_till": "2026-10-31T23:59:00.000Z",
+  "serialized_main_actions": [
+    {
+      "action": "sport_bet",
+      "conditions": {
+        "odd": {
+          "value": "1.5",
+          "operator": ">="
+        },
+        "min_bet_amount": "1000",
+        "sport_bet_types": [
+          "express"
+        ]
+      },
+      "requirements": {
+        "sport_bets_count": "3",
+        "sport_bet_points_sum": "3000"
+      }
+    }
+  ],
+  "serialized_secondary_actions": [],
+  "main_actions_sequential": false,
+  "secondary_actions_sequential": false,
+  "main_bonus_group_id": "gamification_award:GAMIFICATION BONUS POINTS 20:GAMIFICATION BONUS POINTS 20",
+  "secondary_bonus_group_id": null,
+  "manual_reward": false,
+  "cancel_on_targeting_loss": false,
+  "notification_events": [
+    "main_bonus_issue",
+    "start"
+  ],
+  "conditions": [
+    {
+      "fraud": false
+    },
+    {
+      "no_bonus": false
+    },
+    {
+      "no_bonus_sport": false
+    },
+    {
+      "gambling_addict": false
+    },
+    {
+      "groups": {
+        "list": [
+          "2396"
+        ],
+        "type": "enabled",
+        "extra_type": "or"
+      }
+    },
+    {
+      "gamification_tasks": {
+        "list": [
+          "1365",
+          "1314"
+        ],
+        "type": "enabled",
+        "extra_type": "or",
+        "only_completed": true
+      }
+    }
+  ],
+  "cross_project": false,
+  "shared_projects": [],
+  "tag": {
+    "id": 20956,
+    "name": "gamification_s7",
+    "settings": {
+      "color": "#000000"
+    },
+    "cross_project": false,
+    "shared_projects": []
+  }
+}

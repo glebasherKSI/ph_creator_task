@@ -1,0 +1,132 @@
+{
+  "id": 1365,
+  "name": "Спортивный уик-энд SEASON 7_v2",
+  "locales": {
+    "de": "Sportwochenende",
+    "en": "Sports Weekend",
+    "es": "Fin de semana deportivo",
+    "fr": "Week-end sportif",
+    "it": "Weekend sportivo",
+    "pt": "Fim de semana esportivo",
+    "ru": "Спортивный уик-энд"
+  },
+  "hidden": false,
+  "frontend_identifier": "Default_sport_task24",
+  "countries_lists": [],
+  "countries_matching_type": "countries",
+  "type": "interactive",
+  "player_consent_required": true,
+  "repeatable": false,
+  "countries": [
+    "all"
+  ],
+  "category": "basic",
+  "priority": 2,
+  "tag_id": 20956,
+  "filter_id": null,
+  "events": [
+    "scheduler",
+    "task_completed"
+  ],
+  "cron": "0 0 1 * *",
+  "max_repetitions": 1,
+  "state": "active",
+  "duration": 44640,
+  "available_from": "2026-09-30T23:59:00.000Z",
+  "available_till": "2026-10-31T23:59:00.000Z",
+  "serialized_main_actions": [
+    {
+      "action": "sport_bet",
+      "conditions": {
+        "odd": {
+          "value": "1.5",
+          "operator": ">="
+        },
+        "types": [
+          "single"
+        ],
+        "sport_types": [
+          "Football"
+        ],
+        "min_bet_amount": "1500"
+      },
+      "requirements": {
+        "sport_bets_count": "1"
+      }
+    },
+    {
+      "action": "sport_bet",
+      "conditions": {
+        "odd": {
+          "value": "1.5",
+          "operator": ">="
+        },
+        "types": [
+          "single"
+        ],
+        "sport_types": [
+          "Basketball"
+        ],
+        "min_bet_amount": "1500"
+      },
+      "requirements": {
+        "sport_bets_count": "1"
+      }
+    }
+  ],
+  "serialized_secondary_actions": [],
+  "main_actions_sequential": false,
+  "secondary_actions_sequential": false,
+  "main_bonus_group_id": "gamification_award:GAMIFICATION BONUS POINTS 15:GAMIFICATION BONUS POINTS 15",
+  "secondary_bonus_group_id": null,
+  "manual_reward": false,
+  "cancel_on_targeting_loss": false,
+  "notification_events": [
+    "issue",
+    "start",
+    "main_bonus_issue"
+  ],
+  "conditions": [
+    {
+      "fraud": false
+    },
+    {
+      "no_bonus": false
+    },
+    {
+      "no_bonus_sport": false
+    },
+    {
+      "gambling_addict": false
+    },
+    {
+      "groups": {
+        "list": [
+          "2396"
+        ],
+        "type": "enabled",
+        "extra_type": "or"
+      }
+    },
+    {
+      "gamification_tasks": {
+        "list": [
+          "1313"
+        ],
+        "type": "enabled",
+        "extra_type": "or"
+      }
+    }
+  ],
+  "cross_project": false,
+  "shared_projects": [],
+  "tag": {
+    "id": 20956,
+    "name": "gamification_s7",
+    "settings": {
+      "color": "#000000"
+    },
+    "cross_project": false,
+    "shared_projects": []
+  }
+}

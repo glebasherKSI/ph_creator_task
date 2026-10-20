@@ -13,6 +13,12 @@ import { setConditionsLabelSchema } from "../shared/labels-ru.js";
 import { loadChainsLayout, saveChainsLayout, getDomainCanvasTemplates, upsertDomainCanvasTemplate, deleteDomainCanvasTemplate } from "../shared/storage.js";
 import { mountCopyPanel } from "../shared/copy-panel.js";
 import {
+  exportStorageToFile,
+  importStorageFromBackup,
+  parseBackupText,
+  pickBackupFile,
+} from "../shared/backup.js";
+import {
   cloneJson,
   buildPatchPayload,
   boolValue,
@@ -1797,7 +1803,13 @@ function syncCatalogTaskMeta(id, source) {
     available_from: source.available_from ?? null,
     available_till: source.available_till ?? null,
     main_bonus_group_id: source.main_bonus_group_id ?? null,
+    type: source.type ?? state.catalog.get(id)?.type ?? null,
   });
+}
+
+function isSequenceTask(task) {
+  const type = task?._full?.type ?? state.catalog.get(String(task?.id))?.type ?? task?.type;
+  return type === "sequence";
 }
 
 /** Актуальные id/name заданий для виджета gamification_tasks в conditions-builder. */
@@ -2239,6 +2251,10 @@ function renderCards() {
         ? `<span class="task-card__backend-badge" title="Настроена на бэке" aria-label="Настроена на бэке">BE</span>`
         : "";
 
+    const sequenceBadge = isSequenceTask(task)
+      ? `<span class="task-card__sequence-badge" title="Задание-цепочка (type: sequence)" aria-label="Цепочка">Цепочка</span>`
+      : "";
+
     const headClass = buildCardHeadClassName(task.headerColor);
 
     const idLabel = isTaskLocalOnly(task) ? "черновик" : task.id;
@@ -2250,6 +2266,7 @@ function renderCards() {
           <span class="task-card__id">#${escapeHtml(String(idLabel))}</span>
           ${localBadge}
           ${backendBadge}
+          ${sequenceBadge}
           ${blockBadge}
         </div>
         <button class="task-card__remove" type="button" title="Убрать с канвы">×</button>
@@ -3110,6 +3127,7 @@ async function handleEditUpdate(requestBody) {
       available_from: updated.available_from ?? null,
       available_till: updated.available_till ?? null,
       main_bonus_group_id: updated.main_bonus_group_id ?? null,
+      type: updated.type ?? gt.type ?? null,
     });
   }
 
@@ -3687,6 +3705,7 @@ async function loadTasks(reset = true, loadAllPages = reset, authRetry = false, 
           available_from: raw.available_from ?? null,
           available_till: raw.available_till ?? null,
           main_bonus_group_id: raw.main_bonus_group_id ?? null,
+          type: raw.type ?? null,
         });
       }
 
@@ -4800,7 +4819,35 @@ async function confirmCopyToProject() {
   await confirmCopyTaskToProject(taskId, targetDomain);
 }
 
+async function handleExportBackup() {
+  try {
+    const count = await exportStorageToFile();
+    showToast(`Экспортировано ключей: ${count}`);
+  } catch (err) {
+    showToast(`Не удалось экспортировать данные: ${err.message || err}`, { type: "warning" });
+  }
+}
+
+async function handleImportBackup() {
+  const text = await pickBackupFile();
+  if (text == null) return;
+  try {
+    const backup = parseBackupText(text);
+    const when = backup.exportedAt ? ` от ${new Date(backup.exportedAt).toLocaleString("ru-RU")}` : "";
+    const ok = window.confirm(
+      `Импортировать резервную копию${when}?\n\nДанные с совпадающими ключами (домены, сессии, шаблоны, раскладки) будут перезаписаны. Страница перезагрузится.`
+    );
+    if (!ok) return;
+    await importStorageFromBackup(backup);
+    window.location.reload();
+  } catch (err) {
+    showToast(`Не удалось импортировать данные: ${err.message || err}`, { type: "warning" });
+  }
+}
+
 function bindTemplateEvents() {
+  $("btn-export-backup")?.addEventListener("click", () => void handleExportBackup());
+  $("btn-import-backup")?.addEventListener("click", () => void handleImportBackup());
   $("btn-save-template")?.addEventListener("click", () => void openSaveTemplateModal());
   $("btn-load-template")?.addEventListener("click", () => void openLoadTemplateModal());
   $("btn-close-save-template")?.addEventListener("click", closeSaveTemplateModal);
