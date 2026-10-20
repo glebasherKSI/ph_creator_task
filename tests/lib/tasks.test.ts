@@ -14,6 +14,8 @@ import {
 } from "@/lib/tasks";
 import type { GamificationTask } from "@/lib/types";
 
+import { withoutV3Keys } from "../helpers";
+
 // Старая реализация — эталон поведения до конца миграции (этап 9 удалит src/).
 import * as legacy from "legacy/tasks.js";
 
@@ -33,7 +35,7 @@ const FIXTURE_TASKS: Array<[string, GamificationTask]> = [
 
 describe("buildCreatePayload — паритет со старой реализацией", () => {
   it.each(FIXTURE_TASKS)("%s: без overrides", (_name, task) => {
-    expect(buildCreatePayload(task)).toEqual(legacy.buildCreatePayload(task));
+    expect(withoutV3Keys(buildCreatePayload(task))).toEqual(legacy.buildCreatePayload(task));
   });
 
   it.each(FIXTURE_TASKS)("%s: с overrides формы", (_name, task) => {
@@ -44,12 +46,14 @@ describe("buildCreatePayload — паритет со старой реализа
       priority: 4,
       __tagRaw: JSON.stringify({ id: 777, name: "tag", settings: {} }),
     };
-    expect(buildCreatePayload(task, overrides)).toEqual(legacy.buildCreatePayload(task, overrides));
+    expect(withoutV3Keys(buildCreatePayload(task, overrides))).toEqual(
+      legacy.buildCreatePayload(task, overrides),
+    );
   });
 
   it("тег числом из формы", () => {
     const overrides = { __tagRaw: "20213" };
-    expect(buildCreatePayload(taskInteractive, overrides)).toEqual(
+    expect(withoutV3Keys(buildCreatePayload(taskInteractive, overrides))).toEqual(
       legacy.buildCreatePayload(taskInteractive, overrides),
     );
   });
@@ -65,15 +69,16 @@ describe("buildCreatePayload — содержимое", () => {
     expect(payload).not.toHaveProperty("created_at");
   });
 
-  it("покрывает поля админки, кроме известного отличия (manual_reward, cross_project, shared_projects)", () => {
-    // Админка шлёт эти три поля, расширение — нет (и старое тоже). Бэк принимает оба варианта.
-    // Решение, отправлять ли их, — этап 5 (TaskForm). Тест ловит любой новый дрейф.
-    const KNOWN_MISSING = ["cross_project", "manual_reward", "shared_projects"];
+  it("покрывает все поля, которые админка шлёт при создании (manual_reward, cross_project, shared_projects — с дефолтами)", () => {
     const payload = buildCreatePayload(taskInteractive);
-    const missing = Object.keys(createInteractive.gamification_task)
-      .filter((key) => !(key in payload))
-      .sort();
-    expect(missing).toEqual(KNOWN_MISSING);
+    const missing = Object.keys(createInteractive.gamification_task).filter(
+      (key) => !(key in payload),
+    );
+    expect(missing).toEqual([]);
+    const fresh = buildCreatePayload({ name: "x", frontend_identifier: "y" });
+    expect(fresh.manual_reward).toBe(false);
+    expect(fresh.cross_project).toBe(false);
+    expect(fresh.shared_projects).toEqual([]);
   });
 
   it("цепочка: SEQUENCE_FIELD_OVERRIDES даёт те же значения, что админка", () => {
@@ -100,7 +105,9 @@ describe("buildCreatePayload — содержимое", () => {
 describe("buildPatchPayload — паритет со старой реализацией", () => {
   it.each(FIXTURE_TASKS)("%s", (_name, task) => {
     const conditions = [{ gamification_tasks: { list: ["1"], type: "enabled", extra_type: "or" } }];
-    expect(buildPatchPayload(task, conditions)).toEqual(legacy.buildPatchPayload(task, conditions));
+    expect(withoutV3Keys(buildPatchPayload(task, conditions).gamification_task)).toEqual(
+      legacy.buildPatchPayload(task, conditions).gamification_task,
+    );
   });
 });
 

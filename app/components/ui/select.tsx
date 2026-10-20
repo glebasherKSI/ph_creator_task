@@ -48,6 +48,7 @@ function SelectContent({
         position={position}
         className={cn(
           "z-50 max-h-80 min-w-[8rem] overflow-hidden rounded-md bg-popover text-popover-foreground shadow-lg ring-1 ring-border",
+          "data-[state=open]:animate-pop-in data-[state=closed]:animate-pop-out",
           position === "popper" && "w-[var(--radix-select-trigger-width)]",
           className,
         )}

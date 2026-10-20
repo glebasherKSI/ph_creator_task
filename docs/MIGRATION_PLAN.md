@@ -216,7 +216,10 @@ SF Pro лицензионно только для устройств Apple — �
       Новое: модалка сама переходит к OTP, когда background принял magic link.
 - [x] Форма на витрине (`showcase.html`, секция «Форма задачи») на фикстурах #1454 и #1456; SSR-смоук в тестах.
 - [ ] Проверить форму вживую на домене: копия обычной задачи и цепочки, «Показать payload» vs старое расширение.
-- [ ] Решить про `manual_reward`, `cross_project`, `shared_projects` (админка шлёт, расширение — нет).
+- [x] `manual_reward`, `cross_project`, `shared_projects` теперь уходят в payload как у админки (дефолты `false` / `false` / `[]`,
+      `CREATE_TASK_KEYS` + `applyCreateDefaults`). Тесты паритета со старым кодом сравнивают без этих трёх ключей.
+- [x] Анимации раскрытия секций и поповеров: Radix `data-state` + `@keyframes` на height/opacity/transform
+      (`globals.css`, `@utility animate-*`), 140–240 мс, отключаются при `prefers-reduced-motion`.
 
 **Готово, когда:** `TaskForm` собирает тот же payload, что старая форма, на эталонных задачах.
 

@@ -59,6 +59,9 @@ export const taskPayloadSchema = z
     main_bonus_group_id: nullableString.optional(),
     secondary_bonus_group_id: nullableString.optional(),
     notification_events: z.array(z.string()),
+    manual_reward: z.boolean(),
+    cross_project: z.boolean(),
+    shared_projects: z.array(z.unknown()),
   })
   .superRefine((task, ctx) => {
     if (task.type !== SEQUENCE_TASK_TYPE) return;

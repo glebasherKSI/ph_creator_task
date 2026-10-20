@@ -14,6 +14,7 @@ import { buildCreatePayload } from "@/lib/tasks";
 import * as legacy from "legacy/graphic-task-map.js";
 import * as legacyTasks from "legacy/tasks.js";
 
+import { withoutV3Keys } from "../helpers";
 import taskInteractive from "../fixtures/har/task-interactive-1454.json";
 
 /** Задача планировщика в формате Graphic API (строки-поля действий, таргетинг, время). */
@@ -151,7 +152,7 @@ describe("graphic-task-map — паритет со старой реализац
 describe("graphic-task-map — содержимое", () => {
   it("черновик из графика превращается в тот же create payload, что и в старом коде", () => {
     const draft = mapPlannerTaskToDraft(PLANNER_TASK, CONTEXT);
-    expect(buildCreatePayload(draft)).toEqual(legacyTasks.buildCreatePayload(draft));
+    expect(withoutV3Keys(buildCreatePayload(draft))).toEqual(legacyTasks.buildCreatePayload(draft));
     const payload = buildCreatePayload(draft);
     // Служебные поля брифа не уходят на бэк.
     expect(payload).not.toHaveProperty("_plannerNote");

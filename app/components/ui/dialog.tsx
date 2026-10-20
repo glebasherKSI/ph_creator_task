@@ -16,7 +16,10 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
-      className={cn("fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px]", className)}
+      className={cn(
+        "fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] data-[state=open]:animate-fade-in data-[state=closed]:animate-fade-out",
+        className,
+      )}
       {...props}
     />
   );
@@ -37,6 +40,7 @@ function DialogContent({
         className={cn(
           "fixed top-1/2 left-1/2 z-50 flex w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4",
           "rounded-lg bg-surface p-5 shadow-2xl ring-1 ring-border outline-none",
+          "data-[state=open]:animate-pop-in data-[state=closed]:animate-pop-out",
           className,
         )}
         {...props}
@@ -70,6 +74,7 @@ function SheetContent({
         className={cn(
           "fixed inset-y-0 z-50 flex h-full w-full max-w-3xl flex-col bg-background shadow-2xl ring-1 ring-border outline-none",
           side === "right" ? "right-0" : "left-0",
+          "data-[state=open]:animate-slide-in-right data-[state=closed]:animate-slide-out-right",
           className,
         )}
         {...props}

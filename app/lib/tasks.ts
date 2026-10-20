@@ -253,6 +253,10 @@ function applyCreateDefaults(payload: TaskLike): TaskLike {
   if (!("serialized_secondary_actions" in payload)) payload.serialized_secondary_actions = [];
   if (!("events" in payload)) payload.events = [];
   if (!("hidden" in payload)) payload.hidden = false;
+  // Как админка: эти три поля всегда в теле, по умолчанию выключены.
+  if (!("manual_reward" in payload)) payload.manual_reward = false;
+  if (!("cross_project" in payload)) payload.cross_project = false;
+  if (!("shared_projects" in payload)) payload.shared_projects = [];
   return payload;
 }
 

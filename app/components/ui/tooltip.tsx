@@ -19,6 +19,7 @@ function TooltipContent({
         sideOffset={sideOffset}
         className={cn(
           "z-50 max-w-xs rounded-chip bg-surface-2 px-2 py-1 text-caption text-foreground shadow-md ring-1 ring-border",
+          "data-[state=delayed-open]:animate-fade-in",
           className,
         )}
         {...props}
