@@ -63,6 +63,8 @@ export interface TaskFormProps {
   showPreview?: boolean;
   title?: string;
   className?: string;
+  /** Какие секции раскрыты при открытии (по умолчанию — «Основное»). */
+  initialOpenSections?: ReadonlyArray<SectionId>;
 }
 
 const MODE_LABELS: Record<
@@ -207,6 +209,7 @@ export function TaskForm({
   showPreview = true,
   title,
   className,
+  initialOpenSections = ["basic"],
 }: TaskFormProps) {
   const labels = MODE_LABELS[mode];
   const meta = useTaskMeta(domain);
@@ -223,7 +226,7 @@ export function TaskForm({
 
   const [openSections, setOpenSections] = useState<Record<SectionId, boolean>>(
     () =>
-      Object.fromEntries(SECTION_IDS.map((id) => [id, id === "basic"])) as Record<
+      Object.fromEntries(SECTION_IDS.map((id) => [id, initialOpenSections.includes(id)])) as Record<
         SectionId,
         boolean
       >,

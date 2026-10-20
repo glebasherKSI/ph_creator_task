@@ -7,6 +7,7 @@
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import * as React from "react";
 
+import { AnimatedHeight } from "@/components/animated-height";
 import { MultiCombobox } from "@/components/multi-combobox";
 import { Button } from "@/components/ui/button";
 import { CheckboxField } from "@/components/ui/checkbox";
@@ -253,20 +254,59 @@ function SegmentedField({
         onValueChange={onValue}
         options={toSegmentedOptions(options, disabled)}
         aria-label={label}
+        className="w-fit max-w-full"
       />
     </Field>
   );
+}
+
+/**
+ * Группа связанных полей: заголовок + рамка. Даёт глазу понять, что к чему относится
+ * (период, диапазон суммы, список и т.д.).
+ */
+function Group({
+  title,
+  hint,
+  children,
+  className,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <fieldset
+      className={cn(
+        "flex min-w-0 flex-col gap-3 rounded-md bg-background/60 p-3 ring-1 ring-border",
+        className,
+      )}
+    >
+      <legend className="px-1 text-caption font-semibold tracking-wide text-muted-foreground uppercase">
+        {title}
+      </legend>
+      {hint ? <p className="-mt-1 text-caption text-muted-foreground">{hint}</p> : null}
+      {children}
+    </fieldset>
+  );
+}
+
+/** Два поля в ряд на широких экранах, одно под другим на узких. */
+function Row({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>;
 }
 
 /* ---------- составные виджеты ---------- */
 
 function MoneyRangeWidget({
   uid,
+  title,
   value,
   onChange,
   disabled,
 }: {
   uid: string;
+  title: string;
   value: unknown;
   onChange: (next: Record<string, unknown>) => void;
   disabled?: boolean;
@@ -274,33 +314,35 @@ function MoneyRangeWidget({
   const view = moneyRangeView(isRecord(value) ? value.money_range : undefined);
   const isRange = view.type === "range";
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <Group title={title}>
       <SegmentedField
-        label="Количество / сумма"
+        label="Как сравнивать"
         options={MONEY_RANGE_TYPES}
         value={view.type}
         onValue={(id) => onChange(setNested(value, "money_range.type", id))}
         disabled={disabled}
       />
-      <Field label={isRange ? "От" : "Значение"} htmlFor={`${uid}-money-min`}>
-        <NumberField
-          id={`${uid}-money-min`}
-          value={view.min}
-          onValue={(num) => onChange(patchMoneyRange(value, "min", num))}
-          disabled={disabled}
-        />
-      </Field>
-      {isRange ? (
-        <Field label="До" htmlFor={`${uid}-money-max`}>
+      <Row>
+        <Field label={isRange ? "От" : "Значение"} htmlFor={`${uid}-money-min`}>
           <NumberField
-            id={`${uid}-money-max`}
-            value={view.max}
-            onValue={(num) => onChange(patchMoneyRange(value, "max", num))}
+            id={`${uid}-money-min`}
+            value={view.min}
+            onValue={(num) => onChange(patchMoneyRange(value, "min", num))}
             disabled={disabled}
           />
         </Field>
-      ) : null}
-      <div className="col-span-full">
+        {isRange ? (
+          <Field label="До" htmlFor={`${uid}-money-max`}>
+            <NumberField
+              id={`${uid}-money-max`}
+              value={view.max}
+              onValue={(num) => onChange(patchMoneyRange(value, "max", num))}
+              disabled={disabled}
+            />
+          </Field>
+        ) : null}
+      </Row>
+      {isRange ? (
         <CheckboxField
           label="Исключить конец диапазона"
           checked={view.excludeEnd}
@@ -309,8 +351,8 @@ function MoneyRangeWidget({
             onChange(patchMoneyRange(value, "exclude_end", checked === true))
           }
         />
-      </div>
-    </div>
+      ) : null}
+    </Group>
   );
 }
 
@@ -330,36 +372,36 @@ function DurationWidget({
   const duration = isRecord(value) && isRecord(value.duration) ? value.duration : {};
   const options = periods?.length ? periods : DURATION_PERIODS;
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <Field label="Период">
-        <SimpleSelect
-          value={String(duration.period ?? "lifetime")}
-          onValueChange={(period) => onChange(patchDuration(value, "period", period))}
-          options={toSelectOptions(options)}
-          disabled={disabled}
-          aria-label="Период"
-        />
-      </Field>
-      <Field label="Число" htmlFor={`${uid}-duration-number`}>
-        <NumberField
-          id={`${uid}-duration-number`}
-          value={duration.number ?? 1}
-          min={0}
-          onValue={(num) => onChange(patchDuration(value, "number", num))}
-          disabled={disabled}
-        />
-      </Field>
-      <div className="col-span-full flex items-end">
-        <CheckboxField
-          label="Включая текущий период"
-          checked={Boolean(duration.include_current_period)}
-          disabled={disabled}
-          onCheckedChange={(checked) =>
-            onChange(patchDuration(value, "include_current_period", checked === true))
-          }
-        />
-      </div>
-    </div>
+    <Group title="Период">
+      <Row>
+        <Field label="За какой период">
+          <SimpleSelect
+            value={String(duration.period ?? "lifetime")}
+            onValueChange={(period) => onChange(patchDuration(value, "period", period))}
+            options={toSelectOptions(options)}
+            disabled={disabled}
+            aria-label="Период"
+          />
+        </Field>
+        <Field label="Сколько периодов" htmlFor={`${uid}-duration-number`}>
+          <NumberField
+            id={`${uid}-duration-number`}
+            value={duration.number ?? 1}
+            min={0}
+            onValue={(num) => onChange(patchDuration(value, "number", num))}
+            disabled={disabled}
+          />
+        </Field>
+      </Row>
+      <CheckboxField
+        label="Включая текущий период"
+        checked={Boolean(duration.include_current_period)}
+        disabled={disabled}
+        onCheckedChange={(checked) =>
+          onChange(patchDuration(value, "include_current_period", checked === true))
+        }
+      />
+    </Group>
   );
 }
 
@@ -383,7 +425,7 @@ function CheckboxListWidget({
     onList(collection.map((opt) => String(opt.id)).filter((optId) => next.has(optId)));
   };
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-2">
+    <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
       {collection.map((opt) => (
         <CheckboxField
           key={opt.id}
@@ -505,34 +547,37 @@ function WidgetBody({
 
   if (widgetType === "number") {
     const types = def.availableTypes || NUMBER_TYPES;
+    const isRange = v.type === "range";
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <Group title="Значение">
         <SegmentedField
-          label="Тип"
+          label="Как сравнивать"
           options={types}
           value={v.type ?? types[0]?.id}
           onValue={(id) => patch({ type: id })}
           disabled={disabled}
         />
-        <Field label="Значение" htmlFor={`${uid}-min`}>
-          <NumberField
-            id={`${uid}-min`}
-            value={v.min ?? 0}
-            onValue={(num) => patch({ min: num })}
-            disabled={disabled}
-          />
-        </Field>
-        {v.type === "range" ? (
-          <Field label="До" htmlFor={`${uid}-max`}>
+        <Row>
+          <Field label={isRange ? "От" : "Значение"} htmlFor={`${uid}-min`}>
             <NumberField
-              id={`${uid}-max`}
-              value={v.max ?? 0}
-              onValue={(num) => patch({ max: num })}
+              id={`${uid}-min`}
+              value={v.min ?? 0}
+              onValue={(num) => patch({ min: num })}
               disabled={disabled}
             />
           </Field>
-        ) : null}
-      </div>
+          {isRange ? (
+            <Field label="До" htmlFor={`${uid}-max`}>
+              <NumberField
+                id={`${uid}-max`}
+                value={v.max ?? 0}
+                onValue={(num) => patch({ max: num })}
+                disabled={disabled}
+              />
+            </Field>
+          ) : null}
+        </Row>
+      </Group>
     );
   }
 
@@ -541,21 +586,21 @@ function WidgetBody({
     return (
       <div className="flex flex-col gap-3">
         <SegmentedField
-          label="Тип"
+          label="Условие"
           options={types}
           value={v.type ?? "enabled"}
           onValue={(id) => patch({ type: id })}
           disabled={disabled}
         />
         {def.collection?.length ? (
-          <Field label="Список">
+          <Group title="Список">
             <CheckboxListWidget
               collection={def.collection}
               list={v.list}
               onList={(list) => patch({ list })}
               disabled={disabled}
             />
-          </Field>
+          </Group>
         ) : null}
         <CheckboxField
           label="Только выполненные"
@@ -600,9 +645,9 @@ function WidgetBody({
   if (widgetType === "tags_extended" || def.name === "user_id") {
     const types = def.availableTypes || INCLUDE_EXCLUDE_TYPES;
     return (
-      <div className="grid grid-cols-1 gap-3">
+      <div className="flex flex-col gap-3">
         <SegmentedField
-          label="Тип"
+          label="Условие"
           options={types}
           value={v.type ?? "enabled"}
           onValue={(id) => patch({ type: id })}
@@ -645,9 +690,9 @@ function WidgetBody({
       : resolveGamificationTaskOptions(def, selectedIds, taskOptions);
     return (
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-wrap gap-x-6 gap-y-3">
           <SegmentedField
-            label="Тип"
+            label="Условие"
             options={types}
             value={v.type ?? "enabled"}
             onValue={(id) => patch({ type: id })}
@@ -661,8 +706,8 @@ function WidgetBody({
             disabled={disabled}
           />
         </div>
-        {hasCollection ? (
-          <Field label={isGroups ? "Группы" : "Задания"} htmlFor={`${uid}-list`} wide>
+        <Group title={isGroups ? "Группы" : "Задания"}>
+          {hasCollection ? (
             <MultiCombobox
               id={`${uid}-list`}
               options={toComboOptions(options)}
@@ -670,25 +715,26 @@ function WidgetBody({
               onChange={(list) => patch({ list })}
               placeholder={isGroups ? "Выберите группы…" : "Выберите задания…"}
               disabled={disabled}
+              aria-label={isGroups ? "Группы" : "Задания"}
             />
-          </Field>
-        ) : (
-          <TagsField
-            id={`${uid}-list`}
-            label={isGroups ? "ID групп" : "ID заданий"}
-            list={v.list}
-            onList={(list) => patch({ list })}
-            disabled={disabled}
-          />
-        )}
-        {!isGroups ? (
-          <CheckboxField
-            label="Только выполненные"
-            checked={v.only_completed === true}
-            disabled={disabled}
-            onCheckedChange={(checked) => patch({ only_completed: checked === true })}
-          />
-        ) : null}
+          ) : (
+            <TagsField
+              id={`${uid}-list`}
+              label={isGroups ? "ID групп" : "ID заданий"}
+              list={v.list}
+              onList={(list) => patch({ list })}
+              disabled={disabled}
+            />
+          )}
+          {!isGroups ? (
+            <CheckboxField
+              label="Только выполненные"
+              checked={v.only_completed === true}
+              disabled={disabled}
+              onCheckedChange={(checked) => patch({ only_completed: checked === true })}
+            />
+          ) : null}
+        </Group>
       </div>
     );
   }
@@ -699,26 +745,28 @@ function WidgetBody({
     const periodTypes = extraOptionList(def, "availablePeriodTypes");
     return (
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Наличие">
-            <SimpleSelect
-              value={String(v.existence ?? "any")}
-              onValueChange={(existence) => patch({ existence })}
-              options={toSelectOptions(existenceTypes)}
-              disabled={disabled}
-              aria-label="Наличие"
-            />
-          </Field>
-          <Field label="Статус">
-            <SimpleSelect
-              value={String(v.status ?? "any")}
-              onValueChange={(status) => patch({ status })}
-              options={toSelectOptions(statusTypes)}
-              disabled={disabled}
-              aria-label="Статус"
-            />
-          </Field>
-        </div>
+        <Group title="Платёж">
+          <Row>
+            <Field label="Наличие">
+              <SimpleSelect
+                value={String(v.existence ?? "any")}
+                onValueChange={(existence) => patch({ existence })}
+                options={toSelectOptions(existenceTypes)}
+                disabled={disabled}
+                aria-label="Наличие"
+              />
+            </Field>
+            <Field label="Статус">
+              <SimpleSelect
+                value={String(v.status ?? "any")}
+                onValueChange={(status) => patch({ status })}
+                options={toSelectOptions(statusTypes)}
+                disabled={disabled}
+                aria-label="Статус"
+              />
+            </Field>
+          </Row>
+        </Group>
         <DurationWidget
           uid={uid}
           value={value}
@@ -726,9 +774,13 @@ function WidgetBody({
           onChange={onChange}
           disabled={disabled}
         />
-        <Field label="Диапазон суммы">
-          <MoneyRangeWidget uid={uid} value={value} onChange={onChange} disabled={disabled} />
-        </Field>
+        <MoneyRangeWidget
+          uid={uid}
+          title="Диапазон суммы"
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+        />
       </div>
     );
   }
@@ -745,32 +797,40 @@ function WidgetBody({
           onChange={onChange}
           disabled={disabled}
         />
-        <Field label="Количество / сумма ставок">
-          <MoneyRangeWidget uid={uid} value={value} onChange={onChange} disabled={disabled} />
-        </Field>
-        {gameCategories?.length ? (
-          <Field label="Категории игр" htmlFor={`${uid}-game-categories`} wide>
-            <MultiCombobox
-              id={`${uid}-game-categories`}
-              options={toComboOptions(gameCategories)}
-              value={stringList(v.game_categories)}
-              onChange={(list) => patch({ game_categories: list })}
-              placeholder="Выберите категории…"
-              disabled={disabled}
-            />
-          </Field>
-        ) : null}
-        {betTypes?.length ? (
-          <Field label="Тип ставки">
-            <SimpleSelect
-              value={String(v.bet_type ?? "")}
-              onValueChange={(raw) => patch({ bet_type: raw === "" ? null : raw })}
-              options={toSelectOptions(betTypes)}
-              nullable
-              disabled={disabled}
-              aria-label="Тип ставки"
-            />
-          </Field>
+        <MoneyRangeWidget
+          uid={uid}
+          title="Количество / сумма ставок"
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+        />
+        {gameCategories?.length || betTypes?.length ? (
+          <Group title="Параметры ставки">
+            {gameCategories?.length ? (
+              <Field label="Категории игр" htmlFor={`${uid}-game-categories`} wide>
+                <MultiCombobox
+                  id={`${uid}-game-categories`}
+                  options={toComboOptions(gameCategories)}
+                  value={stringList(v.game_categories)}
+                  onChange={(list) => patch({ game_categories: list })}
+                  placeholder="Выберите категории…"
+                  disabled={disabled}
+                />
+              </Field>
+            ) : null}
+            {betTypes?.length ? (
+              <Field label="Тип ставки">
+                <SimpleSelect
+                  value={String(v.bet_type ?? "")}
+                  onValueChange={(raw) => patch({ bet_type: raw === "" ? null : raw })}
+                  options={toSelectOptions(betTypes)}
+                  nullable
+                  disabled={disabled}
+                  aria-label="Тип ставки"
+                />
+              </Field>
+            ) : null}
+          </Group>
         ) : null}
       </div>
     );
@@ -781,19 +841,21 @@ function WidgetBody({
     return (
       <div className="flex flex-col gap-3">
         <SegmentedField
-          label="Тип"
+          label="Условие"
           options={types}
           value={v.type ?? "enabled"}
           onValue={(id) => patch({ type: id })}
           disabled={disabled}
         />
-        <CountrySelector
-          value={conditionValueToCountrySelector(value)}
-          onChange={(next) => onChange(countrySelectorToConditionValue(next, value))}
-          data={countries.data}
-          loading={countries.loading}
-          disabled={disabled}
-        />
+        <Group title="Страны">
+          <CountrySelector
+            value={conditionValueToCountrySelector(value)}
+            onChange={(next) => onChange(countrySelectorToConditionValue(next, value))}
+            data={countries.data}
+            loading={countries.loading}
+            disabled={disabled}
+          />
+        </Group>
       </div>
     );
   }
@@ -923,7 +985,7 @@ export function ConditionsBuilder({
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-[14rem_minmax(0,1fr)]">
-        <aside className="flex flex-col gap-1.5 rounded-lg bg-surface p-2">
+        <aside className="flex flex-col gap-1.5 self-start rounded-lg bg-surface-2/40 p-2">
           <div className="px-1 text-caption font-semibold text-muted-foreground uppercase">
             Активные условия ({items.length})
           </div>
@@ -944,8 +1006,8 @@ export function ConditionsBuilder({
                         "flex w-full cursor-pointer flex-col items-start rounded-md border px-2 py-1.5 text-left transition-colors outline-none",
                         "focus-visible:ring-2 focus-visible:ring-ring/60",
                         isSelected
-                          ? "border-primary bg-surface-2"
-                          : "border-transparent hover:bg-surface-2",
+                          ? "border-primary bg-surface"
+                          : "border-transparent hover:bg-surface",
                       )}
                     >
                       <span className="w-full truncate text-subhead text-foreground">
@@ -962,10 +1024,10 @@ export function ConditionsBuilder({
           )}
         </aside>
 
-        <div className="min-w-0">
+        <AnimatedHeight className="min-w-0 rounded-lg">
           {selected ? (
-            <article className="flex flex-col gap-3 rounded-lg bg-surface p-3">
-              <header className="flex flex-wrap items-start justify-between gap-2">
+            <article className="flex flex-col gap-4 rounded-lg bg-surface-2/40 p-4">
+              <header className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-3">
                 <div className="min-w-0">
                   <div className="text-headline">
                     {conditionInstanceLabel(items, selected, selectedDef)}
@@ -1023,11 +1085,11 @@ export function ConditionsBuilder({
               )}
             </article>
           ) : (
-            <div className="rounded-lg bg-surface p-4 text-subhead text-muted-foreground">
+            <div className="rounded-lg bg-surface-2/40 p-4 text-subhead text-muted-foreground">
               Добавьте условие из списка слева
             </div>
           )}
-        </div>
+        </AnimatedHeight>
       </div>
     </div>
   );

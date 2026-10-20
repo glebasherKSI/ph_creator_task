@@ -21,9 +21,39 @@ import { cn } from "@/lib/utils";
 import taskInteractiveFixture from "../../../tests/fixtures/har/task-interactive-1454.json";
 import taskSequenceFixture from "../../../tests/fixtures/har/task-sequence-1456.json";
 
+/** Задача с несколькими условиями таргетинга — для проверки виджетов условий. */
+const TASK_TARGETING_DEMO: TaskLike = {
+  ...(taskInteractiveFixture as TaskLike),
+  id: 9001,
+  name: "Демо таргетинга",
+  frontend_identifier: "targeting_demo",
+  conditions: [
+    {
+      cashout: {
+        existence: "any",
+        status: "any",
+        duration: { period: "lifetime", number: 1, include_current_period: false },
+        money_range: { type: "range", list: [100, 5000], exclude_end: false },
+      },
+    },
+    { fraud: false },
+    { active_phones: null },
+    { average_bet: { type: "min", min: 10 } },
+    {
+      gamification_tasks: {
+        list: ["1366"],
+        type: "enabled",
+        extra_type: "or",
+        only_completed: true,
+      },
+    },
+  ],
+};
+
 const TASK_FIXTURES: Record<string, TaskLike> = {
   interactive: taskInteractiveFixture as TaskLike,
   sequence: taskSequenceFixture as TaskLike,
+  targeting: TASK_TARGETING_DEMO,
 };
 
 const noop = async () => {};
@@ -179,7 +209,11 @@ export function Showcase() {
   const [type, setType] = useState<"enabled" | "disabled">("enabled");
   const [logic, setLogic] = useState<"and" | "or">("or");
   const [ready, setReady] = useState(false);
-  const [formFixture, setFormFixture] = useState<"interactive" | "sequence">("interactive");
+  // Фикстуру можно выбрать hash'ем (#sequence, #targeting) — удобно для скриншотов.
+  const [formFixture, setFormFixture] = useState<"interactive" | "sequence" | "targeting">(() => {
+    const hash = location.hash.replace("#", "");
+    return hash === "sequence" || hash === "targeting" ? hash : "interactive";
+  });
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-12 px-6 py-10">
@@ -365,13 +399,16 @@ export function Showcase() {
           options={[
             { value: "interactive", label: "Обычная задача #1454" },
             { value: "sequence", label: "Цепочка #1456" },
+            { value: "targeting", label: "Демо таргетинга" },
           ]}
         />
         <div className="max-w-3xl rounded-lg bg-background p-4 ring-1 ring-border">
           <TaskForm
+            key={formFixture}
             mode="copy"
             domain=""
             sourceTask={TASK_FIXTURES[formFixture] ?? null}
+            initialOpenSections={formFixture === "targeting" ? ["targeting"] : ["basic"]}
             onSubmit={async (payload) => ({ echo: payload.gamification_task.name })}
           />
         </div>
