@@ -50,14 +50,16 @@ function TaskCardMock({ selected, sequence }: { selected?: boolean; sequence?: b
       <div className="flex flex-col gap-1.5 px-3 pb-3 pt-1">
         <div className="text-headline">Хьюстон, у нас пополнение!</div>
         <div className="text-caption text-muted-foreground">test_chains</div>
-        <div className="flex items-center gap-3 pt-1 text-caption text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Calendar className="size-3" /> 01.10 — 31.10
+        <div className="flex flex-col gap-1 pt-1 text-caption text-muted-foreground">
+          <span className="inline-flex items-center gap-1 whitespace-nowrap">
+            <Calendar className="size-3 shrink-0" /> 01.10.2026 15:39 — 31.10.2026 15:39
           </span>
-          <span className="inline-flex items-center gap-1">
-            <Clock className="size-3" /> 1440 мин
-          </span>
-          <span className="ml-auto font-semibold text-primary">5 б.</span>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1">
+              <Clock className="size-3 shrink-0" /> 1440 мин
+            </span>
+            <span className="ml-auto font-semibold text-primary">5 б.</span>
+          </div>
         </div>
       </div>
     </div>
