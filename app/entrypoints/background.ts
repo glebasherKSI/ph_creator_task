@@ -22,7 +22,12 @@ import { ensureContentScriptReady } from "@/lib/content-script";
 import { hostFromUrl, loadDomainsFromStorage, originPattern } from "@/lib/domains";
 import { handleGraphicAuthMessage, handleGraphicFetchMessage } from "@/lib/graphic-api";
 import { createMessageRouter, type ErrorResponse, type MessageMap } from "@/lib/messaging";
-import { handleReportsFetch, handleReportsState, reportsErrorResponse } from "@/lib/reports-fetch";
+import {
+  getReportsStatus,
+  handleReportsFetch,
+  handleReportsState,
+  reportsErrorResponse,
+} from "@/lib/reports-fetch";
 
 type Tab = Browser.tabs.Tab;
 
@@ -118,6 +123,7 @@ export default defineBackground(() => {
       {
         PH_REPORTS_FETCH: (payload) => handleReportsFetch(payload),
         PH_REPORTS_STATE: () => handleReportsState(),
+        PH_REPORTS_STATUS: () => getReportsStatus(),
         PH_ADMIN_API_FETCH: (payload) =>
           adminApiFetch(
             payload.domain,

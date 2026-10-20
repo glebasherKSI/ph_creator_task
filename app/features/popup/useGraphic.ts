@@ -3,11 +3,11 @@ import { browser } from "wxt/browser";
 
 import { STORAGE_KEYS } from "@/lib/constants";
 import {
-  GRAPHIC_DEFAULT_BASE_URL,
   type GraphicStatus,
   graphicLoginFromPage,
   graphicLogoutFromPage,
-  graphicStatusFromPage,
+  loadGraphicAuth,
+  loadGraphicBaseUrl,
 } from "@/lib/graphic-api";
 
 export interface GraphicState {
@@ -18,24 +18,25 @@ export interface GraphicState {
   logout: () => Promise<void>;
 }
 
-const OFFLINE: GraphicStatus = {
-  ok: true,
-  authenticated: false,
-  user: null,
-  baseUrl: GRAPHIC_DEFAULT_BASE_URL,
-};
+/** Статус Graphic — это два ключа storage; читаем их напрямую, без RPC в background. */
+async function readGraphicStatus(): Promise<GraphicStatus> {
+  const [auth, baseUrl] = await Promise.all([loadGraphicAuth(), loadGraphicBaseUrl()]);
+  return {
+    ok: true,
+    authenticated: Boolean(auth?.access_token),
+    user: auth?.user || null,
+    baseUrl,
+  };
+}
 
-/** Сессия Promo Graphic: статус из background, вход/выход, реакция на storage. */
+/** Сессия Promo Graphic: статус из storage, вход/выход через background, реакция на storage. */
 export function useGraphic(): GraphicState {
   const [status, setStatus] = useState<GraphicStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   // setState только в колбэках промиса — так эффект не вызывает setState синхронно.
-  const refresh = useCallback(
-    () => graphicStatusFromPage().then(setStatus, () => setStatus(OFFLINE)),
-    [],
-  );
+  const refresh = useCallback(() => readGraphicStatus().then(setStatus, () => undefined), []);
 
   useEffect(() => {
     void refresh();

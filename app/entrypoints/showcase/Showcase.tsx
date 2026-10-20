@@ -9,8 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Segmented } from "@/components/ui/segmented";
 import { DomainsCard } from "@/features/popup/DomainsCard";
 import { GraphicCard } from "@/features/popup/GraphicCard";
+import { ReportsCard } from "@/features/popup/ReportsCard";
+import { StatusTabs } from "@/features/popup/StatusTabs";
 import type { DomainsState } from "@/features/popup/useDomains";
 import type { GraphicState } from "@/features/popup/useGraphic";
+import type { ReportsState } from "@/features/popup/useReports";
 import { cn } from "@/lib/utils";
 
 const noop = async () => {};
@@ -29,9 +32,25 @@ const POPUP_DOMAINS: DomainsState = {
   },
   status: "Домен admin.example.com добавлен, доступ разрешён",
   loading: false,
+  checking: { "admin.no-perm.io": true },
   addDomain: async () => true,
   addCurrentTab: noop,
   removeDomain: noop,
+  refreshAuth: noop,
+};
+
+const POPUP_REPORTS: ReportsState = {
+  status: {
+    ok: true,
+    origin: "https://reports.maxbit.private",
+    sessionPresent: true,
+    xsrfPresent: true,
+    tabOpen: false,
+    tabId: null,
+  },
+  error: "",
+  refresh: noop,
+  openTab: noop,
 };
 
 const POPUP_GRAPHIC_ONLINE: GraphicState = {
@@ -300,6 +319,15 @@ export function Showcase() {
       <Section title="Popup">
         <div className="flex flex-wrap items-start gap-6">
           <div className="flex w-[380px] flex-col gap-3 rounded-lg bg-background p-3 ring-1 ring-border">
+            <StatusTabs
+              value="backend"
+              onValueChange={() => {}}
+              items={[
+                { value: "backend", label: "Бэкенд", tone: "pending" },
+                { value: "graphic", label: "Graphic", tone: "ok" },
+                { value: "reports", label: "Отчёты", tone: "none" },
+              ]}
+            />
             <DomainsCard state={POPUP_DOMAINS} />
             <GraphicCard state={POPUP_GRAPHIC_ONLINE} />
             <Button variant="primary" size="lg">
@@ -308,6 +336,7 @@ export function Showcase() {
           </div>
           <div className="flex w-[380px] flex-col gap-3 rounded-lg bg-background p-3 ring-1 ring-border">
             <GraphicCard state={POPUP_GRAPHIC_OFFLINE} />
+            <ReportsCard state={POPUP_REPORTS} />
           </div>
         </div>
       </Section>

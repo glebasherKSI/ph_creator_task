@@ -234,6 +234,33 @@ export async function handleReportsState(): Promise<ReportsFetchResult> {
   }
 }
 
+export interface ReportsStatus {
+  ok: true;
+  origin: string;
+  /** Cookie reports_session есть — пользователь залогинен в Reports. */
+  sessionPresent: boolean;
+  xsrfPresent: boolean;
+  /** Открыта вкладка Reports — через неё идут запросы. */
+  tabOpen: boolean;
+  tabId: number | null;
+}
+
+/** Быстрая проверка готовности Reports: cookies + вкладка, без сетевых запросов. */
+export async function getReportsStatus(): Promise<ReportsStatus> {
+  const [{ xsrfCookie, sessionCookie }, tab] = await Promise.all([
+    resolveReportsAuthCookies(),
+    findReportsTab(),
+  ]);
+  return {
+    ok: true,
+    origin: REPORTS_ORIGIN,
+    sessionPresent: Boolean(sessionCookie?.value),
+    xsrfPresent: Boolean(xsrfCookie?.value),
+    tabOpen: Boolean(tab?.id),
+    tabId: tab?.id ?? null,
+  };
+}
+
 export function reportsErrorResponse(err: unknown): ReportsFetchResult {
   const message = String((err as Error)?.message || err);
   return {

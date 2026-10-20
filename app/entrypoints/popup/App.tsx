@@ -1,22 +1,59 @@
+import { useState } from "react";
 import { browser } from "wxt/browser";
 
 import { Button } from "@/components/ui/button";
 import { DomainsCard } from "@/features/popup/DomainsCard";
 import { GraphicCard } from "@/features/popup/GraphicCard";
+import { ReportsCard } from "@/features/popup/ReportsCard";
+import { type PopupTab, StatusTabs } from "@/features/popup/StatusTabs";
+import {
+  backendTone,
+  formatAuthTitle,
+  graphicTone,
+  reportsReadiness,
+  reportsTone,
+} from "@/features/popup/labels";
 import { useDomains } from "@/features/popup/useDomains";
 import { useGraphic } from "@/features/popup/useGraphic";
+import { useReports } from "@/features/popup/useReports";
 
 /** Страница конструктора появится на этапе 7; до тех пор кнопка ведёт на витрину. */
 const CONSTRUCTOR_PAGE = "/showcase.html";
+const TAB_KEY = "ph_popup_tab";
+
+function readLastTab(): PopupTab {
+  try {
+    const raw = localStorage.getItem(TAB_KEY);
+    return raw === "graphic" || raw === "reports" ? raw : "backend";
+  } catch {
+    return "backend";
+  }
+}
 
 export function App() {
   const version = browser.runtime.getManifest().version;
+  const [tab, setTab] = useState<PopupTab>(readLastTab);
   const domains = useDomains();
   const graphic = useGraphic();
+  const reports = useReports();
+
+  function selectTab(next: PopupTab) {
+    setTab(next);
+    try {
+      localStorage.setItem(TAB_KEY, next);
+    } catch {
+      /* необязательно */
+    }
+  }
 
   function openConstructor() {
     void browser.tabs.create({ url: browser.runtime.getURL(CONSTRUCTOR_PAGE) });
   }
+
+  const readiness = reportsReadiness(reports.status);
+  const backendTitle = domains.domains
+    .map((host) => `${host}: ${formatAuthTitle(domains.auth[host])}`)
+    .join("\n");
 
   return (
     <div className="flex w-[380px] flex-col gap-3 p-3">
@@ -24,10 +61,43 @@ export function App() {
         <h1 className="text-title-2">PromoHub конструктор задач</h1>
       </header>
 
-      <DomainsCard state={domains} />
-      <GraphicCard state={graphic} />
+      <StatusTabs
+        value={tab}
+        onValueChange={selectTab}
+        items={[
+          {
+            value: "backend",
+            label: "Бэкенд",
+            tone: backendTone(domains.auth, domains.domains),
+            title: backendTitle || "Нет доменов",
+          },
+          {
+            value: "graphic",
+            label: "Graphic",
+            tone: graphicTone(graphic.status),
+            title: graphic.status?.authenticated ? "Подключено" : "Нет входа",
+          },
+          {
+            value: "reports",
+            label: "Отчёты",
+            tone: reportsTone(readiness),
+            title:
+              readiness === "ready"
+                ? "Сессия и вкладка есть"
+                : readiness === "no-session"
+                  ? "Нет сессии Reports"
+                  : readiness === "no-tab"
+                    ? "Откройте вкладку Reports"
+                    : "Проверяю…",
+          },
+        ]}
+      />
 
-      {domains.status ? (
+      {tab === "backend" ? <DomainsCard state={domains} /> : null}
+      {tab === "graphic" ? <GraphicCard state={graphic} /> : null}
+      {tab === "reports" ? <ReportsCard state={reports} /> : null}
+
+      {tab === "backend" && domains.status ? (
         <p role="status" className="px-1 text-caption text-muted-foreground">
           {domains.status}
         </p>

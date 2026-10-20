@@ -49,3 +49,43 @@ export function graphicHostLabel(baseUrl: string | null | undefined): string {
 export function isGraphicConnectivityError(message: string): boolean {
   return /fetch|network|сервер|адрес|url/i.test(message);
 }
+
+export type ReportsReadiness = "ready" | "no-session" | "no-tab" | "unknown";
+
+export function reportsReadiness(
+  status: { sessionPresent: boolean; tabOpen: boolean } | null | undefined,
+): ReportsReadiness {
+  if (!status) return "unknown";
+  if (!status.sessionPresent) return "no-session";
+  if (!status.tabOpen) return "no-tab";
+  return "ready";
+}
+
+export function reportsHostLabel(origin: string | null | undefined): string {
+  return graphicHostLabel(origin || "https://reports.maxbit.private");
+}
+
+/** Тон точки в строке статусов popup. */
+export function graphicTone(status: { authenticated: boolean } | null | undefined) {
+  if (!status) return "unknown" as const;
+  return status.authenticated ? ("ok" as const) : ("none" as const);
+}
+
+export function backendTone(
+  auth: Record<string, DomainAuthState | undefined>,
+  domains: string[],
+): "ok" | "pending" | "none" | "unknown" {
+  if (!domains.length) return "none";
+  const tones = domains.map((host) => domainAuthTone(auth[host]));
+  if (tones.every((t) => t === "ok")) return "ok";
+  if (tones.some((t) => t === "ok" || t === "pending")) return "pending";
+  if (domains.every((host) => auth[host] === undefined)) return "unknown";
+  return "none";
+}
+
+export function reportsTone(readiness: ReportsReadiness): "ok" | "pending" | "none" | "unknown" {
+  if (readiness === "ready") return "ok";
+  if (readiness === "unknown") return "unknown";
+  if (readiness === "no-tab") return "pending";
+  return "none";
+}

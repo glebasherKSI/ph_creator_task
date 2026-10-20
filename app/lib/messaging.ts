@@ -8,7 +8,7 @@ import type { AdminFetchOptions, AdminFetchResult } from "./auth/admin-fetch";
 import { AUTH_MESSAGE_TIMEOUT_MS, withTimeout } from "./auth/errors";
 import type { AuthStatus } from "./auth/status";
 import type { GraphicAuthPayload, GraphicFetchPayload, GraphicStatus } from "./graphic-api";
-import type { ReportsFetchResult } from "./reports-fetch";
+import type { ReportsFetchResult, ReportsStatus } from "./reports-fetch";
 
 export interface ErrorResponse {
   ok: false;
@@ -57,6 +57,10 @@ export type MessageMap = {
   PH_REPORTS_STATE: {
     payload: undefined;
     response: ReportsFetchResult | ErrorResponse;
+  };
+  PH_REPORTS_STATUS: {
+    payload: undefined;
+    response: ReportsStatus | ErrorResponse;
   };
   PH_GRAPHIC_AUTH: {
     payload: GraphicAuthPayload;

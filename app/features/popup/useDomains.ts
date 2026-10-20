@@ -15,69 +15,91 @@ import {
 } from "@/lib/domains";
 import { sendMessage } from "@/lib/messaging";
 
+import { dropAuthCache, readAuthCache, writeAuthCache } from "./auth-cache";
 import type { DomainAuthState } from "./labels";
 
 export interface DomainsState {
   domains: string[];
   permissions: Record<string, boolean>;
   auth: Record<string, DomainAuthState | undefined>;
+  /** Домены, для которых статус сейчас проверяется в background. */
+  checking: Record<string, boolean>;
   status: string;
   loading: boolean;
   addDomain: (raw: string) => Promise<boolean>;
   addCurrentTab: () => Promise<void>;
   removeDomain: (host: string) => Promise<void>;
+  refreshAuth: () => Promise<void>;
 }
 
-async function queryAuthStatuses(
-  hosts: string[],
-): Promise<Record<string, DomainAuthState | undefined>> {
-  const entries = await Promise.all(
-    hosts.map(async (host): Promise<[string, DomainAuthState | undefined]> => {
-      try {
-        const response = await sendMessage("PH_AUTH_STATUS", { domain: host });
-        return [host, response?.ok !== false ? (response as DomainAuthState) : undefined];
-      } catch {
-        return [host, { authenticated: false, pendingOtp: false }];
-      }
-    }),
-  );
-  return Object.fromEntries(entries);
+/** Проверка через вкладку админки может длиться секунды — popup не ждёт дольше этого. */
+const AUTH_STATUS_TIMEOUT_MS = 8_000;
+
+async function queryAuthStatus(host: string): Promise<DomainAuthState> {
+  try {
+    const response = await sendMessage(
+      "PH_AUTH_STATUS",
+      { domain: host },
+      { timeoutMs: AUTH_STATUS_TIMEOUT_MS },
+    );
+    return response?.ok === false ? { authenticated: false } : (response as DomainAuthState);
+  } catch {
+    return { authenticated: false, pendingOtp: false };
+  }
 }
 
-/** Домены админок, их host-permissions и статусы входа; следит за chrome.storage. */
+/**
+ * Домены админок, их host-permissions и статусы входа.
+ * Домены показываются сразу; permissions и статусы подтягиваются асинхронно,
+ * статусы кэшируются на сессию браузера (auth-cache) для мгновенного открытия.
+ */
 export function useDomains(): DomainsState {
   const [domains, setDomains] = useState<string[]>([]);
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [auth, setAuth] = useState<Record<string, DomainAuthState | undefined>>({});
+  const [checking, setChecking] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
-  // Актуальный список для обработчиков событий (storage.onChanged, клики) без замыканий на stale state.
+
+  // Актуальный список для обработчиков событий без замыканий на stale state.
   const domainsRef = useRef<string[]>([]);
   useEffect(() => {
     domainsRef.current = domains;
   }, [domains]);
 
-  const refreshAuth = useCallback(async (hosts: string[]) => {
-    setAuth(await queryAuthStatuses(hosts));
+  const refreshAuthFor = useCallback(async (hosts: string[]) => {
+    if (!hosts.length) return;
+    setChecking((prev) => ({ ...prev, ...Object.fromEntries(hosts.map((h) => [h, true])) }));
+    await Promise.all(
+      hosts.map(async (host) => {
+        const state = await queryAuthStatus(host);
+        setAuth((prev) => ({ ...prev, [host]: state }));
+        setChecking((prev) => ({ ...prev, [host]: false }));
+        void writeAuthCache(host, state);
+      }),
+    );
   }, []);
 
   const applyDomains = useCallback(
-    async (next: string[]) => {
+    (next: string[]) => {
       setDomains(next);
-      setPermissions(await refreshDomainPermissions(next));
-      await refreshAuth(next);
+      void refreshDomainPermissions(next).then(setPermissions);
+      void refreshAuthFor(next);
     },
-    [refreshAuth],
+    [refreshAuthFor],
   );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      let list = await loadDomainsFromStorage();
-      if (!list.length) list = await ensureDefaultDomainsInStorage();
+      const [cached, stored] = await Promise.all([readAuthCache(), loadDomainsFromStorage()]);
       if (cancelled) return;
-      await applyDomains(list);
-      if (!cancelled) setLoading(false);
+      const list = stored.length ? stored : await ensureDefaultDomainsInStorage();
+      if (cancelled) return;
+      // Сначала показываем то, что знаем, потом проверяем.
+      setAuth(cached);
+      setLoading(false);
+      applyDomains(list);
     })();
 
     const onChanged = (changes: Record<string, { newValue?: unknown }>, area: string) => {
@@ -87,24 +109,24 @@ export function useDomains(): DomainsState {
         const next = Array.isArray(domainsChange.newValue)
           ? (domainsChange.newValue as string[])
           : [];
-        void applyDomains(next);
+        applyDomains(next);
         return;
       }
       const current = domainsRef.current;
-      const authChanged =
-        Boolean(changes[STORAGE_KEYS.AUTH_SESSIONS]) ||
-        current.some(
-          (host) =>
-            changes[pendingOtpStorageKey(host)] || changes[awaitingMagicLinkStorageKey(host)],
-        );
-      if (authChanged) void refreshAuth(current);
+      const touched = current.filter(
+        (host) => changes[pendingOtpStorageKey(host)] || changes[awaitingMagicLinkStorageKey(host)],
+      );
+      if (changes[STORAGE_KEYS.AUTH_SESSIONS]) void refreshAuthFor(current);
+      else if (touched.length) void refreshAuthFor(touched);
     };
     browser.storage.onChanged.addListener(onChanged);
     return () => {
       cancelled = true;
       browser.storage.onChanged.removeListener(onChanged);
     };
-  }, [applyDomains, refreshAuth]);
+  }, [applyDomains, refreshAuthFor]);
+
+  const refreshAuth = useCallback(() => refreshAuthFor(domainsRef.current), [refreshAuthFor]);
 
   const addDomain = useCallback(
     async (raw: string): Promise<boolean> => {
@@ -125,27 +147,28 @@ export function useDomains(): DomainsState {
       setPermissions((prev) => ({ ...prev, [host]: granted }));
 
       if (granted) {
-        await injectOnDomainTabs(host);
+        void injectOnDomainTabs(host);
         setStatus(`Домен ${host} добавлен, доступ разрешён`);
       } else {
         setStatus(`Домен ${host} сохранён, но доступ не выдан — API из конструктора недоступен`);
       }
-      await refreshAuth(next);
+      void refreshAuthFor([host]);
       return true;
     },
-    [refreshAuth],
+    [refreshAuthFor],
   );
 
   const removeDomain = useCallback(async (host: string) => {
     const next = domainsRef.current.filter((d) => d !== host);
     await saveDomainsToStorage(next);
-    await removeDomainPermission(host);
     setDomains(next);
     setPermissions((prev) => {
       const copy = { ...prev };
       delete copy[host];
       return copy;
     });
+    void removeDomainPermission(host);
+    void dropAuthCache(host);
     setStatus(`Домен ${host} удалён`);
   }, []);
 
@@ -167,5 +190,16 @@ export function useDomains(): DomainsState {
     await addDomain(host);
   }, [addDomain]);
 
-  return { domains, permissions, auth, status, loading, addDomain, addCurrentTab, removeDomain };
+  return {
+    domains,
+    permissions,
+    auth,
+    checking,
+    status,
+    loading,
+    addDomain,
+    addCurrentTab,
+    removeDomain,
+    refreshAuth,
+  };
 }
