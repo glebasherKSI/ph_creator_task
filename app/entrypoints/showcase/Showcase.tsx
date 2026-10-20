@@ -48,6 +48,14 @@ const TASK_TARGETING_DEMO: TaskLike = {
       },
     },
   ],
+  serialized_main_actions: [
+    {
+      action: "deposit",
+      requirements: { payments_count: "2", min_points: "10", payment_systems: ["visa"] },
+      conditions: { points_sum: "100" },
+    },
+    { action: "bet", requirements: { bets_count: "5" }, conditions: {} },
+  ],
 };
 
 const TASK_FIXTURES: Record<string, TaskLike> = {
@@ -408,7 +416,7 @@ export function Showcase() {
             mode="copy"
             domain=""
             sourceTask={TASK_FIXTURES[formFixture] ?? null}
-            initialOpenSections={formFixture === "targeting" ? ["targeting"] : ["basic"]}
+            initialOpenSections={formFixture === "targeting" ? ["targeting", "actions"] : ["basic"]}
             onSubmit={async (payload) => ({ echo: payload.gamification_task.name })}
           />
         </div>

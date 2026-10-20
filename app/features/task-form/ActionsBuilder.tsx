@@ -445,9 +445,11 @@ function FieldRow({ onRemove, ...props }: Omit<ControlProps, "id"> & { onRemove:
   const id = React.useId();
   const { def, disabled } = props;
   return (
-    <div className="flex flex-col gap-1.5 rounded-md bg-surface-2/40 p-2">
+    <div className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0">
       <div className="flex items-center justify-between gap-2">
-        <Label htmlFor={id}>{def.label}</Label>
+        <Label htmlFor={id} className="text-foreground">
+          {def.label}
+        </Label>
         <Button
           type="button"
           variant="ghost"
@@ -519,32 +521,41 @@ function FieldColumn({
     .filter((def): def is RequirementFieldDef => def !== null);
 
   return (
-    <section className="flex flex-col gap-2">
-      <header className="flex items-center justify-between gap-2">
-        <span className="text-subhead font-medium">{isCondition ? "Условия" : "Атрибуты"}</span>
+    <fieldset className="flex min-w-0 flex-col gap-2 rounded-md bg-surface/70 p-3 ring-1 ring-border">
+      <legend className="px-1 text-caption font-semibold tracking-wide text-muted-foreground uppercase">
+        {isCondition ? "Условия" : "Атрибуты"}
+      </legend>
+      <p className="text-caption text-muted-foreground">
+        {isCondition
+          ? "Что игрок должен сделать, чтобы действие засчиталось"
+          : "Какие действия учитывать (фильтры)"}
+      </p>
+      {rows.length ? (
+        <div className="flex flex-col divide-y divide-border/70">
+          {rows.map((def) => (
+            <FieldRow
+              key={def.key}
+              {...control}
+              def={def}
+              onFields={(next) => onFields(def.key, next)}
+              onRemove={() => onRemove(def.key)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-md border border-dashed border-border px-3 py-2 text-center text-caption text-muted-foreground">
+          {isCondition ? "Нет условий" : "Нет атрибутов"}
+        </div>
+      )}
+      <div className="mt-1 flex justify-end">
         <AddFieldSelect
           label={isCondition ? "Добавить условие" : "Добавить атрибут"}
           available={available}
           disabled={control.disabled}
           onAdd={onAdd}
         />
-      </header>
-      {rows.length ? (
-        rows.map((def) => (
-          <FieldRow
-            key={def.key}
-            {...control}
-            def={def}
-            onFields={(next) => onFields(def.key, next)}
-            onRemove={() => onRemove(def.key)}
-          />
-        ))
-      ) : (
-        <div className="text-caption text-muted-foreground">
-          {isCondition ? "Нет условий" : "Нет атрибутов"}
-        </div>
-      )}
-    </section>
+      </div>
+    </fieldset>
   );
 }
 
@@ -592,26 +603,35 @@ function ActionCard({
   };
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg bg-surface p-3">
-      <header className="flex items-center gap-2">
-        <Badge variant="muted">#{index + 1}</Badge>
-        <Label className="shrink-0">Тип действия</Label>
-        <SimpleSelect
-          value={type}
-          onValueChange={onChangeType}
-          options={typeOptions}
-          aria-label="Тип действия"
-          size="sm"
-          className="flex-1"
+    <article className="overflow-hidden rounded-lg bg-background/60 ring-1 ring-border">
+      <header className="flex items-center gap-3 border-b border-border bg-surface-2/40 py-2 pr-2 pl-3">
+        <Badge variant="accent">#{index + 1}</Badge>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Label className="shrink-0">Тип действия</Label>
+          <SimpleSelect
+            value={type}
+            onValueChange={onChangeType}
+            options={typeOptions}
+            aria-label="Тип действия"
+            size="sm"
+            className="max-w-xs"
+            disabled={disabled}
+          />
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Удалить действие"
+          title="Удалить действие"
+          onClick={onRemove}
           disabled={disabled}
-        />
-        <Button type="button" variant="ghost" size="sm" onClick={onRemove} disabled={disabled}>
-          <Trash2 />
-          Удалить
+        >
+          <Trash2 className="size-3.5" />
         </Button>
       </header>
       {def?.handled ? (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2">
           <FieldColumn
             {...columnProps}
             role="condition"
@@ -632,7 +652,7 @@ function ActionCard({
           />
         </div>
       ) : (
-        <p className="text-subhead text-muted-foreground">
+        <p className="p-3 text-subhead text-muted-foreground">
           Тип «{ACTION_LABELS[type] ?? type}» — без настраиваемых параметров в schema
         </p>
       )}
@@ -724,9 +744,12 @@ export function ActionsBuilder({
       {BLOCKS.map((block) => {
         const items = value[block.id];
         return (
-          <section key={block.id} className="flex flex-col gap-3">
+          <section key={block.id} className="flex flex-col gap-3 rounded-lg bg-surface-2/40 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="text-headline">{block.title}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-headline">{block.title}</div>
+                <Badge variant={items.length ? "neutral" : "muted"}>{items.length}</Badge>
+              </div>
               <div className="flex flex-wrap items-center gap-3">
                 <SwitchField
                   label="Выполнять по порядку"
@@ -767,7 +790,7 @@ export function ActionsBuilder({
                 />
               ))
             ) : (
-              <div className="rounded-md bg-surface p-3 text-subhead text-muted-foreground">
+              <div className="rounded-md border border-dashed border-border p-4 text-center text-subhead text-muted-foreground">
                 Нет действий — нажмите «Добавить действие»
               </div>
             )}
