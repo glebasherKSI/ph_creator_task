@@ -139,15 +139,23 @@ SF Pro лицензионно только для устройств Apple — �
 
 Перевести в `.ts` модули, не зависящие от DOM, с типами:
 
-- [ ] `constants.js`, `format.js`, `domains.js`, `labels-ru.js`
-- [ ] `tasks.js` (`buildCreatePayload`, `buildPatchPayload`, парсинг ответов)
-- [ ] `api.js`, `meta.js`, `reports.js`, `games-api.js`, `graphic-api.js`
-- [ ] `conditions-schema.js`, `actions-schema.js`
-- [ ] `graphic-task-map.js`
-- [ ] `storage.js`, `auth.js` (обёртки над `chrome.*`)
-- [ ] Типы домена: `GamificationTask` с вариантами по `type` (`interactive` | `informational` | `achievement` | `sequence`), `Condition`, `Action`, `CanvasTemplate`.
-- [ ] Zod-схемы задачи; для `sequence` — без `events`, `conditions`, расписания, дат, `max_repetitions`, стран, `category`.
-- [ ] Vitest: payload'ы совпадают с эталонами из этапа 0, `only_completed` отсутствует ⇒ `false`.
+- [x] `constants.js`, `format.js`, `domains.js`, `labels-ru.js` → `app/lib/*.ts`
+- [x] `tasks.js` → `app/lib/tasks.ts` (`buildCreatePayload`, `buildPatchPayload`, парсинг ответов,
+      `SEQUENCE_FIELD_OVERRIDES`, `normalizeGamificationTasksCondition`)
+- [x] `api.js`, `meta.js`, `reports.js`, `games-api.js`, `graphic-api.js`
+- [x] `conditions-schema.js` → `app/lib/conditions-schema.ts`
+- [ ] `actions-schema.js` → `app/lib/actions-schema.ts`
+- [x] `graphic-task-map.js` → `app/lib/graphic-task-map.ts`
+- [x] `storage.js` → `app/lib/storage.ts`; `auth.js` → `app/lib/auth/{errors,session-store,admin-fetch,status}.ts`
+      (`admin-fetch`/`status` — только для background). `messaging.ts` — транспорт RPC с таймаутом.
+- [x] Типы домена в `app/lib/types.ts`: `GamificationTask`, `TaskType`, `Condition`, `GamificationTasksCondition`,
+      `TaskAction`, `TaskTag`; `CanvasTemplate`/`ChainsLayout` — в `storage.ts`. `TaskLike` намеренно свободный.
+- [x] Zod-схема `taskPayloadSchema` (`app/lib/task-schema.ts`): для `sequence` требует пустые `events`,
+      `conditions`, `countries`, `category`, `cron`, даты, `max_repetitions`.
+- [x] Vitest (`npm test`): паритет нового TS со старым JS на фикстурах из HAR через алиас `legacy/*`,
+      `only_completed` отсутствует ⇒ `false`, storage/session roundtrip на fake-browser.
+      Известное отличие от админки (не шлём `manual_reward`, `cross_project`, `shared_projects`) закреплено тестом —
+      решение на этапе 5.
 
 **Готово, когда:** тесты зелёные, старые страницы при этом продолжают импортировать старые `.js`.
 
