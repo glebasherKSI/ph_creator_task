@@ -13,7 +13,7 @@ const PLANNER_PRIORITY_TO_PH = {
   lowest: 4,
 };
 
-const TASK_TYPES = new Set(["interactive", "informational", "achievement"]);
+const TASK_TYPES = new Set(["interactive", "informational", "achievement", "sequence"]);
 
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};

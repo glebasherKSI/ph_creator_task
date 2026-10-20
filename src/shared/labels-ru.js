@@ -31,6 +31,7 @@ const TYPE_LABELS = {
   achievement: "Достижения",
   informational: "Информационное",
   interactive: "Интерактивное",
+  sequence: "Цепочка",
 };
 
 /** @type {Record<string, string>} */
