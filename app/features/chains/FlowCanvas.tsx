@@ -304,7 +304,9 @@ export function FlowCanvas() {
   }, []);
 
   return (
-    <div className="relative h-full min-h-0 w-full overflow-hidden rounded-lg bg-background ring-1 ring-border">
+    // contain: strict — сотни карточек не участвуют в пересчёте раскладки остальной страницы
+    // (открытие списков в панели задачи над канвой).
+    <div className="relative h-full min-h-0 w-full overflow-hidden rounded-lg bg-background ring-1 ring-border [contain:strict]">
       <style>{FLOW_THEME}</style>
       <ReactFlow<CanvasFlowNode, Edge>
         className="chains-flow"

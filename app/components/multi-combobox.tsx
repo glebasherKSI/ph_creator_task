@@ -38,6 +38,8 @@ export interface MultiComboboxProps {
 
 export const ALL_VALUE = "all";
 const EMPTY_OPTIONS: MultiComboboxOption[] = [];
+/** Сколько строк рисуем сразу и добавляем при прокрутке: сотни строк cmdk открываются с задержкой. */
+const RENDER_STEP = 60;
 
 export function MultiCombobox({
   options,
@@ -63,6 +65,13 @@ export function MultiCombobox({
   const [loading, setLoading] = React.useState(false);
   const searchSeq = React.useRef(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const [limit, setLimit] = React.useState(RENDER_STEP);
+  // Новый запрос — снова с первой порции («состояние из прошлого рендера», без эффекта).
+  const [limitQuery, setLimitQuery] = React.useState(query);
+  if (limitQuery !== query) {
+    setLimitQuery(query);
+    setLimit(RENDER_STEP);
+  }
 
   const allSelected = allowAll && value.includes(ALL_VALUE);
   const selected = React.useMemo(
@@ -151,6 +160,15 @@ export function MultiCombobox({
   function close() {
     setOpen(false);
     setQuery("");
+    setLimit(RENDER_STEP);
+  }
+
+  const visible = filtered.length > limit ? filtered.slice(0, limit) : filtered;
+
+  function onListScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    if (visible.length < filtered.length && el.scrollTop + el.clientHeight > el.scrollHeight - 120)
+      setLimit((n) => n + RENDER_STEP);
   }
 
   const chips = allSelected
@@ -257,7 +275,7 @@ export function MultiCombobox({
       >
         {/* Поиск живёт в поле контрола, cmdk получает его через value и не фильтрует сам. */}
         <Command shouldFilter={false}>
-          <CommandList>
+          <CommandList onScroll={onListScroll}>
             {loading ? (
               <div className="flex items-center justify-center gap-2 py-4 text-subhead text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" /> Загрузка…
@@ -265,7 +283,7 @@ export function MultiCombobox({
             ) : filtered.length === 0 ? (
               <CommandEmpty>{emptyText}</CommandEmpty>
             ) : (
-              filtered.map((opt) => {
+              visible.map((opt) => {
                 const isSelected = selected.has(opt.value);
                 return (
                   <CommandItem
@@ -285,6 +303,11 @@ export function MultiCombobox({
                 );
               })
             )}
+            {!loading && visible.length < filtered.length ? (
+              <div className="px-2 py-1.5 text-center text-caption text-muted-foreground tabular-nums">
+                Показано {visible.length} из {filtered.length} — прокрутите или уточните поиск
+              </div>
+            ) : null}
             {allowAll ? (
               <>
                 <div className="my-1 h-px bg-border" />
