@@ -1,7 +1,7 @@
 /**
  * Content-script вкладки админки PromoHub: мост для API-запросов конструктора
  * с cookie этой вкладки. В манифест не попадает — background инжектит его
- * только во вкладки доменов, добавленных пользователем (optional host permissions).
+ * только во вкладки доменов, добавленных пользователем.
  */
 import { browser } from "wxt/browser";
 import { defineUnlistedScript } from "wxt/utils/define-unlisted-script";

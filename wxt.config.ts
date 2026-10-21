@@ -21,12 +21,8 @@ export default defineConfig({
       default_title: "PromoHub конструктор задач",
     },
     permissions: ["storage", "tabs", "scripting", "cookies"],
-    host_permissions: [
-      "https://reports.maxbit.private/*",
-      "http://127.0.0.1:8000/*",
-      "http://localhost:8000/*",
-    ],
-    optional_host_permissions: ["https://*/*", "http://*/*"],
+    // Доступ ко всем сайтам сразу: админки, Reports и Graphic работают без запроса разрешений.
+    host_permissions: ["https://*/*", "http://*/*"],
     web_accessible_resources: [
       {
         resources: ["test_primer/conditions.json", "test_primer/constant.json"],
