@@ -163,7 +163,7 @@ SF Pro лицензионно только для устройств Apple — �
 
 - [x] `background.js` → `app/entrypoints/background.ts`: роутер сообщений, `onInstalled`, `tabs.onUpdated`
       (инъекция content-script + перехват magic link). Логика Reports вынесена в `app/lib/reports-fetch.ts`.
-- [x] `src/inject/content.js` → `app/entrypoints/admin.content.ts` (`registration: "runtime"`, в манифест не попадает,
+- [x] `src/inject/content.js` → `app/entrypoints/admin-bridge.ts` (unlisted-скрипт: в манифест не попадает и не добавляет host_permissions,
       инжектится в `content-scripts/admin.js`). `src/shared/content-script.js` → `app/lib/content-script.ts`.
 - [x] `page-hook.js` **не переносится**: это мёртвый код — его никто не инжектит, событие `ph-request-captured`
       никто не слушает, popup список запросов не показывает. Ключи `ph_captured_requests` / `ph_capture_enabled`

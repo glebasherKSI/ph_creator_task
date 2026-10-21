@@ -32,7 +32,7 @@ ID расширения зафиксирован ключом в манифес�
 
 ```
 app/
-  entrypoints/      background.ts, admin.content.ts (runtime-инъекция), popup/, chains/, showcase/
+  entrypoints/      background.ts, admin-bridge.ts (мост во вкладке админки, инжектится background-ом), popup/, chains/, showcase/
   lib/              логика без UI: api, auth/, tasks, task-api, meta, storage, messaging, schemas, graphic, reports…
   features/
     popup/          карточки и хуки popup

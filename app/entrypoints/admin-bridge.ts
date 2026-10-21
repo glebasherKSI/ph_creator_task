@@ -4,7 +4,7 @@
  * только во вкладки доменов, добавленных пользователем (optional host permissions).
  */
 import { browser } from "wxt/browser";
-import { defineContentScript } from "wxt/utils/define-content-script";
+import { defineUnlistedScript } from "wxt/utils/define-unlisted-script";
 
 import { createMessageRouter, type TabMessageMap } from "@/lib/messaging";
 
@@ -60,9 +60,9 @@ async function runTaskApiRequest(
   };
 }
 
-export default defineContentScript({
-  matches: ["https://*/*"],
-  registration: "runtime",
+// Unlisted-скрипт: попадает в сборку файлом, но не в манифест — никаких content_scripts и
+// host_permissions. Background инжектит его сам (executeScript) только в разрешённые домены.
+export default defineUnlistedScript({
   main() {
     const scope = window as unknown as Record<string, unknown>;
     if (scope[LOADED_FLAG]) return;
