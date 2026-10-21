@@ -22,6 +22,7 @@ import {
   removeTasks,
   savableDirtyTargets,
   setTargetConfig,
+  withReferencingTasks,
 } from "./graph";
 import { GRID_START_X, GRID_START_Y, type LayoutOptions, layoutCanvasTasks } from "./layout";
 
@@ -328,7 +329,8 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
           ...(saved?.configuredOnBackend ? { configuredOnBackend: true } : {}),
         };
       }
-      return importGraphFromConditions({ ...s, canvas }, added);
+      const next = { ...s, canvas };
+      return importGraphFromConditions(next, withReferencingTasks(next, added));
     });
 
     // Без сохранённой позиции — раскладываем новые карточки, остальные не трогаем.
@@ -544,7 +546,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
       };
       const withTask: GraphState = { ...next, canvas };
       return {
-        ...importGraphFromConditions(withTask, [id]),
+        ...importGraphFromConditions(withTask, withReferencingTasks(withTask, [id])),
         catalog,
         catalogOrder,
         selectedTaskId: id,

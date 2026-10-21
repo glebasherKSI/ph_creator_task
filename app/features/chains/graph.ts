@@ -179,6 +179,23 @@ export function importGraphFromConditions(
   return { ...state, edges, targetConfigs };
 }
 
+/**
+ * `ids` плюс задачи канвы, у которых они указаны в gamification_tasks. Нужна при добавлении:
+ * связи «новая → уже на канве» живут в conditions старых задач, а не новой.
+ */
+export function withReferencingTasks(state: GraphState, ids: string[]): string[] {
+  const added = new Set(ids.map(String));
+  const result = new Set(added);
+  for (const task of Object.values(state.canvas)) {
+    if (result.has(task.id)) continue;
+    const gt = getGamificationTasksCondition(task.conditions);
+    if (Array.isArray(gt?.list) && gt.list.some((raw) => added.has(String(raw)))) {
+      result.add(task.id);
+    }
+  }
+  return [...result];
+}
+
 export function addEdge(state: GraphState, from: string, to: string): GraphState {
   if (from === to || !state.canvas[from] || !state.canvas[to]) return state;
   if (state.edges.some((e) => e.from === from && e.to === to)) return state;

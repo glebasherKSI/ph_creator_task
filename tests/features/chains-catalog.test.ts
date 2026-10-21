@@ -115,3 +115,25 @@ describe("addToCanvas", () => {
     expect(canvasSizes[firstAdded]).toBe(2);
   });
 });
+
+it("addToCanvas: связи от новой задачи к уже добавленным подтягиваются", async () => {
+  fetchTasksPage.mockResolvedValueOnce(page([1, 2, 3], false));
+  await useChainsStore.getState().loadCatalog(true);
+  const gt = (list: number[]) => [
+    { gamification_tasks: { type: "enabled", extra_type: "or", list } },
+  ];
+  fetchTask.mockImplementation(async (_d: string, id: string) => ({
+    ...task(Number(id)),
+    conditions: id === "1" ? [] : gt([1]),
+  }));
+  // Сначала дочерние, потом родитель.
+  await useChainsStore.getState().addToCanvas(["2", "3"]);
+  expect(useChainsStore.getState().edges).toEqual([]);
+  await useChainsStore.getState().addToCanvas(["1"]);
+  const edges = useChainsStore
+    .getState()
+    .edges.map((e) => `${e.from}->${e.to}`)
+    .sort();
+  expect(edges).toEqual(["1->2", "1->3"]);
+  expect(useChainsStore.getState().dirtyTargets).toEqual([]);
+});
