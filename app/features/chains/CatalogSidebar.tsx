@@ -17,7 +17,7 @@ import { type CatalogTask, useChainsStore } from "./store";
 
 type StatusFilter = "all" | "active" | "draft";
 
-const ROW_HEIGHT = 64;
+const ROW_HEIGHT = 74;
 
 function stateVariant(state: string): "success" | "muted" | "neutral" {
   if (state === "active") return "success";
@@ -51,8 +51,12 @@ function CatalogRow({
   return (
     <div
       className={cn(
-        "flex h-full items-center gap-2 rounded-md px-2 transition-colors",
-        onCanvas ? "bg-surface-2/40" : "hover:bg-surface-2/60",
+        "flex h-full items-center gap-2.5 rounded-md bg-surface-2/35 py-2 pr-1.5 pl-2.5 ring-1 transition-colors",
+        onCanvas
+          ? "ring-primary/40"
+          : checked
+            ? "bg-surface-2/60 ring-border"
+            : "ring-border/60 hover:bg-surface-2/60 hover:ring-border",
       )}
     >
       <Checkbox
@@ -67,20 +71,28 @@ function CatalogRow({
         className="flex min-w-0 flex-1 cursor-pointer flex-col gap-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
       >
         <div className="flex items-center gap-2">
-          <span className="font-mono text-caption text-muted-foreground">#{task.id}</span>
-          <span className="min-w-0 flex-1 truncate text-subhead">
+          <span className="shrink-0 font-mono text-caption text-muted-foreground">#{task.id}</span>
+          <span className="min-w-0 flex-1 truncate text-subhead font-medium">
             {task.name || "(без названия)"}
           </span>
-          <Badge variant={stateVariant(task.state)}>{task.state}</Badge>
+          <Badge variant={stateVariant(task.state)} className="shrink-0">
+            {task.state}
+          </Badge>
         </div>
-        <div className="flex items-center gap-2 text-caption text-muted-foreground">
-          <span className="min-w-0 flex-1 truncate font-mono">
+        <div className="flex items-center gap-1.5">
+          <span className="min-w-0 flex-1 truncate font-mono text-caption text-muted-foreground">
             {task.frontend_identifier || "—"}
           </span>
           {isSequenceType(task.type) ? (
-            <Badge variant="neutral">{typeLabel("sequence")}</Badge>
+            <Badge variant="muted" className="shrink-0">
+              {typeLabel("sequence")}
+            </Badge>
           ) : null}
-          {onCanvas ? <Badge variant="accent-outline">на канве</Badge> : null}
+          {onCanvas ? (
+            <Badge variant="accent-outline" className="shrink-0">
+              на канве
+            </Badge>
+          ) : null}
         </div>
       </button>
       {onCanvas ? (
@@ -237,7 +249,7 @@ export function CatalogSidebar({
               return (
                 <div
                   key={id}
-                  className="pb-1"
+                  className="pb-1.5"
                   style={{
                     position: "absolute",
                     top: 0,
