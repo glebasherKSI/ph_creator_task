@@ -29,6 +29,14 @@ import { GRID_START_X, GRID_START_Y, type LayoutOptions, layoutCanvasTasks } fro
 const CATALOG_PAGE_SIZE = 100;
 const MAX_CATALOG_PAGES = 100;
 
+export interface CatalogProgress {
+  phase: "auth" | "loading";
+  /** Просмотрено строк бэка (включая скрытые по статусу). */
+  scanned: number;
+  /** Всего задач на бэке, если известно. */
+  total: number | null;
+}
+
 export interface CatalogTask {
   id: string;
   name: string;
@@ -82,6 +90,8 @@ export interface ChainsStore extends GraphState {
   catalogHasMore: boolean;
   catalogHidden: number;
   catalogLoading: boolean;
+  /** Этап загрузки каталога для UI: проверка входа → страницы (scanned из total). */
+  catalogProgress: CatalogProgress | null;
   catalogError: string;
   /** Сохранённые позиции из storage (ключ — id задачи). */
   savedPositions: Record<string, CanvasPosition>;
@@ -94,6 +104,8 @@ export interface ChainsStore extends GraphState {
   status: { text: string; error: boolean };
 
   setDomain: (domain: string) => Promise<void>;
+  /** Сразу показать «Проверяю вход…» (до ensureAuthenticated) или сбросить индикатор. */
+  setCatalogAuthPhase: (active: boolean) => void;
   setStatus: (text: string, error?: boolean) => void;
   loadCatalog: (reset: boolean) => Promise<void>;
   /** Добавляет задачи из каталога на канву: позиция из storage или автораскладка, conditions с бэка. */
@@ -126,6 +138,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
   catalogHasMore: false,
   catalogHidden: 0,
   catalogLoading: false,
+  catalogProgress: null,
   catalogError: "",
   savedPositions: {},
   saving: false,
@@ -136,6 +149,13 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
   status: { text: "Выберите домен и загрузите задачи", error: false },
 
   setStatus: (text, error = false) => set({ status: { text, error } }),
+
+  setCatalogAuthPhase: (active) =>
+    set(
+      active
+        ? { catalogLoading: true, catalogProgress: { phase: "auth", scanned: 0, total: null } }
+        : { catalogLoading: false, catalogProgress: null },
+    ),
 
   setDomain: async (domain) => {
     if (domain === get().domain) return;
@@ -160,7 +180,11 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
   loadCatalog: async (reset) => {
     const { domain } = get();
     if (!domain) return;
-    set({ catalogLoading: true, catalogError: "" });
+    set({
+      catalogLoading: true,
+      catalogError: "",
+      catalogProgress: { phase: "loading", scanned: 0, total: null },
+    });
     try {
       // reset — полная перезагрузка: проходим все страницы, пока бэк их отдаёт
       // (в каталог попадают только active и draft). Иначе — одна следующая страница.
@@ -186,6 +210,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
             catalogOffset: offset,
             catalogHasMore: page.hasMore,
             catalogHidden: (replace ? 0 : s.catalogHidden) + page.hidden,
+            catalogProgress: { phase: "loading", scanned: offset, total: page.total },
             status: {
               text: `Загружаю задачи… ${order.length} (просмотрено ${offset})`,
               error: false,
@@ -194,9 +219,9 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
         });
         if (!reset || !page.hasMore) break;
       }
-      set({ catalogLoading: false });
+      set({ catalogLoading: false, catalogProgress: null });
     } catch (err) {
-      set({ catalogLoading: false, catalogError: errorText(err) });
+      set({ catalogLoading: false, catalogProgress: null, catalogError: errorText(err) });
       throw err;
     }
   },

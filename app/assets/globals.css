@@ -106,6 +106,15 @@
  * Анимации. Только transform / opacity / height по CSS-переменным Radix —
  * без тяжёлых эффектов; при prefers-reduced-motion отключаются.
  */
+@keyframes progress-indeterminate {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
 @keyframes pop-in {
   from {
     opacity: 0;

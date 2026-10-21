@@ -16,6 +16,18 @@ export interface TasksPage {
   /** Сколько строк вернул бэк (для offset и hasMore). */
   rawCount: number;
   hasMore: boolean;
+  /** Всего задач на бэке (pagination.count), если бэк его отдал. */
+  total: number | null;
+}
+
+function readPagination(data: unknown): { count: number | null; hasNext: boolean | null } {
+  const p = (data as { pagination?: { count?: unknown; has_next_page?: unknown } } | null)
+    ?.pagination;
+  const count = Number(p?.count);
+  return {
+    count: Number.isFinite(count) && count >= 0 ? count : null,
+    hasNext: typeof p?.has_next_page === "boolean" ? p.has_next_page : null,
+  };
 }
 
 export async function fetchTasksPage(
@@ -30,11 +42,13 @@ export async function fetchTasksPage(
   );
   const page = taskListFromResponse(data);
   const tasks = page.filter(isVisibleTaskState);
+  const pagination = readPagination(data);
   return {
     tasks,
     hidden: page.length - tasks.length,
     rawCount: page.length,
-    hasMore: page.length === limit,
+    hasMore: pagination.hasNext ?? page.length === limit,
+    total: pagination.count,
   };
 }
 

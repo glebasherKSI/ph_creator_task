@@ -17,7 +17,13 @@ function task(id: number, state = "active"): GamificationTask {
 }
 
 function page(ids: number[], hasMore: boolean, hidden = 0) {
-  return { tasks: ids.map((id) => task(id)), hidden, rawCount: ids.length + hidden, hasMore };
+  return {
+    tasks: ids.map((id) => task(id)),
+    hidden,
+    rawCount: ids.length + hidden,
+    hasMore,
+    total: null,
+  };
 }
 
 beforeEach(async () => {
@@ -41,6 +47,7 @@ describe("loadCatalog", () => {
     expect(s.catalogOffset).toBe(5);
     expect(fetchTasksPage.mock.calls.map((c) => c[1])).toEqual([0, 3, 4]);
     expect(s.catalogLoading).toBe(false);
+    expect(s.catalogProgress).toBeNull();
   });
 
   it("без reset — одна следующая страница", async () => {

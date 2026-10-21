@@ -110,6 +110,78 @@ function CatalogRow({
   );
 }
 
+/** Полоса прогресса загрузки каталога: проверка входа (бегущая) → страницы (по pagination.count). */
+function CatalogProgressBar() {
+  const progress = useChainsStore((s) => s.catalogProgress);
+  const loaded = useChainsStore((s) => s.catalogOrder.length);
+  if (!progress) return null;
+  const known = progress.phase === "loading" && progress.total ? progress.total : null;
+  const percent = known ? Math.min(100, Math.round((progress.scanned / known) * 100)) : null;
+  const label =
+    progress.phase === "auth"
+      ? "Проверяю вход в админку…"
+      : known
+        ? `Просмотрено ${Math.min(progress.scanned, known)} из ${known} · в каталоге ${loaded}`
+        : `Загружаю задачи… в каталоге ${loaded}`;
+  return (
+    <div
+      className="flex flex-col gap-1.5"
+      role="progressbar"
+      aria-valuenow={percent ?? undefined}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="Загрузка задач"
+    >
+      <div className="flex items-center justify-between gap-2 text-caption">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin text-primary" />
+          {label}
+        </span>
+        {percent != null ? (
+          <span className="font-semibold text-primary tabular-nums">{percent}%</span>
+        ) : null}
+      </div>
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-surface-2">
+        {percent != null ? (
+          <div
+            className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+            style={{ width: `${percent}%` }}
+          />
+        ) : (
+          <div className="absolute inset-y-0 w-1/3 animate-[progress-indeterminate_1.2s_ease-in-out_infinite] rounded-full bg-primary" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Заглушки строк, пока список пуст и идёт загрузка. */
+function CatalogSkeleton() {
+  return (
+    <div className="flex flex-col gap-1.5" aria-hidden="true">
+      {Array.from({ length: 8 }, (_, i) => (
+        <div
+          key={i}
+          className="flex h-[68px] items-center gap-2.5 rounded-md bg-surface-2/35 px-2.5 ring-1 ring-border/60"
+        >
+          <div className="size-4 rounded-[4px] bg-surface-2" />
+          <div className="flex flex-1 flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-2.5 w-10 animate-pulse rounded bg-surface-2" />
+              <div
+                className="h-3 flex-1 animate-pulse rounded bg-surface-2"
+                style={{ maxWidth: `${55 + ((i * 17) % 35)}%` }}
+              />
+              <div className="h-4 w-12 animate-pulse rounded-chip bg-surface-2" />
+            </div>
+            <div className="h-2.5 w-24 animate-pulse rounded bg-surface-2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CatalogSidebar({
   onAdd,
   onFocusNode,
@@ -201,6 +273,8 @@ export function CatalogSidebar({
         </span>
       </div>
 
+      <CatalogProgressBar />
+
       <div className="relative">
         <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -237,15 +311,11 @@ export function CatalogSidebar({
       {error ? <p className="text-caption text-destructive">{error}</p> : null}
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        {visible.length === 0 ? (
+        {visible.length === 0 && loading ? (
+          <CatalogSkeleton />
+        ) : visible.length === 0 ? (
           <div className="py-6 text-center text-subhead text-muted-foreground">
-            {loading ? (
-              <Loader2 className="mx-auto size-5 animate-spin" />
-            ) : order.length ? (
-              "Ничего не найдено по фильтру"
-            ) : (
-              "Список пуст — загрузите задачи"
-            )}
+            {order.length ? "Ничего не найдено по фильтру" : "Список пуст — загрузите задачи"}
           </div>
         ) : (
           <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>

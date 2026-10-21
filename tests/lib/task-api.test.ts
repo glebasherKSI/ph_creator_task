@@ -47,6 +47,16 @@ describe("task-api", () => {
     expect(page.hasMore).toBe(true);
   });
 
+  it("fetchTasksPage: has_next_page и count из pagination", async () => {
+    installBackground(() => ({
+      gamification_tasks: [taskInteractive, taskSequence],
+      pagination: { limit: 2, offset: 0, count: 1456, has_next_page: false },
+    }));
+    const page = await fetchTasksPage(DOMAIN, 0, 2);
+    expect(page.hasMore).toBe(false);
+    expect(page.total).toBe(1456);
+  });
+
   it("createTask: ответ 200 без тела → id ищется по списку, задача дочитывается", async () => {
     const calls = installBackground((path, method) => {
       if (method === "POST") return 200;

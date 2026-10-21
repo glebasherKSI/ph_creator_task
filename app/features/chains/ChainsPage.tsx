@@ -38,7 +38,7 @@ import { FlowCanvas } from "./FlowCanvas";
 import { useLabelsStore } from "./labels-store";
 import { PackagesPanel } from "./PackagesPanel";
 import { SelectionToolbar } from "./SelectionToolbar";
-import { type SaveLogEntry, useChainsStore } from "./store";
+import { type CatalogProgress, type SaveLogEntry, useChainsStore } from "./store";
 import { TaskSheet } from "./TaskSheet";
 import { TemplatesDialogs, useLoadTemplateDialog, useSaveTemplateDialog } from "./TemplatesDialogs";
 
@@ -72,6 +72,14 @@ function SaveLog({ entries, onClose }: { entries: SaveLogEntry[]; onClose: () =>
 }
 
 type MainView = "canvas" | "stats" | "packages";
+
+function catalogLoadingLabel(progress: CatalogProgress | null): string {
+  if (!progress) return "Загрузить задачи";
+  if (progress.phase === "auth") return "Проверяю вход…";
+  if (progress.total)
+    return `Загружаю ${Math.min(progress.scanned, progress.total)} / ${progress.total}`;
+  return progress.scanned ? `Загружаю… ${progress.scanned}` : "Загружаю…";
+}
 
 /** Группа инструментов: подпись слева и кнопки в общей подложке. */
 function ToolGroup({ label, children }: { label: string; children: React.ReactNode }) {
@@ -119,6 +127,7 @@ function ChainsPageInner() {
   const status = useChainsStore((s) => s.status);
   const setStatus = useChainsStore((s) => s.setStatus);
   const catalogLoading = useChainsStore((s) => s.catalogLoading);
+  const catalogProgress = useChainsStore((s) => s.catalogProgress);
   const catalogHasMore = useChainsStore((s) => s.catalogHasMore);
   const catalogSize = useChainsStore((s) => s.catalogOrder.length);
   const canvasSize = useChainsStore((s) => Object.keys(s.canvas).length);
@@ -162,9 +171,18 @@ function ChainsPageInner() {
       setStatus("Нет сохранённых доменов. Добавьте админку в popup.", true);
       return;
     }
-    const ok = await auth.ensureAuthenticated(domain, {
-      message: `Для загрузки задач нужен вход в ${domain}`,
-    });
+    // Индикатор сразу: проверка входа может перезагрузить вкладку админки и занять секунды.
+    const store = useChainsStore.getState();
+    store.setCatalogAuthPhase(true);
+    setStatus(`Проверяю вход в ${domain}…`);
+    let ok = false;
+    try {
+      ok = await auth.ensureAuthenticated(domain, {
+        message: `Для загрузки задач нужен вход в ${domain}`,
+      });
+    } finally {
+      if (!ok) store.setCatalogAuthPhase(false);
+    }
     if (!ok) {
       setStatus("Вход не выполнен — список задач недоступен", true);
       return;
@@ -259,7 +277,7 @@ function ChainsPageInner() {
               title="Загрузить список задач домена (с входом в админку при необходимости)"
             >
               {catalogLoading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-              Загрузить задачи
+              {catalogLoadingLabel(catalogProgress)}
             </Button>
             <Popover>
               <PopoverTrigger asChild>
