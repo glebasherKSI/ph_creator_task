@@ -30,7 +30,7 @@ import {
   useAddLabel,
   useLabelNodes,
 } from "./CanvasLabels";
-import { edgeKey } from "./graph";
+import { conditionSources, edgeKey } from "./graph";
 import { useLabelsStore } from "./labels-store";
 import { type AddProgress, useChainsStore } from "./store";
 import { type TaskFlowNode, TaskNode } from "./TaskNode";
@@ -145,6 +145,7 @@ export function FlowCanvas() {
   const dirtyTargets = useChainsStore((s) => s.dirtyTargets);
   const selectedIds = useChainsStore((s) => s.selectedIds);
   const selectedEdge = useChainsStore((s) => s.selectedEdge);
+  const detachedDeps = useChainsStore((s) => s.detachedDeps);
   const [measured, setMeasured] = useState<Measured>({});
   const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(null);
   const closePaneMenu = useCallback(() => setPaneMenu(null), []);
@@ -154,9 +155,21 @@ export function FlowCanvas() {
   const nodes = useMemo<TaskFlowNode[]>(() => {
     const incoming: Record<string, string[]> = {};
     const outgoing: Record<string, string[]> = {};
+    const offIncoming: Record<string, string[]> = {};
+    const offOutgoing: Record<string, string[]> = {};
     for (const e of storeEdges) {
       (incoming[e.to] ??= []).push(e.from);
       (outgoing[e.from] ??= []).push(e.to);
+    }
+    // Связи с задачами вне канвы: входящие — из своих conditions, исходящие — из памяти убранных.
+    for (const task of Object.values(canvas)) {
+      for (const from of conditionSources(task)) {
+        if (!canvas[from]) (offIncoming[task.id] ??= []).push(from);
+      }
+    }
+    for (const [to, sources] of Object.entries(detachedDeps)) {
+      if (canvas[to]) continue;
+      for (const from of sources) if (canvas[from]) (offOutgoing[from] ??= []).push(to);
     }
     return Object.values(canvas).map((task) => ({
       id: task.id,
@@ -169,10 +182,12 @@ export function FlowCanvas() {
         meta: catalog[task.id] ?? null,
         incoming: incoming[task.id] ?? [],
         outgoing: outgoing[task.id] ?? [],
+        offIncoming: offIncoming[task.id] ?? [],
+        offOutgoing: offOutgoing[task.id] ?? [],
         dirty: dirtyTargets.includes(task.id),
       },
     }));
-  }, [canvas, storeEdges, catalog, dirtyTargets, selectedIds, measured]);
+  }, [canvas, storeEdges, catalog, dirtyTargets, selectedIds, measured, detachedDeps]);
 
   const allNodes = useMemo<CanvasFlowNode[]>(() => [...nodes, ...labelNodes], [nodes, labelNodes]);
 
@@ -258,7 +273,8 @@ export function FlowCanvas() {
   const onBeforeDelete = useCallback<OnBeforeDelete<CanvasFlowNode, Edge>>(
     async ({ nodes: toDeleteNodes, edges: toDelete }) => ({
       nodes: toDeleteNodes.filter((n) => n.type === "label"),
-      edges: toDelete,
+      // Только явно выбранная связь: React Flow добавляет сюда и связи выделенных карточек.
+      edges: toDelete.filter((e) => e.selected),
     }),
     [],
   );

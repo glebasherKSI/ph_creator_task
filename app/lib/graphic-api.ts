@@ -288,10 +288,11 @@ interface GraphicMessageResponse {
 async function sendGraphicMessage<T = GraphicMessageResponse>(
   action: string,
   payload: unknown,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
 ): Promise<T> {
   const response = (await withTimeout(
     browser.runtime.sendMessage({ action, payload }),
-    FETCH_TIMEOUT_MS,
+    timeoutMs,
     "Превышено время ожидания Graphic",
   )) as GraphicMessageResponse | undefined;
   if (!response?.ok) throw new Error(response?.error || "Ошибка Graphic");
@@ -340,11 +341,16 @@ export async function graphicApiGet(
   return response.data;
 }
 
-export async function graphicApiPost(path: string, body?: unknown): Promise<unknown> {
-  const response = await sendGraphicMessage("PH_GRAPHIC_FETCH", {
-    path,
-    method: "POST",
-    body: body ?? null,
-  });
+/** timeoutMs — для долгих запросов (импорт в пакет); по умолчанию 30 с. */
+export async function graphicApiPost(
+  path: string,
+  body?: unknown,
+  timeoutMs?: number,
+): Promise<unknown> {
+  const response = await sendGraphicMessage(
+    "PH_GRAPHIC_FETCH",
+    { path, method: "POST", body: body ?? null },
+    timeoutMs,
+  );
   return response.data;
 }

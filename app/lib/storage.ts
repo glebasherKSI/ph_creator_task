@@ -206,3 +206,28 @@ export async function deleteDomainCanvasTemplate(
   await saveCanvasTemplatesStore(store);
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Проект Promo Graphic, выбранный для домена в «Отправить в пакет»
+// ---------------------------------------------------------------------------
+
+async function loadGraphicProjectsByDomain(): Promise<Record<string, string>> {
+  const stored = await browser.storage.local.get(STORAGE_KEYS.GRAPHIC_PROJECT_BY_DOMAIN);
+  const value = stored[STORAGE_KEYS.GRAPHIC_PROJECT_BY_DOMAIN];
+  return isRecord(value) ? (value as Record<string, string>) : {};
+}
+
+export async function getGraphicProjectForDomain(domain: string): Promise<string> {
+  const map = await loadGraphicProjectsByDomain();
+  return typeof map[domain] === "string" ? map[domain] : "";
+}
+
+export async function setGraphicProjectForDomain(
+  domain: string,
+  projectCode: string,
+): Promise<void> {
+  if (!domain) return;
+  const map = await loadGraphicProjectsByDomain();
+  map[domain] = projectCode;
+  await browser.storage.local.set({ [STORAGE_KEYS.GRAPHIC_PROJECT_BY_DOMAIN]: map });
+}

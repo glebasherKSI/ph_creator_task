@@ -10,6 +10,7 @@ import {
   Copy,
   FolderOutput,
   LayoutGrid,
+  PackagePlus,
   Pencil,
   Trash2,
   X,
@@ -20,13 +21,14 @@ import { createPortal } from "react-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCardDateTime } from "@/lib/format";
-import { isSequenceType } from "@/lib/tasks";
+import { isSequenceType, parseBonusPointsFromGroupId } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
 
 import type { CanvasTask } from "./graph";
 import { measuredHeights } from "./layout";
 import { type CatalogTask, HEADER_COLORS, useChainsStore } from "./store";
 import { useTaskSheet } from "./TaskSheet";
+import { useSendToPackageDialog } from "./SendToPackageDialog";
 import { useCopyToProjectDialog } from "./TemplatesDialogs";
 
 export type TaskNodeData = {
@@ -34,6 +36,9 @@ export type TaskNodeData = {
   meta: CatalogTask | null;
   incoming: string[];
   outgoing: string[];
+  /** Связи с задачами, которых нет на канве (в conditions они есть). */
+  offIncoming: string[];
+  offOutgoing: string[];
   dirty: boolean;
 };
 
@@ -124,17 +129,6 @@ export function removeTasksWithConfirm(ids: string[]) {
   if (ids.length > 1) store.setStatus(`Убрано с канвы: ${ids.length}`);
 }
 
-/** Последнее число в main_bonus_group_id («…:Награда 5») — как parseBonusPointsFromGroupId в legacy. */
-export function parseBonusPointsFromGroupId(groupId: unknown): number | null {
-  if (!groupId || typeof groupId !== "string") return null;
-  const parts = groupId.split(":");
-  const namePart = (parts.length >= 2 ? parts[1]! : groupId).trim();
-  const match = namePart.match(/(\d+)\s*$/);
-  if (!match) return null;
-  const points = Number(match[1]);
-  return Number.isFinite(points) ? points : null;
-}
-
 function str(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
 }
@@ -167,8 +161,21 @@ function DepChip({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Связь с задачей вне канвы: пунктирная рамка, название — в подсказке. */
+function OffCanvasChip({ id, children }: { id: string; children: React.ReactNode }) {
+  const name = useChainsStore((s) => s.catalog[id]?.name);
+  return (
+    <span
+      title={`#${id}${name ? ` · ${name}` : ""} — не на канве`}
+      className="rounded-chip border border-dashed border-muted-foreground/50 px-1.5 py-px font-mono text-caption text-muted-foreground"
+    >
+      {children}
+    </span>
+  );
+}
+
 const MENU_W = 224;
-const MENU_H = 236;
+const MENU_H = 268;
 
 function ContextMenu({
   x,
@@ -236,6 +243,14 @@ function ContextMenu({
         >
           <LayoutGrid className="size-4 text-muted-foreground" /> Выровнять выбранные
         </button>
+        <button
+          type="button"
+          role="menuitem"
+          className={item}
+          onClick={run(() => useSendToPackageDialog.getState().show(group))}
+        >
+          <PackagePlus className="size-4 text-muted-foreground" /> Отправить в пакет…
+        </button>
 
         <div className="my-1 border-t border-border" />
         <div className="px-2 pt-1 pb-0.5 text-caption text-muted-foreground">Цвет шапки</div>
@@ -292,6 +307,16 @@ function ContextMenu({
       >
         <FolderOutput className="size-4 text-muted-foreground" /> Копировать в проект…
       </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={cn(item, "disabled:cursor-not-allowed disabled:opacity-50")}
+        disabled={task.localOnly === true}
+        title={task.localOnly ? "Черновик ещё не создан на бэке" : undefined}
+        onClick={run(() => useSendToPackageDialog.getState().show([task.id]))}
+      >
+        <PackagePlus className="size-4 text-muted-foreground" /> Отправить в пакет…
+      </button>
 
       <div className="my-1 border-t border-border" />
       <div className="px-2 pt-1 pb-0.5 text-caption text-muted-foreground">Цвет шапки</div>
@@ -315,7 +340,9 @@ function ContextMenu({
 }
 
 export const TaskNode = memo(function TaskNode({ data, selected }: NodeProps<TaskFlowNode>) {
-  const { task, meta, incoming, outgoing, dirty } = data;
+  const { task, meta, incoming, outgoing, offIncoming, offOutgoing, dirty } = data;
+  const hasIn = incoming.length + offIncoming.length > 0;
+  const hasOut = outgoing.length + offOutgoing.length > 0;
   const [menu, setMenu] = useState<{ x: number; y: number; group: string[] | null } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
 
@@ -465,25 +492,40 @@ export const TaskNode = memo(function TaskNode({ data, selected }: NodeProps<Tas
       <div className="flex flex-col gap-1.5 px-3 py-2.5 text-caption">
         {loadingDeps ? (
           <span className="text-muted-foreground">Загрузка условий…</span>
-        ) : !incoming.length && !outgoing.length ? (
+        ) : !hasIn && !hasOut ? (
           <span className="text-muted-foreground">Нет входящих связей</span>
         ) : (
           <>
-            {incoming.length ? (
+            {hasIn ? (
               <div className="flex flex-wrap items-center gap-1">
                 <span className="text-muted-foreground">Зависит от:</span>
                 {incoming.map((id) => (
                   <DepChip key={id}>← #{id}</DepChip>
                 ))}
+                {offIncoming.map((id) => (
+                  <OffCanvasChip key={id} id={id}>
+                    ← #{id}
+                  </OffCanvasChip>
+                ))}
               </div>
             ) : null}
-            {outgoing.length ? (
+            {hasOut ? (
               <div className="flex flex-wrap items-center gap-1">
                 <span className="text-muted-foreground">Требуется для:</span>
                 {outgoing.map((id) => (
                   <DepChip key={id}>→ #{id}</DepChip>
                 ))}
+                {offOutgoing.map((id) => (
+                  <OffCanvasChip key={id} id={id}>
+                    → #{id}
+                  </OffCanvasChip>
+                ))}
               </div>
+            ) : null}
+            {offIncoming.length || offOutgoing.length ? (
+              <span className="text-muted-foreground/80">
+                Пунктир — задача не на канве, связь сохраняется
+              </span>
             ) : null}
           </>
         )}

@@ -21,6 +21,7 @@ import {
   removeEdge,
   removeTasks,
   savableDirtyTargets,
+  conditionSources,
   setTargetConfig,
   withReferencingTasks,
 } from "./graph";
@@ -115,6 +116,11 @@ export interface ChainsStore extends GraphState {
   /** Сохранённые позиции из storage (ключ — id задачи). */
   savedPositions: Record<string, CanvasPosition>;
   saving: boolean;
+  /**
+   * Убранные с канвы задачи → их gamification_tasks. Нужна, чтобы карточка оставшейся задачи
+   * показывала «требуется для #N (не на канве)»: conditions убранной на канве больше нет.
+   */
+  detachedDeps: Record<string, string[]>;
   saveLog: SaveLogEntry[];
   selectedTaskId: string | null;
   /** Все выделенные карточки (рамка, Shift+клик); selectedTaskId — последняя из них. */
@@ -165,6 +171,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
   addProgress: null,
   savedPositions: {},
   saving: false,
+  detachedDeps: {},
   saveLog: [],
   selectedTaskId: null,
   selectedIds: [],
@@ -193,6 +200,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
       catalogHidden: 0,
       catalogError: "",
       savedPositions: layout.positions ?? {},
+      detachedDeps: {},
       saveLog: [],
       selectedTaskId: null,
       selectedIds: [],
@@ -339,7 +347,12 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
         };
       }
       const next = { ...s, canvas };
-      return importGraphFromConditions(next, withReferencingTasks(next, added));
+      const detachedDeps = { ...s.detachedDeps };
+      for (const id of added) delete detachedDeps[id];
+      return {
+        ...importGraphFromConditions(next, withReferencingTasks(next, added)),
+        detachedDeps,
+      };
     });
 
     // Без сохранённой позиции — раскладываем новые карточки, остальные не трогаем.
@@ -355,8 +368,14 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
     set((s) => {
       const next = removeTasks(s, ids);
       const gone = new Set(ids);
+      const detachedDeps = { ...s.detachedDeps };
+      for (const id of ids) {
+        const sources = conditionSources(s.canvas[id]);
+        if (sources.length) detachedDeps[id] = sources;
+      }
       return {
         ...next,
+        detachedDeps,
         selectedTaskId: s.selectedTaskId && gone.has(s.selectedTaskId) ? null : s.selectedTaskId,
         selectedIds: s.selectedIds.filter((id) => !gone.has(id)),
         selectedEdge:

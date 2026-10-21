@@ -1,6 +1,6 @@
 /** Каталог задач домена: поиск, фильтр статуса, отметка и добавление на канву. */
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Check, Crosshair, Loader2, Search } from "lucide-react";
+import { Check, Crosshair, Loader2, PackagePlus, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -13,6 +13,7 @@ import { typeLabel } from "@/lib/labels-ru";
 import { isSequenceType } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
 
+import { useSendToPackageDialog } from "./SendToPackageDialog";
 import { type CatalogProgress, type CatalogTask, useChainsStore } from "./store";
 
 type StatusFilter = "all" | "active" | "draft";
@@ -391,10 +392,27 @@ export function CatalogSidebar({
           Загрузить ещё задачи
         </Button>
       ) : null}
-      <Button variant="primary" disabled={!toAdd.length || adding} onClick={() => void add()}>
-        {adding ? <Loader2 className="animate-spin" /> : null}
-        Добавить выбранные на канву{toAdd.length ? ` (${toAdd.length})` : ""}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          variant="primary"
+          className="flex-1"
+          disabled={!toAdd.length || adding}
+          onClick={() => void add()}
+        >
+          {adding ? <Loader2 className="animate-spin" /> : null}
+          Добавить выбранные на канву{toAdd.length ? ` (${toAdd.length})` : ""}
+        </Button>
+        <Button
+          variant="secondary"
+          size="icon"
+          disabled={!toAdd.length}
+          aria-label="Отправить выбранные в пакет Promo Graphic"
+          title="Отправить выбранные в пакет Promo Graphic"
+          onClick={() => useSendToPackageDialog.getState().show(toAdd)}
+        >
+          <PackagePlus />
+        </Button>
+      </div>
     </aside>
   );
 }

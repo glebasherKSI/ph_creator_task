@@ -6,8 +6,11 @@ import {
   coerceActionConditions,
   coerceActionRequirements,
   getAllRequirementFieldKeys,
+  getFieldRoleForAction,
+  getRequirementFieldDef,
   splitActionFieldsForApi,
 } from "./actions-schema";
+import { getGamificationTasksCondition, parseBonusPointsFromGroupId } from "./tasks";
 import type { Condition, TaskAction, TaskLike } from "./types";
 
 /** Задача из API планировщика. Поля известны частично; остальное — в бриф. */
@@ -75,6 +78,8 @@ function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+const COMPARISON_TEXT = /^(>=|<=|==|=|>|<)\s*(-?\d+(?:[.,]\d+)?)$/;
+
 function coerceRowValue(value: unknown): unknown {
   if (Array.isArray(value)) return value;
   if (typeof value === "number" || typeof value === "boolean") return value;
@@ -83,6 +88,9 @@ function coerceRowValue(value: unknown): unknown {
   if (text === "true") return true;
   if (text === "false") return false;
   if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+  // «>= 1.5» пишет mapPhTaskToPlannerImport — так сравнение переживает поездку через график.
+  const comparison = COMPARISON_TEXT.exec(text);
+  if (comparison) return { operator: comparison[1], value: comparison[2]!.replace(",", ".") };
   if (text.includes(",")) {
     return text
       .split(",")
@@ -99,7 +107,11 @@ function rowsToObject(rows: unknown): Record<string, unknown> {
     if (!row || typeof row !== "object") continue;
     const key = String((row as { key?: unknown }).key || "").trim();
     if (!key) continue;
-    out[key] = coerceRowValue((row as { value?: unknown }).value);
+    const value = coerceRowValue((row as { value?: unknown }).value);
+    // Список из одного значения строка не отличит от скаляра — тип берём из схемы поля.
+    const widget = getRequirementFieldDef(key)?.widget;
+    const isList = widget === "multi_text" || widget === "multi_select";
+    out[key] = isList && value !== "" && !Array.isArray(value) ? [String(value)] : value;
   }
   return out;
 }
@@ -646,5 +658,201 @@ export function mapPlannerTaskToDraft(task: unknown, context: PlannerContext = {
     filter_id: null,
     tag_id: null,
     ...brief,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Обратно: задача PromoHub → задание пакета графика (POST /packages/{id}/import)
+// ---------------------------------------------------------------------------
+
+const PH_PRIORITY_TO_PLANNER: Record<number, string> = Object.fromEntries(
+  Object.entries(PLANNER_PRIORITY_TO_PH).map(([key, value]) => [value, key]),
+);
+
+/** Цвет шапки карточки на канве → CSS-цвет полоски задания в графике. */
+export const HEADER_COLOR_HEX: Record<string, string> = {
+  green: "#22c55e",
+  orange: "#f97316",
+  purple: "#8b5cf6",
+  red: "#ef4444",
+  teal: "#14b8a6",
+  gray: "#6b7280",
+  pink: "#ec4899",
+  amber: "#f59e0b",
+};
+
+/** Строка действия графика: `{ key, value }`, значение — текст. */
+interface PlannerFieldRow {
+  key: string;
+  value: string;
+}
+
+interface PlannerAction {
+  action: string;
+  conditions: PlannerFieldRow[];
+  attributes: PlannerFieldRow[];
+}
+
+/** Задание для импорта: поля TaskBase графика + ключ и связи на стороне PromoHub. */
+export interface PlannerImportItem {
+  ph_backend_id: string;
+  prerequisite_ph_ids: string[];
+  ph_snapshot: TaskLike;
+  frontend_identifier: string;
+  name_backend: string;
+  name_frontend: Record<string, string>;
+  task_type?: string;
+  priority?: string;
+  hidden: boolean;
+  player_consent_required: boolean;
+  cron: string | null;
+  color?: string;
+  countries: string[];
+  category: string | null;
+  tag: string | null;
+  events: string[];
+  notifications: string[];
+  reward_points: number | null;
+  secondary_reward_points: number | null;
+  time_availability: {
+    available_from: string | null;
+    available_till: string | null;
+    max_repetitions: number | null;
+    duration_minutes: number | null;
+    infinite: boolean;
+  };
+  targeting: { groups: string[]; extra: string };
+  main_actions: PlannerAction[];
+  secondary_actions: PlannerAction[];
+}
+
+/** Элемент списка: игры и категории приходят объектами — график, как и форма, хранит их id. */
+function listItemText(item: unknown): string {
+  const obj = asObject(item);
+  const id = obj.id ?? obj.value ?? obj.game_id ?? obj.name;
+  return String(Object.keys(obj).length ? (id ?? "") : (item ?? "")).trim();
+}
+
+/**
+ * Значение поля действия → текст строки графика. Сравнение — «>= 1.5» (его разбирает
+ * coerceRowValue), прочие объекты — JSON: в графике видно, что там было.
+ */
+function rowValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map(listItemText).filter(Boolean).join(", ");
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if (obj.operator != null && obj.value != null && !Array.isArray(obj.value)) {
+      return `${String(obj.operator).trim()} ${String(obj.value).trim()}`;
+    }
+    return JSON.stringify(value);
+  }
+  return value == null ? "" : String(value);
+}
+
+function toPlannerAction(item: TaskAction): PlannerAction | null {
+  const action = String(item?.action ?? "").trim();
+  if (!action) return null;
+  const out: PlannerAction = { action, conditions: [], attributes: [] };
+  const fields = { ...asObject(item.requirements), ...asObject(item.conditions) };
+  for (const [key, value] of Object.entries(fields)) {
+    const row = { key, value: rowValue(value) };
+    if (!row.value) continue;
+    if (getFieldRoleForAction(action, key) === "attribute") out.attributes.push(row);
+    else out.conditions.push(row);
+  }
+  return out;
+}
+
+function toPlannerActions(items: unknown): PlannerAction[] {
+  return asArray(items)
+    .map((item) => toPlannerAction(item as TaskAction))
+    .filter((item): item is PlannerAction => item !== null);
+}
+
+const DEFAULT_FLAG_KEYS: ReadonlySet<string> = new Set(
+  DEFAULT_DRAFT_CONDITION_FLAGS.map(([key]) => key),
+);
+
+/**
+ * Таргетинг PromoHub → поля графика. Включённые группы ложатся в groups, остальное,
+ * кроме связей и выключенных флагов по умолчанию, — текстом в extra.
+ */
+function toPlannerTargeting(task: TaskLike): { groups: string[]; extra: string } {
+  const groups: string[] = [];
+  const extra: string[] = [];
+  for (const entry of asArray(task.conditions)) {
+    for (const [key, value] of Object.entries(asObject(entry))) {
+      if (key === "gamification_tasks") continue;
+      if (DEFAULT_FLAG_KEYS.has(key) && value === false) continue;
+      const block = asObject(value);
+      if (key === "groups" && block.type !== "disabled" && Array.isArray(block.list)) {
+        groups.push(...block.list.map(String));
+        continue;
+      }
+      extra.push(`${key}: ${JSON.stringify(value)}`);
+    }
+  }
+  if (asArray(task.countries_lists).length) {
+    extra.push(`countries_lists: ${JSON.stringify(task.countries_lists)}`);
+  }
+  return { groups, extra: extra.join("\n") };
+}
+
+function textOrNull(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
+function intOrNull(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? Math.trunc(num) : null;
+}
+
+/** Задача PromoHub → задание графика. headerColor — цвет карточки на канве. */
+export function mapPhTaskToPlannerImport(
+  task: TaskLike,
+  options: { headerColor?: string } = {},
+): PlannerImportItem {
+  const type = String(task.type ?? "").trim();
+  const priority = PH_PRIORITY_TO_PLANNER[Number(task.priority)];
+  const infinite = Boolean(task.infinite);
+  const color = options.headerColor ? HEADER_COLOR_HEX[options.headerColor] : undefined;
+  const tag = asObject(task.tag);
+  const links = getGamificationTasksCondition(task.conditions);
+
+  return {
+    ph_backend_id: String(task.id ?? "").trim(),
+    prerequisite_ph_ids: links && links.type !== "disabled" ? asArray(links.list).map(String) : [],
+    // Служебные _planner*-поля карточки с канвы в снимок не нужны — только сама задача ПХ.
+    ph_snapshot: Object.fromEntries(
+      Object.entries(clonePlain(task)).filter(([key]) => !key.startsWith("_")),
+    ),
+    frontend_identifier: String(task.frontend_identifier ?? "").trim(),
+    name_backend: String(task.name ?? "").trim(),
+    name_frontend: mapLocales(task.locales),
+    ...(TASK_TYPES.has(type) ? { task_type: type } : {}),
+    ...(priority ? { priority } : {}),
+    hidden: Boolean(task.hidden),
+    player_consent_required: Boolean(task.player_consent_required),
+    cron: textOrNull(task.cron),
+    ...(color ? { color } : {}),
+    countries: asArray(task.countries).map(String).filter(Boolean),
+    category: textOrNull(task.category),
+    tag: textOrNull(tag.name),
+    events: asArray(task.events).map(String).filter(Boolean),
+    notifications: asArray(task.notification_events).map(String).filter(Boolean),
+    reward_points: parseBonusPointsFromGroupId(task.main_bonus_group_id),
+    secondary_reward_points: parseBonusPointsFromGroupId(task.secondary_bonus_group_id),
+    time_availability: {
+      available_from: textOrNull(task.available_from),
+      available_till: textOrNull(task.available_till),
+      max_repetitions: intOrNull(task.max_repetitions),
+      duration_minutes: infinite ? null : intOrNull(task.duration),
+      infinite,
+    },
+    targeting: toPlannerTargeting(task),
+    main_actions: toPlannerActions(task.serialized_main_actions),
+    secondary_actions: toPlannerActions(task.serialized_secondary_actions),
   };
 }

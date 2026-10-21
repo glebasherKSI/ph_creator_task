@@ -9,6 +9,7 @@ export const STORAGE_KEYS = {
   CANVAS_TEMPLATES: "ph_canvas_templates",
   GRAPHIC_AUTH: "ph_graphic_auth",
   GRAPHIC_BASE_URL: "ph_graphic_base_url",
+  GRAPHIC_PROJECT_BY_DOMAIN: "ph_graphic_project_by_domain",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

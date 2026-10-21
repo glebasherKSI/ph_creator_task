@@ -4,6 +4,7 @@ import {
   buildPlannerBriefOverlay,
   getPlannerPhBackendId,
   getPlannerPrerequisiteId,
+  mapPhTaskToPlannerImport,
   mapPlannerTaskToDraft,
   mergeBackendTaskWithPlannerBrief,
   mergeDefaultDraftConditions,
@@ -16,6 +17,7 @@ import * as legacyTasks from "legacy/tasks.js";
 
 import { withoutV3Keys } from "../helpers";
 import taskInteractive from "../fixtures/har/task-interactive-1454.json";
+import taskWithLinks from "../fixtures/har/task-with-gamification-tasks-1366.json";
 
 /** Задача планировщика в формате Graphic API (строки-поля действий, таргетинг, время). */
 const PLANNER_TASK = {
@@ -182,5 +184,115 @@ describe("graphic-task-map — содержимое", () => {
   it("type: sequence из графика сохраняется", () => {
     expect(mapPlannerTaskToDraft({ task_type: "Sequence" }).type).toBe("sequence");
     expect(mapPlannerTaskToDraft({ task_type: "weird" }).type).toBe("interactive");
+  });
+});
+
+describe("mapPhTaskToPlannerImport", () => {
+  const task = taskWithLinks as unknown as Record<string, unknown>;
+
+  it("переносит поля задачи ПХ в поля задания графика", () => {
+    const item = mapPhTaskToPlannerImport(task, { headerColor: "teal" });
+    expect(item).toMatchObject({
+      ph_backend_id: "1366",
+      prerequisite_ph_ids: ["1365", "1314"],
+      frontend_identifier: "Default_sport_task8",
+      name_backend: "Экспресс-вечеринка SEASON 7_v2",
+      task_type: "interactive",
+      priority: "low",
+      player_consent_required: true,
+      cron: "0 0 1 * *",
+      color: "#14b8a6",
+      countries: ["all"],
+      category: "basic",
+      tag: "gamification_s7",
+      events: ["scheduler", "task_completed"],
+      notifications: ["main_bonus_issue", "start"],
+      reward_points: 20,
+      secondary_reward_points: null,
+      time_availability: {
+        available_from: "2026-09-30T23:59:00.000Z",
+        available_till: "2026-10-31T23:59:00.000Z",
+        max_repetitions: 1,
+        duration_minutes: 44640,
+        infinite: false,
+      },
+      targeting: { groups: ["2396"], extra: "" },
+    });
+    expect(item.name_frontend.ru).toBe("Экспресс-вечеринка");
+    expect(item.ph_snapshot).toEqual(task);
+    expect(item.ph_snapshot).not.toBe(task);
+  });
+
+  it("действия: сравнения строкой, списки через запятую", () => {
+    const [action] = mapPhTaskToPlannerImport(task).main_actions;
+    const rows = [...action!.conditions, ...action!.attributes];
+    expect(action!.action).toBe("sport_bet");
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { key: "sport_bets_count", value: "3" },
+        { key: "odd", value: ">= 1.5" },
+        { key: "sport_bet_types", value: "express" },
+      ]),
+    );
+  });
+
+  it("туда и обратно: действия восстанавливаются в формат ПХ", () => {
+    const draft = mapPlannerTaskToDraft(mapPhTaskToPlannerImport(task));
+    expect(draft.serialized_main_actions).toEqual([
+      {
+        action: "sport_bet",
+        requirements: { sport_bets_count: 3, sport_bet_points_sum: 3000 },
+        conditions: {
+          odd: { operator: ">=", value: "1.5" },
+          min_bet_amount: 1000,
+          sport_bet_types: ["express"],
+        },
+      },
+    ]);
+  });
+
+  it("прочий таргетинг уходит текстом в extra, флаги по умолчанию — нет", () => {
+    const item = mapPhTaskToPlannerImport({
+      id: 1,
+      conditions: [
+        { fraud: false },
+        { no_bonus: true },
+        { groups: { list: ["5"], type: "disabled", extra_type: "or" } },
+        { gamification_tasks: { list: ["9"], type: "disabled", extra_type: "or" } },
+      ],
+    });
+    expect(item.targeting).toEqual({
+      groups: [],
+      extra: 'no_bonus: true\ngroups: {"list":["5"],"type":"disabled","extra_type":"or"}',
+    });
+    expect(item.prerequisite_ph_ids).toEqual([]);
+  });
+
+  it("бессрочная задача без длительности; неизвестные тип и приоритет не отправляются", () => {
+    const item = mapPhTaskToPlannerImport({
+      id: 2,
+      type: "lottery",
+      priority: 9,
+      infinite: true,
+      duration: 60,
+    });
+    expect(item.time_availability.duration_minutes).toBeNull();
+    expect(item.time_availability.infinite).toBe(true);
+    expect(item).not.toHaveProperty("task_type");
+    expect(item).not.toHaveProperty("priority");
+    expect(item).not.toHaveProperty("color");
+  });
+
+  it("списки объектов (игры) сводятся к id", () => {
+    const [action] = mapPhTaskToPlannerImport({
+      id: 3,
+      serialized_main_actions: [
+        { action: "bet", conditions: { games: [{ id: 7, name: "Book" }, { id: 8 }] } },
+      ],
+    }).main_actions;
+    expect([...action!.conditions, ...action!.attributes]).toContainEqual({
+      key: "games",
+      value: "7, 8",
+    });
   });
 });

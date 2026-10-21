@@ -137,3 +137,26 @@ it("addToCanvas: связи от новой задачи к уже добавл�
   expect(edges).toEqual(["1->2", "1->3"]);
   expect(useChainsStore.getState().dirtyTargets).toEqual([]);
 });
+
+it("removeFromCanvas: связи не теряются, убранная задача помнится как «не на канве»", async () => {
+  fetchTasksPage.mockResolvedValueOnce(page([1, 2], false));
+  await useChainsStore.getState().loadCatalog(true);
+  fetchTask.mockImplementation(async (_d: string, id: string) => ({
+    ...task(Number(id)),
+    conditions:
+      id === "2" ? [{ gamification_tasks: { type: "enabled", extra_type: "or", list: [1] } }] : [],
+  }));
+  await useChainsStore.getState().addToCanvas(["1", "2"]);
+  expect(useChainsStore.getState().edges).toHaveLength(1);
+
+  useChainsStore.getState().removeFromCanvas(["2"]);
+  let s = useChainsStore.getState();
+  expect(s.dirtyTargets).toEqual([]);
+  expect(s.detachedDeps).toEqual({ "2": ["1"] });
+
+  useChainsStore.getState().removeFromCanvas(["1"]);
+  await useChainsStore.getState().addToCanvas(["2"]);
+  s = useChainsStore.getState();
+  expect(s.dirtyTargets).toEqual([]);
+  expect(s.detachedDeps).toEqual({});
+});

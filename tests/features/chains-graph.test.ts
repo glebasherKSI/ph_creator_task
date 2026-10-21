@@ -5,6 +5,7 @@ import {
   EMPTY_GRAPH,
   addEdge,
   buildGtValueForTarget,
+  conditionSources,
   conditionsForSave,
   importGraphFromConditions,
   mergeGamificationTasks,
@@ -134,12 +135,26 @@ describe("chains graph — рёбра ↔ conditions", () => {
     expect(savableDirtyTargets(state)).toEqual(["2"]);
   });
 
-  it("removeTasks: цели потерянных рёбер становятся грязными", () => {
+  it("removeTasks: задача уходит с канвы, conditions остальных не меняются", () => {
     let state = addEdge(graph(["1", "2", "3"]), "1", "2");
     state = { ...state, dirtyTargets: [] };
+    const before = state.canvas["2"]!.conditions;
     const next = removeTasks(state, ["1"]);
     expect(next.canvas["1"]).toBeUndefined();
     expect(next.edges).toEqual([]);
+    expect(next.dirtyTargets).toEqual([]);
+    expect(next.canvas["2"]!.conditions).toBe(before);
+    expect(conditionSources(next.canvas["2"])).toEqual(["1"]);
+    // При сохранении связь с задачей вне канвы остаётся.
+    expect(buildGtValueForTarget(next, "2").list).toEqual(["1"]);
+  });
+
+  it("importGraphFromConditions: у dirty-задачи связь с вернувшейся задачей дорисовывается", () => {
+    let state = addEdge(graph(["1", "2"]), "1", "2"); // 2 — dirty
+    state = removeTasks(state, ["1"]);
+    state = { ...state, canvas: { ...state.canvas, "1": graph(["1"]).canvas["1"]! } };
+    const next = importGraphFromConditions(state, ["1", "2"]);
+    expect(next.edges).toEqual([{ from: "1", to: "2" }]);
     expect(next.dirtyTargets).toEqual(["2"]);
   });
 

@@ -156,7 +156,14 @@ export function importGraphFromConditions(
   for (const task of Object.values(state.canvas)) {
     const targetId = task.id;
     if (onlySet && !onlySet.has(targetId)) continue;
-    if (onlySet && state.dirtyTargets.includes(targetId)) continue;
+    if (onlySet && state.dirtyTargets.includes(targetId)) {
+      // Локальные правки не перетираем, но связи с вернувшимися на канву задачами — дорисовываем.
+      for (const from of conditionSources(task)) {
+        if (state.canvas[from] && !edges.some((e) => e.from === from && e.to === targetId))
+          edges.push({ from, to: targetId });
+      }
+      continue;
+    }
     if (onlySet) {
       edges = edges.filter((e) => e.to !== targetId || isLocalCanvasId(state, e.from));
       delete targetConfigs[targetId];
@@ -238,30 +245,30 @@ export function setTargetConfig(
 }
 
 /** Убирает задачи с канвы вместе с их рёбрами; цели потерянных рёбер становятся грязными. */
+/**
+ * Убрать задачи с канвы. Это только вид: conditions оставшихся задач не меняются
+ * (связь с убранной остаётся в gamification_tasks и показывается в карточке как «не на канве»).
+ */
 export function removeTasks(state: GraphState, ids: string[]): GraphState {
   const gone = new Set(ids);
   const canvas = { ...state.canvas };
   for (const id of gone) delete canvas[id];
   const targetConfigs = { ...state.targetConfigs };
   for (const id of gone) delete targetConfigs[id];
-  const affected = new Set<string>();
-  const edges = state.edges.filter((e) => {
-    const keep = !gone.has(e.from) && !gone.has(e.to);
-    if (!keep && gone.has(e.from) && !gone.has(e.to)) affected.add(e.to);
-    return keep;
-  });
-  let next: GraphState = {
+  return {
     ...state,
     canvas,
-    edges,
+    edges: state.edges.filter((e) => !gone.has(e.from) && !gone.has(e.to)),
     targetConfigs,
     dirtyTargets: state.dirtyTargets.filter((id) => !gone.has(id)),
   };
-  for (const to of affected) {
-    next = markDirty(next, to);
-    next = syncConditionsFromEdges(next, to);
-  }
-  return next;
+}
+
+/** Id задач из gamification_tasks задачи (без самой задачи). */
+export function conditionSources(task: CanvasTask | undefined): string[] {
+  const gt = getGamificationTasksCondition(task?.conditions);
+  if (!Array.isArray(gt?.list)) return [];
+  return [...new Set(gt.list.map(String))].filter((id) => id !== task!.id);
 }
 
 /** Локальный черновик создан на бэке: переносим рёбра, настройки и выделение на реальный id. */

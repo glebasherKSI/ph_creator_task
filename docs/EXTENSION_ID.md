@@ -39,3 +39,4 @@ ID: ebpabdcmngdgiallonghpgddgcedebka
 | `ph_chains_layout_<domain>`                                     | позиции карточек на канве     |
 | `ph_captured_requests`, `ph_capture_enabled`, `ph_max_requests` | перехват запросов             |
 | `ph_graphic_auth`, `ph_graphic_base_url`                        | авторизация Graphic API       |
+| `ph_graphic_project_by_domain`                                  | проект Graphic для домена     |

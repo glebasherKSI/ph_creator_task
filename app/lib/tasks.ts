@@ -365,4 +365,15 @@ export function normalizeGamificationTasksCondition(
   };
 }
 
+/** Последнее число в main_bonus_group_id («…:Награда 5») — как parseBonusPointsFromGroupId в legacy. */
+export function parseBonusPointsFromGroupId(groupId: unknown): number | null {
+  if (!groupId || typeof groupId !== "string") return null;
+  const parts = groupId.split(":");
+  const namePart = (parts.length >= 2 ? parts[1]! : groupId).trim();
+  const match = namePart.match(/(\d+)\s*$/);
+  if (!match) return null;
+  const points = Number(match[1]);
+  return Number.isFinite(points) ? points : null;
+}
+
 export { CREATE_TASK_KEYS, STRIP_FROM_CREATE, VISIBLE_TASK_STATES };

@@ -1,12 +1,13 @@
-/** Группа «Выделение»: выбрать все / снять / цвет / выровнять / убрать (рамка — Shift + drag). */
+/** Группа «Выделение»: выбрать все / снять / цвет / выровнять / в пакет / убрать (рамка — Shift + drag). */
 import { useReactFlow } from "@xyflow/react";
-import { BoxSelect, LayoutGrid, Palette, Trash2, X } from "lucide-react";
+import { BoxSelect, LayoutGrid, PackagePlus, Palette, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { measuredHeights } from "./layout";
+import { useSendToPackageDialog } from "./SendToPackageDialog";
 import { useChainsStore } from "./store";
 import { HeaderColorPalette, commonHeaderColor, removeTasksWithConfirm } from "./TaskNode";
 
@@ -80,6 +81,14 @@ export function SelectionToolbar() {
         title="Разложить выбранные карточки по рядам на их месте, остальные не трогать"
       >
         <LayoutGrid /> Выровнять
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => useSendToPackageDialog.getState().show(ids)}
+        title="Отправить выбранные задачи в пакет Promo Graphic"
+      >
+        <PackagePlus /> В пакет
       </Button>
       <Button
         variant="ghost"
