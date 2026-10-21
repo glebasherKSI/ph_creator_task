@@ -17,8 +17,8 @@ import { useDomains } from "@/features/popup/useDomains";
 import { useGraphic } from "@/features/popup/useGraphic";
 import { useReports } from "@/features/popup/useReports";
 
-/** Страница конструктора появится на этапе 7; до тех пор кнопка ведёт на витрину. */
-const CONSTRUCTOR_PAGE = "/showcase.html";
+/** Страница конструктора связей (канва React Flow). */
+const CONSTRUCTOR_PAGE = "/chains.html";
 const TAB_KEY = "ph_popup_tab";
 
 function readLastTab(): PopupTab {

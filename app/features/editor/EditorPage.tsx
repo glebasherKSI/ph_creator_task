@@ -23,8 +23,8 @@ import { useTaskList } from "./useTaskList";
 
 type MainView = "editor" | "stats";
 
-/** Страница канвы появится на этапе 7. */
-const CHAINS_PAGE = "/showcase.html";
+/** Страница канвы (конструктор связей). */
+const CHAINS_PAGE = "/chains.html";
 
 export function EditorPage() {
   const { domains, domain, setDomain, loaded } = useDomainList();
