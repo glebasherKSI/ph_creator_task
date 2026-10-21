@@ -202,6 +202,42 @@
   }
 }
 
+/* Полосы прокрутки в стиле темы: тонкие, без стрелок, ползунок проявляется при наведении. */
+/* Стандартные свойства — только там, где нет ::-webkit-scrollbar (Firefox):
+ * в Chrome они отключают webkit-стили и возвращают системную полосу со стрелками. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--muted-foreground) 35%, transparent) transparent;
+  }
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--muted-foreground) 30%, transparent);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+}
+
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-corner {
+  display: none;
+  background: transparent;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

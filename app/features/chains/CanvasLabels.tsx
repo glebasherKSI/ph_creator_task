@@ -72,10 +72,9 @@ export const LabelNode = memo(function LabelNode({ data, selected }: NodeProps<L
       <Tag className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
       {draft != null ? (
         <input
-          ref={(el) => {
-            el?.focus();
-            el?.select();
-          }}
+          // Фокус и выделение — один раз при открытии (callback-ref в разметке срабатывал на каждый ввод).
+          autoFocus
+          onFocus={(e) => e.currentTarget.select()}
           type="text"
           value={draft}
           maxLength={LABEL_MAX_LENGTH}
