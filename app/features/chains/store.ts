@@ -24,7 +24,13 @@ import {
   setTargetConfig,
   withReferencingTasks,
 } from "./graph";
-import { GRID_START_X, GRID_START_Y, type LayoutOptions, layoutCanvasTasks } from "./layout";
+import {
+  GRID_START_X,
+  GRID_START_Y,
+  type LayoutOptions,
+  layoutCanvasTasks,
+  layoutSelection,
+} from "./layout";
 
 /** Размер страницы каталога и предохранитель от бесконечного цикла (250 × 100 = 25 000 задач). */
 const CATALOG_PAGE_SIZE = 250;
@@ -130,7 +136,10 @@ export interface ChainsStore extends GraphState {
   disconnect: (from: string, to: string) => void;
   updateTargetConfig: (to: string, patch: Partial<GtConfig>) => void;
   autoLayout: (options?: LayoutOptions) => void;
-  setHeaderColor: (id: string, color: string | null) => void;
+  /** Разложить дорожками только эти карточки — на месте их текущего блока. */
+  alignTasks: (ids: string[], heights?: Record<string, number>) => void;
+  /** Цвет шапки одной или нескольких карточек (null — по умолчанию). */
+  setHeaderColor: (ids: string | string[], color: string | null) => void;
   select: (taskId: string | null) => void;
   setSelectedIds: (ids: string[]) => void;
   selectEdge: (edge: { from: string; to: string } | null) => void;
@@ -415,14 +424,30 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
     void get().persistPositions();
   },
 
-  setHeaderColor: (id, color) => {
+  alignTasks: (ids, heights = {}) => {
     set((s) => {
-      const task = s.canvas[id];
-      if (!task) return {};
-      const next: CanvasTask = { ...task };
-      if (color) next.headerColor = color;
-      else delete next.headerColor;
-      return { canvas: { ...s.canvas, [id]: next } };
+      const positions = layoutSelection(s.canvas, s.edges, ids, heights);
+      const canvas = { ...s.canvas };
+      for (const [id, pos] of Object.entries(positions)) {
+        canvas[id] = { ...canvas[id]!, x: pos.x, y: pos.y };
+      }
+      return { canvas };
+    });
+    void get().persistPositions();
+  },
+
+  setHeaderColor: (ids, color) => {
+    set((s) => {
+      const canvas = { ...s.canvas };
+      for (const id of typeof ids === "string" ? [ids] : ids) {
+        const task = canvas[id];
+        if (!task) continue;
+        const next: CanvasTask = { ...task };
+        if (color) next.headerColor = color;
+        else delete next.headerColor;
+        canvas[id] = next;
+      }
+      return { canvas };
     });
     void get().persistPositions();
   },

@@ -259,8 +259,10 @@ export function FlowCanvas() {
       const store = useChainsStore.getState();
       const parsed = parseEdgeId(change.id);
       if (!parsed) continue;
-      if (change.selected) store.selectEdge(parsed);
-      else if (store.selectedEdge?.from === parsed.from && store.selectedEdge?.to === parsed.to)
+      // Связь выбирается только кликом (onEdgeClick): рамка и множественное выделение
+      // помечают и связи между карточками — их пропускаем.
+      if (change.selected) continue;
+      if (store.selectedEdge?.from === parsed.from && store.selectedEdge?.to === parsed.to)
         store.selectEdge(null);
     }
   }, []);

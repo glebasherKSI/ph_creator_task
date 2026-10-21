@@ -38,6 +38,7 @@ import { FlowCanvas } from "./FlowCanvas";
 import { useLabelsStore } from "./labels-store";
 import { PackagesPanel } from "./PackagesPanel";
 import { SelectionToolbar } from "./SelectionToolbar";
+import { measuredHeights } from "./layout";
 import { type CatalogProgress, type SaveLogEntry, useChainsStore } from "./store";
 import { TaskSheet } from "./TaskSheet";
 import { TemplatesDialogs, useLoadTemplateDialog, useSaveTemplateDialog } from "./TemplatesDialogs";
@@ -220,11 +221,7 @@ function ChainsPageInner() {
   function align() {
     const store = useChainsStore.getState();
     // Реальные высоты карточек из React Flow, чтобы колонки не наезжали.
-    const heights: Record<string, number> = {};
-    for (const node of rf.getNodes()) {
-      if (node.measured?.height) heights[node.id] = node.measured.height;
-    }
-    store.autoLayout({ forceAll: true, heights });
+    store.autoLayout({ forceAll: true, heights: measuredHeights(rf.getNodes()) });
     setStatus(`Раскладка пересчитана для ${Object.keys(store.canvas).length} задач`);
     window.setTimeout(() => fit(), 50);
   }

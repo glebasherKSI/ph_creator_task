@@ -20,6 +20,7 @@ import {
   columnX,
   layoutCanvasTasks,
   layoutLanes,
+  layoutSelection,
   GRID_START_Y,
   CARD_MIN_H,
   VERTICAL_GAP,
@@ -231,5 +232,17 @@ describe("chains layout", () => {
     const pos = layoutCanvasTasks(state.canvas, [], { onlyIds: ["2"] });
     expect(pos["1"]).toBeUndefined();
     expect(pos["2"]!.y).toBe(GRID_START_Y + CARD_MIN_H + VERTICAL_GAP);
+  });
+
+  it("layoutSelection: выделенные — дорожкой на месте блока, остальные не двигаются", () => {
+    const state = graph(["1", "2", "3"]);
+    state.canvas["1"]!.x = 500;
+    state.canvas["1"]!.y = 300;
+    state.canvas["2"]!.x = 900;
+    state.canvas["2"]!.y = 700;
+    const pos = layoutSelection(state.canvas, [{ from: "1", to: "2" }], ["1", "2"]);
+    expect(pos["3"]).toBeUndefined();
+    expect(pos["1"]).toEqual({ x: 500, y: 300 });
+    expect(pos["2"]).toEqual({ x: 500 + columnX(1) - columnX(0), y: 300 });
   });
 });

@@ -169,6 +169,35 @@ export function layoutLanes(
   return result;
 }
 
+/**
+ * Раскладка дорожками только `ids` (связи — между ними): блок встаёт на место
+ * левого верхнего угла выделения, остальные карточки не двигаются.
+ */
+export function layoutSelection(
+  canvas: Record<string, CanvasTask>,
+  edges: CanvasEdge[],
+  ids: string[],
+  heights: Record<string, number> = {},
+): Record<string, Position> {
+  const present = ids.filter((id) => canvas[id]);
+  if (!present.length) return {};
+  const lanes = layoutLanes(present, edges, (id) => heights[id] ?? CARD_MIN_H);
+  const dx = Math.min(...present.map((id) => canvas[id]!.x)) - GRID_START_X;
+  const dy = Math.min(...present.map((id) => canvas[id]!.y)) - GRID_START_Y;
+  const result: Record<string, Position> = {};
+  for (const [id, pos] of Object.entries(lanes)) result[id] = { x: pos.x + dx, y: pos.y + dy };
+  return result;
+}
+
+/** Измеренные React Flow высоты карточек (для раскладки без наложений). */
+export function measuredHeights(
+  nodes: ReadonlyArray<{ id: string; measured?: { height?: number } }>,
+): Record<string, number> {
+  const heights: Record<string, number> = {};
+  for (const node of nodes) if (node.measured?.height) heights[node.id] = node.measured.height;
+  return heights;
+}
+
 export interface LayoutOptions {
   /** Переложить все карточки. */
   forceAll?: boolean;

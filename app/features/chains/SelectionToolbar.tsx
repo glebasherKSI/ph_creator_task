@@ -1,26 +1,31 @@
-/** Группа «Выделение»: выбрать все / снять / убрать выбранные (рамка — Shift + drag). */
-import { BoxSelect, Trash2, X } from "lucide-react";
+/** Группа «Выделение»: выбрать все / снять / цвет / выровнять / убрать (рамка — Shift + drag). */
+import { useReactFlow } from "@xyflow/react";
+import { BoxSelect, LayoutGrid, Palette, Trash2, X } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
+import { measuredHeights } from "./layout";
 import { useChainsStore } from "./store";
+import { HeaderColorPalette, commonHeaderColor, removeTasksWithConfirm } from "./TaskNode";
 
 export function SelectionToolbar() {
-  const selectedCount = useChainsStore((s) => s.selectedIds.length);
+  const rf = useReactFlow();
+  const ids = useChainsStore((s) => s.selectedIds);
+  const selectedCount = ids.length;
   const total = useChainsStore((s) => Object.keys(s.canvas).length);
+  const [colorOpen, setColorOpen] = useState(false);
 
   function selectAll(all: boolean) {
     const store = useChainsStore.getState();
     store.setSelectedIds(all ? Object.keys(store.canvas) : []);
   }
 
-  function removeSelected() {
+  function alignSelected() {
     const store = useChainsStore.getState();
-    const ids = store.selectedIds;
-    if (!ids.length) return;
-    if (ids.length > 1 && !window.confirm(`Убрать с канвы ${ids.length} карточек?`)) return;
-    store.removeFromCanvas(ids);
-    store.setStatus(`Убрано с канвы: ${ids.length}`);
+    store.alignTasks(ids, measuredHeights(rf.getNodes()));
+    store.setStatus(`Выровнено карточек: ${ids.length}`);
   }
 
   if (!selectedCount) {
@@ -51,10 +56,35 @@ export function SelectionToolbar() {
       >
         <X />
       </Button>
+      <Popover open={colorOpen} onOpenChange={setColorOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="sm" title="Цвет шапки выбранных карточек">
+            <Palette /> Цвет
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto pt-2">
+          <HeaderColorPalette
+            current={commonHeaderColor(ids)}
+            onPick={(color) => {
+              useChainsStore.getState().setHeaderColor(ids, color);
+              setColorOpen(false);
+            }}
+          />
+        </PopoverContent>
+      </Popover>
       <Button
         variant="ghost"
         size="sm"
-        onClick={removeSelected}
+        disabled={selectedCount < 2}
+        onClick={alignSelected}
+        title="Разложить выбранные карточки по рядам на их месте, остальные не трогать"
+      >
+        <LayoutGrid /> Выровнять
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => removeTasksWithConfirm(ids)}
         className="text-destructive hover:text-destructive"
         title="Убрать выбранные карточки с канвы"
       >
