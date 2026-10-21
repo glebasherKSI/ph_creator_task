@@ -1,4 +1,7 @@
-/** Автораскладка канвы по колонкам: предшественники слева, последователи справа. */
+/**
+ * Автораскладка канвы: колонки — глубина цепочки (предшественники слева), ряды — дорожки.
+ * Каждая цепочка идёт по своей дорожке, поэтому её связи — прямые горизонтальные линии.
+ */
 import type { CanvasEdge, CanvasTask } from "./graph";
 
 export const CARD_W = 280;
@@ -62,6 +65,110 @@ function findFreeY(
   return y;
 }
 
+/** Сколько одиночных карточек (без связей) в ряду нижнего блока, не меньше. */
+const LOOSE_MIN_PER_ROW = 4;
+
+/**
+ * Полная раскладка дорожками.
+ * - Основной родитель задачи — тот, чья цепочка до неё длиннее (самая правая колонка).
+ * - Продолжение родителя на его дорожке — ребёнок с самой длинной цепочкой дальше.
+ * - Остальные дети начинают свои дорожки сразу под дорожкой родителя.
+ * - Карточки дорожки центрируются по вертикали: ручки связей в центре, линии прямые.
+ * - Задачи без связей — сеткой отдельным блоком внизу.
+ */
+export function layoutLanes(
+  ids: string[],
+  edges: CanvasEdge[],
+  heightOf: (id: string) => number,
+): Record<string, Position> {
+  const byId = (a: string, b: string) => Number(a) - Number(b) || a.localeCompare(b);
+  const columns = assignColumns(ids, edges);
+  const col = (id: string) => columns.get(id) ?? 0;
+
+  // Только рёбра «вперёд» — без обратных рёбер циклов граф ацикличен.
+  const children = new Map<string, string[]>(ids.map((id) => [id, []]));
+  const parents = new Map<string, string[]>(ids.map((id) => [id, []]));
+  const linked = new Set<string>();
+  for (const { from, to } of edges) {
+    if (!children.has(from) || !children.has(to) || from === to) continue;
+    linked.add(from).add(to);
+    if (col(to) <= col(from) || children.get(from)!.includes(to)) continue;
+    children.get(from)!.push(to);
+    parents.get(to)!.push(from);
+  }
+
+  // Длина цепочки от задачи вправо (в карточках).
+  const tailMemo = new Map<string, number>();
+  const tail = (id: string): number => {
+    const known = tailMemo.get(id);
+    if (known !== undefined) return known;
+    const value = 1 + Math.max(0, ...children.get(id)!.map(tail));
+    tailMemo.set(id, value);
+    return value;
+  };
+
+  const primaryParent = new Map<string, string>();
+  for (const id of ids) {
+    const list = parents.get(id)!;
+    if (!list.length) continue;
+    const best = [...list].sort((a, b) => col(b) - col(a) || byId(a, b))[0]!;
+    primaryParent.set(id, best);
+  }
+
+  const continuation = new Map<string, string>();
+  const branchHeads = new Map<string, string[]>();
+  for (const id of ids) {
+    const own = children.get(id)!.filter((c) => primaryParent.get(c) === id);
+    own.sort((a, b) => tail(b) - tail(a) || byId(a, b));
+    if (own[0]) continuation.set(id, own[0]);
+    branchHeads.set(id, own.slice(1));
+  }
+
+  const lane = (head: string): string[] => {
+    const nodes = [head];
+    for (let next = continuation.get(head); next; next = continuation.get(next)) nodes.push(next);
+    return nodes;
+  };
+
+  const result: Record<string, Position> = {};
+  let y = GRID_START_Y;
+  const placeRow = (row: string[]) => {
+    const rowH = Math.max(...row.map(heightOf));
+    return { rowH, top: y };
+  };
+  const placeLane = (head: string) => {
+    const nodes = lane(head);
+    const { rowH, top } = placeRow(nodes);
+    for (const id of nodes) {
+      result[id] = { x: columnX(col(id)), y: top + Math.round((rowH - heightOf(id)) / 2) };
+    }
+    y += rowH + VERTICAL_GAP;
+    // Ответвления — под своей дорожкой: от ранних колонок к поздним, длинные первыми.
+    const branches = nodes
+      .flatMap((id) => branchHeads.get(id)!)
+      .sort((a, b) => col(a) - col(b) || tail(b) - tail(a) || byId(a, b));
+    for (const branch of branches) placeLane(branch);
+  };
+
+  const roots = ids
+    .filter((id) => linked.has(id) && !primaryParent.has(id))
+    .sort((a, b) => tail(b) - tail(a) || byId(a, b));
+  for (const root of roots) placeLane(root);
+
+  const loose = ids.filter((id) => !linked.has(id)).sort(byId);
+  const maxCol = Math.max(0, ...ids.filter((id) => linked.has(id)).map(col));
+  const perRow = Math.max(LOOSE_MIN_PER_ROW, maxCol + 1);
+  for (let i = 0; i < loose.length; i += perRow) {
+    const row = loose.slice(i, i + perRow);
+    const { rowH, top } = placeRow(row);
+    row.forEach((id, index) => {
+      result[id] = { x: columnX(index), y: top };
+    });
+    y += rowH + VERTICAL_GAP;
+  }
+  return result;
+}
+
 export interface LayoutOptions {
   /** Переложить все карточки. */
   forceAll?: boolean;
@@ -93,6 +200,7 @@ export function layoutCanvasTasks(
     forceAll ? allIds : allIds.filter((id) => !fixedSet.has(id) && (!onlySet || onlySet.has(id))),
   );
   if (!moveSet.size) return {};
+  if (moveSet.size === allIds.length) return layoutLanes(allIds, edges, heightOf);
 
   const result: Record<string, Position> = {};
   const byColumn = new Map<number, string[]>();

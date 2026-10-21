@@ -19,6 +19,7 @@ import {
   assignColumns,
   columnX,
   layoutCanvasTasks,
+  layoutLanes,
   GRID_START_Y,
   CARD_MIN_H,
   VERTICAL_GAP,
@@ -178,15 +179,50 @@ describe("chains layout", () => {
     expect(cols.get("b")).toBeGreaterThanOrEqual(1);
   });
 
-  it("layoutCanvasTasks: колонки по id, высоты учитываются", () => {
+  it("layoutCanvasTasks forceAll: цепочка в один ряд по центрам, одиночные — внизу", () => {
     const state = graph(["2", "1", "3"]);
     const pos = layoutCanvasTasks(state.canvas, [{ from: "1", to: "3" }], {
       forceAll: true,
       heights: { "1": 200 },
     });
     expect(pos["1"]).toEqual({ x: columnX(0), y: GRID_START_Y });
+    // Карточка 3 ниже ростом — центрируется по дорожке, ручки на одной линии.
+    expect(pos["3"]).toEqual({ x: columnX(1), y: GRID_START_Y + (200 - CARD_MIN_H) / 2 });
     expect(pos["2"]).toEqual({ x: columnX(0), y: GRID_START_Y + 200 + VERTICAL_GAP });
-    expect(pos["3"]).toEqual({ x: columnX(1), y: GRID_START_Y });
+  });
+
+  it("layoutLanes: дорожку продолжает ребёнок с самой длинной цепочкой", () => {
+    // 1 → 2 → 3 → 4 и 1 → 5 (короткая ветка), 2 → 6 → 7.
+    const edges = [
+      ["1", "2"],
+      ["2", "3"],
+      ["3", "4"],
+      ["1", "5"],
+      ["2", "6"],
+      ["6", "7"],
+    ].map(([from, to]) => ({ from: from!, to: to! }));
+    const pos = layoutLanes(["1", "2", "3", "4", "5", "6", "7"], edges, () => 100);
+    const row = (id: string) => (pos[id]!.y - GRID_START_Y) / (100 + VERTICAL_GAP);
+    expect(["1", "2", "3", "4"].map(row)).toEqual([0, 0, 0, 0]);
+    // Ветки — под основной дорожкой, сначала та, что отходит раньше (колонка 1).
+    expect(row("5")).toBe(1);
+    expect([row("6"), row("7")]).toEqual([2, 2]);
+    expect(pos["7"]!.x).toBe(columnX(3));
+  });
+
+  it("layoutLanes: при слиянии задача на дорожке родителя с более длинной цепочкой", () => {
+    // 1 → 2 → 3 → 9 и 8 → 9: 9 продолжает дорожку 3.
+    const edges = [
+      ["1", "2"],
+      ["2", "3"],
+      ["3", "9"],
+      ["8", "9"],
+    ].map(([from, to]) => ({ from: from!, to: to! }));
+    const pos = layoutLanes(["1", "2", "3", "8", "9", "10"], edges, () => 100);
+    expect(pos["9"]!.y).toBe(pos["3"]!.y);
+    expect(pos["8"]!.y).toBeGreaterThan(pos["3"]!.y);
+    // Без связей — нижний блок, ниже всех дорожек.
+    expect(pos["10"]!.y).toBeGreaterThan(pos["8"]!.y);
   });
 
   it("layoutCanvasTasks onlyIds: новая карточка не накладывается на существующую", () => {
