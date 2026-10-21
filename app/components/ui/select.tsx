@@ -4,6 +4,8 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+import { SearchSelect } from "./search-select";
+
 const Select = SelectPrimitive.Root;
 const SelectGroup = SelectPrimitive.Group;
 const SelectValue = SelectPrimitive.Value;
@@ -85,6 +87,9 @@ function SelectItem({
   );
 }
 
+/** С какого числа опций SimpleSelect переключается на SearchSelect. */
+const SEARCH_THRESHOLD = 30;
+
 export interface SimpleSelectOption {
   value: string;
   label: React.ReactNode;
@@ -118,6 +123,23 @@ function SimpleSelect({
   className?: string;
   "aria-label"?: string;
 }) {
+  // Длинные списки (теги и т. п.) — лёгкий выбор с поиском: Radix Select на них открывается с задержкой.
+  if (options.length > SEARCH_THRESHOLD) {
+    return (
+      <SearchSelect
+        value={value}
+        onValueChange={onValueChange}
+        options={options}
+        placeholder={placeholder}
+        nullable={nullable}
+        nullLabel={nullLabel}
+        disabled={disabled}
+        size={size}
+        className={className}
+        aria-label={ariaLabel}
+      />
+    );
+  }
   // Radix Select не принимает "" как значение item — кодируем «пусто» служебным ключом.
   const NULL = "__null__";
   return (

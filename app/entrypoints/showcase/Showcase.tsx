@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Segmented } from "@/components/ui/segmented";
+import { SimpleSelect } from "@/components/ui/select";
 import { DomainsCard } from "@/features/popup/DomainsCard";
 import { GraphicCard } from "@/features/popup/GraphicCard";
 import { ReportsCard } from "@/features/popup/ReportsCard";
@@ -57,6 +58,12 @@ const TASK_TARGETING_DEMO: TaskLike = {
     { action: "bet", requirements: { bets_count: "5" }, conditions: {} },
   ],
 };
+
+/** Больше порога SimpleSelect — открывается облегчённый выбор с поиском. */
+const LONG_OPTIONS = Array.from({ length: 300 }, (_, i) => ({
+  value: String(i + 1),
+  label: `Тег ${i + 1}`,
+}));
 
 const TASK_FIXTURES: Record<string, TaskLike> = {
   interactive: taskInteractiveFixture as TaskLike,
@@ -217,6 +224,7 @@ export function Showcase() {
   const [type, setType] = useState<"enabled" | "disabled">("enabled");
   const [logic, setLogic] = useState<"and" | "or">("or");
   const [ready, setReady] = useState(false);
+  const [tag, setTag] = useState("");
   // Фикстуру можно выбрать hash'ем (#sequence, #targeting) — удобно для скриншотов.
   const [formFixture, setFormFixture] = useState<"interactive" | "sequence" | "targeting">(() => {
     const hash = location.hash.replace("#", "");
@@ -286,6 +294,18 @@ export function Showcase() {
         </div>
       </Section>
 
+      <Section title="Длинный список">
+        <div className="w-72">
+          <SimpleSelect
+            value={tag}
+            onValueChange={setTag}
+            options={LONG_OPTIONS}
+            nullable
+            aria-label="Длинный список"
+          />
+        </div>
+      </Section>
+
       <Section title="Сегменты">
         <div className="flex flex-wrap items-center gap-6">
           <Segmented
@@ -326,7 +346,6 @@ export function Showcase() {
           <Badge variant="accent">BE</Badge>
           <Badge variant="accent-outline">Только локально</Badge>
           <Badge variant="neutral">Цепочка</Badge>
-          <Badge variant="destructive">⚠ блок</Badge>
           <Badge variant="success">active</Badge>
           <Badge variant="muted">draft</Badge>
         </div>
