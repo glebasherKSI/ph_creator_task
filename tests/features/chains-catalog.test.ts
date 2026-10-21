@@ -4,9 +4,10 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import type { GamificationTask } from "@/lib/types";
 
 const fetchTasksPage = vi.fn();
+const fetchTask = vi.fn();
 vi.mock("@/lib/task-api", () => ({
   fetchTasksPage: (...args: unknown[]) => fetchTasksPage(...args),
-  fetchTask: vi.fn(),
+  fetchTask: (...args: unknown[]) => fetchTask(...args),
   updateTask: vi.fn(),
 }));
 
@@ -29,6 +30,7 @@ function page(ids: number[], hasMore: boolean, hidden = 0, total: number | null 
 beforeEach(async () => {
   fakeBrowser.reset();
   fetchTasksPage.mockReset();
+  fetchTask.mockReset();
   useChainsStore.setState({ domain: "" });
   await useChainsStore.getState().setDomain("admin.example.com");
 });
@@ -80,5 +82,36 @@ describe("loadCatalog", () => {
     await useChainsStore.getState().loadCatalog(false);
     expect(useChainsStore.getState().catalogOrder).toEqual(["1", "2", "3"]);
     expect(fetchTasksPage).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("addToCanvas", () => {
+  it("сначала загружает все задачи, потом добавляет их одним обновлением", async () => {
+    fetchTasksPage.mockResolvedValueOnce(page([1, 2, 3], false));
+    await useChainsStore.getState().loadCatalog(true);
+
+    const canvasSizes: number[] = [];
+    const progress: (number | null)[] = [];
+    const unsubscribe = useChainsStore.subscribe((s) => {
+      canvasSizes.push(Object.keys(s.canvas).length);
+      progress.push(s.addProgress?.done ?? null);
+    });
+    fetchTask.mockImplementation(async (_d: string, id: string) => {
+      if (id === "2") throw new Error("boom");
+      return { ...task(Number(id)), conditions: [] };
+    });
+
+    await expect(useChainsStore.getState().addToCanvas(["1", "2", "3"])).rejects.toThrow(
+      "не загрузились 1 из 3",
+    );
+    unsubscribe();
+
+    expect(Object.keys(useChainsStore.getState().canvas).sort()).toEqual(["1", "3"]);
+    expect(useChainsStore.getState().canvas["1"]!.full).not.toBeNull();
+    expect(useChainsStore.getState().addProgress).toBeNull();
+    // Пока шла загрузка, канва оставалась пустой; прогресс дошёл до 3.
+    const firstAdded = canvasSizes.findIndex((n) => n > 0);
+    expect(progress.slice(0, firstAdded)).toContain(3);
+    expect(canvasSizes[firstAdded]).toBe(2);
   });
 });

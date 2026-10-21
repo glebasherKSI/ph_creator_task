@@ -30,6 +30,14 @@ const CATALOG_PAGE_SIZE = 250;
 const MAX_CATALOG_PAGES = 100;
 /** Сколько страниц каталога запрашивается одновременно. */
 const CATALOG_CONCURRENCY = 4;
+/** Сколько полных задач загружается одновременно при добавлении на канву. */
+const ADD_CONCURRENCY = 6;
+
+export interface AddProgress {
+  /** Загружено задач (включая неудачные). */
+  done: number;
+  total: number;
+}
 
 export interface CatalogProgress {
   phase: "auth" | "loading";
@@ -95,6 +103,8 @@ export interface ChainsStore extends GraphState {
   /** Этап загрузки каталога для UI: проверка входа → страницы (scanned из total). */
   catalogProgress: CatalogProgress | null;
   catalogError: string;
+  /** Загрузка задач перед добавлением на канву (null — ничего не добавляется). */
+  addProgress: AddProgress | null;
   /** Сохранённые позиции из storage (ключ — id задачи). */
   savedPositions: Record<string, CanvasPosition>;
   saving: boolean;
@@ -142,6 +152,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
   catalogLoading: false,
   catalogProgress: null,
   catalogError: "",
+  addProgress: null,
   savedPositions: {},
   saving: false,
   saveLog: [],
@@ -270,34 +281,63 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
     const { catalog, savedPositions } = get();
     const fresh = ids.map(String).filter((id) => catalog[id] && !get().canvas[id]);
     if (!fresh.length) return;
+    const domain = get().domain;
 
+    // Сначала загружаем все задачи (канва не перерисовывается на каждый ответ),
+    // затем добавляем их одним обновлением и раскладываем.
+    const loaded = new Map<string, GamificationTask>();
+    const failed: string[] = [];
+    let done = 0;
+    let cursor = 0;
+    set({ addProgress: { done: 0, total: fresh.length } });
+    const worker = async () => {
+      while (cursor < fresh.length) {
+        const id = fresh[cursor++]!;
+        try {
+          loaded.set(id, await fetchTask(domain, id));
+        } catch {
+          failed.push(id);
+        }
+        done += 1;
+        set({ addProgress: { done, total: fresh.length } });
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: Math.min(ADD_CONCURRENCY, fresh.length) }, worker));
+    } finally {
+      set({ addProgress: null });
+    }
+    if (get().domain !== domain) return;
+
+    const added = fresh.filter((id) => loaded.has(id) && !get().canvas[id]);
     set((s) => {
       const canvas = { ...s.canvas };
-      for (const id of fresh) {
+      for (const id of added) {
         const meta = catalog[id]!;
+        const full = loaded.get(id)!;
         const saved = savedPositions[id];
         canvas[id] = {
           id,
-          name: meta.name,
-          frontend_identifier: meta.frontend_identifier,
-          conditions: null,
-          full: null,
+          name: full.name || meta.name,
+          frontend_identifier: full.frontend_identifier || meta.frontend_identifier,
+          conditions: full.conditions ?? [],
+          full,
           x: saved?.x ?? GRID_START_X,
           y: saved?.y ?? GRID_START_Y,
           ...(saved?.headerColor ? { headerColor: saved.headerColor } : {}),
           ...(saved?.configuredOnBackend ? { configuredOnBackend: true } : {}),
         };
       }
-      return { canvas };
+      return importGraphFromConditions({ ...s, canvas }, added);
     });
 
-    await Promise.all(fresh.map((id) => get().ensureFull(id)));
-    set((s) => importGraphFromConditions(s, fresh));
-
     // Без сохранённой позиции — раскладываем новые карточки, остальные не трогаем.
-    const toLayout = fresh.filter((id) => !savedPositions[id]);
+    const toLayout = added.filter((id) => !savedPositions[id]);
     if (toLayout.length) get().autoLayout({ onlyIds: toLayout });
     await get().persistPositions();
+    if (failed.length) {
+      throw new Error(`не загрузились ${failed.length} из ${fresh.length}: #${failed.join(", #")}`);
+    }
   },
 
   removeFromCanvas: (ids) => {

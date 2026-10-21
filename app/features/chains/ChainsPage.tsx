@@ -201,15 +201,15 @@ function ChainsPageInner() {
   }
 
   async function addToCanvas(ids: string[]) {
-    setStatus(`Добавляю на канву: ${ids.length}…`);
+    setStatus(`Загружаю задачи для канвы: ${ids.length}…`);
     try {
       await useChainsStore.getState().addToCanvas(ids);
       setStatus(`На канве ${Object.keys(useChainsStore.getState().canvas).length} задач`);
-      // Новые ноды измеряются после рендера — вписываем чуть позже.
-      window.setTimeout(() => fit(), 50);
     } catch (err) {
-      setStatus(`Не удалось добавить: ${err instanceof Error ? err.message : String(err)}`, true);
+      setStatus(`Добавлены не все: ${err instanceof Error ? err.message : String(err)}`, true);
     }
+    // Новые ноды измеряются после рендера — вписываем чуть позже.
+    window.setTimeout(() => fit(), 50);
   }
 
   function focusNode(id: string) {

@@ -17,7 +17,10 @@ import {
   type OnNodesDelete,
   ReactFlow,
 } from "@xyflow/react";
+import { Loader2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+
+import { cn } from "@/lib/utils";
 
 import { conflictsByTask, detectBlockConflicts, useBlockCheck } from "./block-check";
 import {
@@ -30,11 +33,65 @@ import {
 } from "./CanvasLabels";
 import { edgeKey } from "./graph";
 import { useLabelsStore } from "./labels-store";
-import { useChainsStore } from "./store";
+import { type AddProgress, useChainsStore } from "./store";
 import { type TaskFlowNode, TaskNode } from "./TaskNode";
 import { useTaskSheet } from "./TaskSheet";
 
 const nodeTypes = { task: TaskNode, label: LabelNode };
+
+/**
+ * Прогресс загрузки задач перед добавлением на канву. Всегда в разметке —
+ * плавно появляется и исчезает; канва под ним затемняется и не принимает клики.
+ */
+function AddProgressOverlay() {
+  const progress = useChainsStore((s) => s.addProgress);
+  const [shown, setShown] = useState<AddProgress | null>(progress);
+  // «Состояние из прошлого рендера»: при исчезновении показываем последний прогресс.
+  if (progress && progress !== shown) setShown(progress);
+
+  const open = progress != null;
+  const view = progress ?? shown;
+  const done = open ? (view?.done ?? 0) : (view?.total ?? 0);
+  const total = view?.total ?? 0;
+  const percent = total ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div
+      aria-hidden={!open}
+      className={cn(
+        "absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-[2px] transition-opacity duration-300 ease-out",
+        open ? "opacity-100" : "pointer-events-none opacity-0",
+      )}
+    >
+      <div
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Загрузка задач для канвы"
+        className={cn(
+          "flex w-80 flex-col gap-3 rounded-lg bg-surface p-4 shadow-xl ring-1 ring-border transition-transform duration-300 ease-out",
+          open ? "scale-100" : "scale-95",
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          <span className="text-headline">Загружаю задачи</span>
+          <span className="ml-auto font-semibold text-primary tabular-nums">{percent}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+          <div
+            className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <div className="text-caption text-muted-foreground tabular-nums">
+          {done} из {total} · затем добавлю на канву и выровняю
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type CanvasFlowNode = TaskFlowNode | LabelFlowNode;
 
@@ -290,6 +347,7 @@ export function FlowCanvas() {
         <Controls showInteractive={false} />
         {allNodes.length ? <MiniMap pannable zoomable /> : null}
       </ReactFlow>
+      <AddProgressOverlay />
       {paneMenu ? (
         <PaneContextMenu
           x={paneMenu.x}
