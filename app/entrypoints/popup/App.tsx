@@ -50,10 +50,6 @@ export function App() {
     void browser.tabs.create({ url: browser.runtime.getURL(CONSTRUCTOR_PAGE) });
   }
 
-  function openEditor() {
-    void browser.tabs.create({ url: browser.runtime.getURL("/editor.html") });
-  }
-
   const readiness = reportsReadiness(reports.status);
   const backendTitle = domains.domains
     .map((host) => `${host}: ${formatAuthTitle(domains.auth[host])}`)
@@ -110,9 +106,6 @@ export function App() {
       <div className="flex flex-col gap-2">
         <Button variant="primary" size="lg" onClick={openConstructor}>
           Перейти в конструктор
-        </Button>
-        <Button variant="secondary" onClick={openEditor}>
-          Редактор задач
         </Button>
       </div>
 

@@ -1,6 +1,6 @@
 # PromoHub конструктор задач (Chrome MV3)
 
-Расширение для работы с заданиями геймификации PromoHub: редактор задач, конструктор связей
+Расширение для работы с заданиями геймификации PromoHub: конструктор связей
 между задачами на канве, статистика из Reports и импорт пакетов из Promo Graphic.
 
 **Версия:** 3.0.0 — WXT + React + TypeScript. История миграции и дизайн-система: `docs/MIGRATION_PLAN.md`.
@@ -25,7 +25,6 @@ ID расширения зафиксирован ключом в манифес�
 | Страница        | Что делает                                                                                                                                             |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | popup           | Домены админок и статус входа, вход в Promo Graphic, готовность Reports, переходы                                                                      |
-| `editor.html`   | Список задач домена, копия / правка задачи в форме, статистика                                                                                         |
 | `chains.html`   | Канва связей (React Flow): карточки задач, связи `gamification_tasks`, панель связи, сохранение PATCH, шаблоны, подписи, пакеты из Graphic, статистика |
 | `showcase.html` | Витрина компонентов и дизайн-системы, форма на фикстурах                                                                                               |
 
@@ -33,13 +32,12 @@ ID расширения зафиксирован ключом в манифес�
 
 ```
 app/
-  entrypoints/      background.ts, admin.content.ts (runtime-инъекция), popup/, editor/, chains/, showcase/
+  entrypoints/      background.ts, admin.content.ts (runtime-инъекция), popup/, chains/, showcase/
   lib/              логика без UI: api, auth/, tasks, task-api, meta, storage, messaging, schemas, graphic, reports…
   features/
     popup/          карточки и хуки popup
     auth/           AuthProvider + модалка входа (magic link → OTP)
     task-form/      TaskForm и виджеты: условия, действия, страны, расписание
-    editor/         список задач, страница редактора
     stats/          агрегация отчётов и панель статистики (Recharts)
     chains/         канва: graph.ts (связи ↔ conditions), layout.ts, store.ts (Zustand), React Flow UI
   components/       UI-примитивы (Radix, стиль shadcn) и составные компоненты; конвенции — components/README.md

@@ -27,7 +27,7 @@ export const DEFAULT_MAX_REQUESTS = 500;
 export const PAGE_SIZE = 50;
 export const LAYOUT_KEY_PREFIX = "ph_chains_layout_";
 
-/** Статусы задач, показываемые в списках editor/chains. */
+/** Статусы задач, показываемые в каталоге канвы. */
 export const VISIBLE_TASK_STATES: ReadonlySet<string> = new Set(["active", "draft"]);
 
 export const KIND_LABELS: Record<string, string> = {

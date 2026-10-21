@@ -25,7 +25,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
 import { SwitchField } from "@/components/ui/switch";
 import { useAuth } from "@/features/auth/AuthModal";
-import { useDomainList } from "@/features/editor/useDomainList";
+import { useDomainList } from "./useDomainList";
 import { StatsPanel } from "@/features/stats/StatsPanel";
 import { useStatsReport } from "@/features/stats/useStatsReport";
 import { cn } from "@/lib/utils";
