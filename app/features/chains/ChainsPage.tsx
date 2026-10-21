@@ -16,6 +16,7 @@ import { CatalogSidebar } from "./CatalogSidebar";
 import { EdgePanel } from "./EdgePanel";
 import { FlowCanvas } from "./FlowCanvas";
 import { PackagesPanel } from "./PackagesPanel";
+import { SelectionToolbar } from "./SelectionToolbar";
 import { type SaveLogEntry, useChainsStore } from "./store";
 import { TaskSheet } from "./TaskSheet";
 
@@ -131,7 +132,12 @@ function ChainsPageInner() {
 
   function align() {
     const store = useChainsStore.getState();
-    store.autoLayout({ forceAll: true });
+    // Реальные высоты карточек из React Flow, чтобы колонки не наезжали.
+    const heights: Record<string, number> = {};
+    for (const node of rf.getNodes()) {
+      if (node.measured?.height) heights[node.id] = node.measured.height;
+    }
+    store.autoLayout({ forceAll: true, heights });
     setStatus(`Раскладка пересчитана для ${Object.keys(store.canvas).length} задач`);
     window.setTimeout(() => fit(), 50);
   }
@@ -196,6 +202,7 @@ function ChainsPageInner() {
           <span className="text-caption text-muted-foreground tabular-nums">
             {catalogSize} задач · на канве {canvasSize}
           </span>
+          <SelectionToolbar />
           <Button variant="secondary" size="sm" disabled={!canvasSize} onClick={align}>
             Выровнять
           </Button>

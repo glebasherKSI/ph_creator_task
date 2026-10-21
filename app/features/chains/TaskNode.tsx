@@ -254,8 +254,9 @@ export const TaskNode = memo(function TaskNode({ data, selected }: NodeProps<Tas
       <Handle
         type="target"
         position={Position.Left}
-        title="Вход"
-        style={{ width: 12, height: 12, borderWidth: 2 }}
+        title={sequence ? "Цепочка: входящие связи недоступны" : "Вход"}
+        isConnectable={!sequence}
+        style={{ width: 12, height: 12, borderWidth: 2, opacity: sequence ? 0.35 : 1 }}
       />
       <Handle
         type="source"

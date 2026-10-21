@@ -74,7 +74,7 @@ export function FlowCanvas() {
   const storeEdges = useChainsStore((s) => s.edges);
   const catalog = useChainsStore((s) => s.catalog);
   const dirtyTargets = useChainsStore((s) => s.dirtyTargets);
-  const selectedTaskId = useChainsStore((s) => s.selectedTaskId);
+  const selectedIds = useChainsStore((s) => s.selectedIds);
   const selectedEdge = useChainsStore((s) => s.selectedEdge);
   const [measured, setMeasured] = useState<Measured>({});
 
@@ -89,7 +89,7 @@ export function FlowCanvas() {
       id: task.id,
       type: "task" as const,
       position: { x: task.x, y: task.y },
-      selected: task.id === selectedTaskId,
+      selected: selectedIds.includes(task.id),
       measured: measured[task.id],
       data: {
         task,
@@ -99,7 +99,7 @@ export function FlowCanvas() {
         dirty: dirtyTargets.includes(task.id),
       },
     }));
-  }, [canvas, storeEdges, catalog, dirtyTargets, selectedTaskId, measured]);
+  }, [canvas, storeEdges, catalog, dirtyTargets, selectedIds, measured]);
 
   const edges = useMemo<Edge[]>(
     () =>
@@ -126,13 +126,16 @@ export function FlowCanvas() {
   );
 
   const onNodesChange = useCallback<OnNodesChange<TaskFlowNode>>((changes) => {
+    // Выделение копим за весь пакет изменений: рамка/Shift+клик дают несколько select сразу.
+    let nextSelected: Set<string> | null = null;
     for (const change of changes) {
       const store = useChainsStore.getState();
       if (change.type === "position" && change.position) {
         store.moveTask(change.id, change.position.x, change.position.y);
       } else if (change.type === "select") {
-        if (change.selected) store.select(change.id);
-        else if (store.selectedTaskId === change.id) store.select(null);
+        nextSelected ??= new Set(store.selectedIds);
+        if (change.selected) nextSelected.add(change.id);
+        else nextSelected.delete(change.id);
       } else if (change.type === "dimensions" && change.dimensions) {
         const { width, height } = change.dimensions;
         setMeasured((prev) => {
@@ -142,6 +145,7 @@ export function FlowCanvas() {
         });
       }
     }
+    if (nextSelected) useChainsStore.getState().setSelectedIds([...nextSelected]);
   }, []);
 
   const onEdgesChange = useCallback<OnEdgesChange<Edge>>((changes) => {

@@ -7,7 +7,7 @@ import { create } from "zustand";
 import { PAGE_SIZE } from "@/lib/constants";
 import { loadChainsLayout, saveChainsLayout, type CanvasPosition } from "@/lib/storage";
 import { fetchTask, fetchTasksPage, updateTask } from "@/lib/task-api";
-import { buildPatchPayload } from "@/lib/tasks";
+import { buildPatchPayload, isSequenceType } from "@/lib/tasks";
 import type { GamificationTask, TaskLike } from "@/lib/types";
 
 import {
@@ -85,6 +85,8 @@ export interface ChainsStore extends GraphState {
   saving: boolean;
   saveLog: SaveLogEntry[];
   selectedTaskId: string | null;
+  /** Все выделенные карточки (рамка, Shift+клик); selectedTaskId — последняя из них. */
+  selectedIds: string[];
   selectedEdge: { from: string; to: string } | null;
   status: { text: string; error: boolean };
 
@@ -102,6 +104,7 @@ export interface ChainsStore extends GraphState {
   autoLayout: (options?: LayoutOptions) => void;
   setHeaderColor: (id: string, color: string | null) => void;
   select: (taskId: string | null) => void;
+  setSelectedIds: (ids: string[]) => void;
   selectEdge: (edge: { from: string; to: string } | null) => void;
   /** Полная задача с бэка для карточки (и кэш в full). */
   ensureFull: (id: string) => Promise<TaskLike | null>;
@@ -125,6 +128,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
   saving: false,
   saveLog: [],
   selectedTaskId: null,
+  selectedIds: [],
   selectedEdge: null,
   status: { text: "Выберите домен и загрузите задачи", error: false },
 
@@ -145,6 +149,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
       savedPositions: layout.positions ?? {},
       saveLog: [],
       selectedTaskId: null,
+      selectedIds: [],
       selectedEdge: null,
     });
   },
@@ -219,6 +224,7 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
       return {
         ...next,
         selectedTaskId: s.selectedTaskId && gone.has(s.selectedTaskId) ? null : s.selectedTaskId,
+        selectedIds: s.selectedIds.filter((id) => !gone.has(id)),
         selectedEdge:
           s.selectedEdge && (gone.has(s.selectedEdge.from) || gone.has(s.selectedEdge.to))
             ? null
@@ -250,7 +256,20 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
     await saveChainsLayout(domain, merged);
   },
 
-  connect: (from, to) => set((s) => addEdge(s, from, to)),
+  connect: (from, to) => {
+    const s = get();
+    // У цепочек (type: sequence) нет таргетинга — входящие связи им не записать.
+    if (isSequenceType(s.canvas[to]?.full?.type ?? s.catalog[to]?.type)) {
+      set({
+        status: {
+          text: `Задача #${to} — цепочка: у неё нет таргетинга, входящие связи недоступны`,
+          error: true,
+        },
+      });
+      return;
+    }
+    set((st) => addEdge(st, from, to));
+  },
   disconnect: (from, to) =>
     set((s) => ({
       ...removeEdge(s, from, to),
@@ -284,7 +303,21 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
   },
 
   select: (taskId) =>
-    set({ selectedTaskId: taskId, selectedEdge: taskId ? null : get().selectedEdge }),
+    set({
+      selectedTaskId: taskId,
+      selectedIds: taskId ? [taskId] : [],
+      selectedEdge: taskId ? null : get().selectedEdge,
+    }),
+  setSelectedIds: (ids) =>
+    set((s) => ({
+      selectedIds: ids,
+      selectedTaskId: ids.length
+        ? ids.includes(s.selectedTaskId ?? "")
+          ? s.selectedTaskId
+          : ids[ids.length - 1]!
+        : null,
+      selectedEdge: ids.length ? null : s.selectedEdge,
+    })),
   selectEdge: (edge) =>
     set({ selectedEdge: edge, selectedTaskId: edge ? null : get().selectedTaskId }),
 
