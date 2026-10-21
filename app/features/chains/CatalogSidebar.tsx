@@ -1,6 +1,6 @@
 /** Каталог задач домена: поиск, фильтр статуса, отметка и добавление на канву. */
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Crosshair, Loader2, Search } from "lucide-react";
+import { Check, Crosshair, Loader2, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -13,7 +13,7 @@ import { typeLabel } from "@/lib/labels-ru";
 import { isSequenceType } from "@/lib/tasks";
 import { cn } from "@/lib/utils";
 
-import { type CatalogTask, useChainsStore } from "./store";
+import { type CatalogProgress, type CatalogTask, useChainsStore } from "./store";
 
 type StatusFilter = "all" | "active" | "draft";
 
@@ -110,46 +110,74 @@ function CatalogRow({
   );
 }
 
-/** Полоса прогресса загрузки каталога: проверка входа (бегущая) → страницы (по pagination.count). */
+/**
+ * Полоса прогресса загрузки каталога: проверка входа (бегущая) → страницы (по pagination.count).
+ * Всегда в разметке: появляется и исчезает плавно (высота через grid-rows 0fr↔1fr + прозрачность);
+ * при исчезновении показывает последнее состояние, дотянутое до 100 %.
+ */
 function CatalogProgressBar() {
   const progress = useChainsStore((s) => s.catalogProgress);
   const loaded = useChainsStore((s) => s.catalogOrder.length);
-  if (!progress) return null;
-  const known = progress.phase === "loading" && progress.total ? progress.total : null;
-  const percent = known ? Math.min(100, Math.round((progress.scanned / known) * 100)) : null;
-  const label =
-    progress.phase === "auth"
-      ? "Проверяю вход в админку…"
-      : known
-        ? `Просмотрено ${Math.min(progress.scanned, known)} из ${known} · в каталоге ${loaded}`
-        : `Загружаю задачи… в каталоге ${loaded}`;
+  const [shown, setShown] = useState<CatalogProgress | null>(progress);
+  // «Состояние из прошлого рендера»: запоминаем последний непустой прогресс без эффектов.
+  if (progress && progress !== shown) setShown(progress);
+
+  const open = progress != null;
+  const view = progress ?? shown;
+  const known = view?.phase === "loading" && view.total ? view.total : null;
+  const scanned = !open && known ? known : (view?.scanned ?? 0);
+  const percent = known ? Math.min(100, Math.round((scanned / known) * 100)) : null;
+  const label = !view
+    ? ""
+    : !open
+      ? `Загружено · в каталоге ${loaded}`
+      : view.phase === "auth"
+        ? "Проверяю вход в админку…"
+        : known
+          ? `Просмотрено ${Math.min(scanned, known)} из ${known} · в каталоге ${loaded}`
+          : `Загружаю задачи… в каталоге ${loaded}`;
+
   return (
     <div
-      className="flex flex-col gap-1.5"
-      role="progressbar"
-      aria-valuenow={percent ?? undefined}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label="Загрузка задач"
+      aria-hidden={!open}
+      className={cn(
+        "-mb-3 grid transition-[grid-template-rows,opacity,margin] duration-300 ease-out",
+        open ? "mb-0 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+      )}
     >
-      <div className="flex items-center justify-between gap-2 text-caption">
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin text-primary" />
-          {label}
-        </span>
-        {percent != null ? (
-          <span className="font-semibold text-primary tabular-nums">{percent}%</span>
-        ) : null}
-      </div>
-      <div className="relative h-1.5 overflow-hidden rounded-full bg-surface-2">
-        {percent != null ? (
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-            style={{ width: `${percent}%` }}
-          />
-        ) : (
-          <div className="absolute inset-y-0 w-1/3 animate-[progress-indeterminate_1.2s_ease-in-out_infinite] rounded-full bg-primary" />
-        )}
+      <div className="min-h-0 overflow-hidden">
+        <div
+          className="flex flex-col gap-1.5 pb-0.5"
+          role="progressbar"
+          aria-valuenow={percent ?? undefined}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Загрузка задач"
+        >
+          <div className="flex items-center justify-between gap-2 text-caption">
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              {open ? (
+                <Loader2 className="size-3.5 animate-spin text-primary" />
+              ) : (
+                <Check className="size-3.5 text-success" />
+              )}
+              {label}
+            </span>
+            {percent != null ? (
+              <span className="font-semibold text-primary tabular-nums">{percent}%</span>
+            ) : null}
+          </div>
+          <div className="relative h-1.5 overflow-hidden rounded-full bg-surface-2">
+            {percent != null ? (
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                style={{ width: `${percent}%` }}
+              />
+            ) : (
+              <div className="absolute inset-y-0 w-1/3 animate-[progress-indeterminate_1.2s_ease-in-out_infinite] rounded-full bg-primary" />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -349,7 +377,7 @@ export function CatalogSidebar({
         )}
       </div>
 
-      {hasMore && onLoadMore ? (
+      {hasMore && onLoadMore && !loadingMore ? (
         <Button variant="ghost" size="sm" disabled={loadingMore} onClick={onLoadMore}>
           {loadingMore ? <Loader2 className="animate-spin" /> : null}
           Загрузить ещё задачи
