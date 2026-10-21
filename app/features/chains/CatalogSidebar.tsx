@@ -17,13 +17,7 @@ import { type CatalogProgress, type CatalogTask, useChainsStore } from "./store"
 
 type StatusFilter = "all" | "active" | "draft";
 
-const ROW_HEIGHT = 74;
-
-function stateVariant(state: string): "success" | "muted" | "neutral" {
-  if (state === "active") return "success";
-  if (state === "draft") return "muted";
-  return "neutral";
-}
+const ROW_HEIGHT = 64;
 
 function matches(task: CatalogTask, query: string, status: StatusFilter): boolean {
   if (status !== "all" && task.state !== status) return false;
@@ -71,42 +65,53 @@ function CatalogRow({
         className="flex min-w-0 flex-1 cursor-pointer flex-col gap-1 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
       >
         <div className="flex items-center gap-2">
-          <span className="shrink-0 font-mono text-caption text-muted-foreground">#{task.id}</span>
           <span className="min-w-0 flex-1 truncate text-subhead font-medium">
             {task.name || "(без названия)"}
           </span>
-          <Badge variant={stateVariant(task.state)} className="shrink-0">
-            {task.state}
-          </Badge>
+          <StateMark state={task.state} />
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="min-w-0 flex-1 truncate font-mono text-caption text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
+          <span className="shrink-0 font-mono tabular-nums">#{task.id}</span>
+          <span aria-hidden="true">·</span>
+          <span className="min-w-0 flex-1 truncate font-mono">
             {task.frontend_identifier || "—"}
           </span>
           {isSequenceType(task.type) ? (
-            <Badge variant="muted" className="shrink-0">
+            <Badge variant="muted" className="shrink-0 py-0">
               {typeLabel("sequence")}
-            </Badge>
-          ) : null}
-          {onCanvas ? (
-            <Badge variant="accent-outline" className="shrink-0">
-              на канве
             </Badge>
           ) : null}
         </div>
       </button>
       {onCanvas ? (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={`Показать #${task.id} на канве`}
-          title="Показать на канве"
+        <button
+          type="button"
           onClick={onFocus}
+          title="Показать на канве"
+          aria-label={`Показать #${task.id} на канве`}
+          className="flex shrink-0 cursor-pointer items-center gap-1 self-stretch rounded-md px-1.5 text-caption font-medium text-primary transition-colors outline-none hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring/60"
         >
-          <Crosshair />
-        </Button>
+          <Crosshair className="size-3.5" />
+          на канве
+        </button>
       ) : null}
     </div>
+  );
+}
+
+/** Статус задачи — точка и подпись, без заливки: не спорит с названием. */
+function StateMark({ state }: { state: string }) {
+  const tone =
+    state === "active"
+      ? "text-success"
+      : state === "draft"
+        ? "text-muted-foreground"
+        : "text-foreground";
+  return (
+    <span className={cn("flex shrink-0 items-center gap-1 text-caption font-medium", tone)}>
+      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+      {state}
+    </span>
   );
 }
 
