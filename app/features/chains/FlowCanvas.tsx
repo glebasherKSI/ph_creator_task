@@ -22,7 +22,6 @@ import { useCallback, useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { conflictsByTask, detectBlockConflicts, useBlockCheck } from "./block-check";
 import {
   type LabelFlowNode,
   LabelNode,
@@ -144,27 +143,13 @@ export function FlowCanvas() {
   const storeEdges = useChainsStore((s) => s.edges);
   const catalog = useChainsStore((s) => s.catalog);
   const dirtyTargets = useChainsStore((s) => s.dirtyTargets);
-  const targetConfigs = useChainsStore((s) => s.targetConfigs);
   const selectedIds = useChainsStore((s) => s.selectedIds);
   const selectedEdge = useChainsStore((s) => s.selectedEdge);
-  const checkBlocks = useBlockCheck((s) => s.enabled);
   const [measured, setMeasured] = useState<Measured>({});
   const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(null);
   const closePaneMenu = useCallback(() => setPaneMenu(null), []);
   const addLabel = useAddLabel();
   const labelNodes = useLabelNodes();
-
-  // Конфликты блокировок считаются только при включённой проверке.
-  const conflictByTask = useMemo(
-    () =>
-      checkBlocks
-        ? conflictsByTask(
-            detectBlockConflicts({ canvas, edges: storeEdges, targetConfigs, dirtyTargets })
-              .conflicts,
-          )
-        : {},
-    [checkBlocks, canvas, storeEdges, targetConfigs, dirtyTargets],
-  );
 
   const nodes = useMemo<TaskFlowNode[]>(() => {
     const incoming: Record<string, string[]> = {};
@@ -185,12 +170,9 @@ export function FlowCanvas() {
         incoming: incoming[task.id] ?? [],
         outgoing: outgoing[task.id] ?? [],
         dirty: dirtyTargets.includes(task.id),
-        blockConflict: conflictByTask[task.id]
-          ? { tooltip: conflictByTask[task.id]!.tooltip }
-          : undefined,
       },
     }));
-  }, [canvas, storeEdges, catalog, dirtyTargets, selectedIds, measured, conflictByTask]);
+  }, [canvas, storeEdges, catalog, dirtyTargets, selectedIds, measured]);
 
   const allNodes = useMemo<CanvasFlowNode[]>(() => [...nodes, ...labelNodes], [nodes, labelNodes]);
 

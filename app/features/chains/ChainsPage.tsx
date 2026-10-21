@@ -14,23 +14,19 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
+import { useEffect, useState } from "react";
 
 import { exportBackup, importBackup } from "@/components/backup-buttons";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
-import { SwitchField } from "@/components/ui/switch";
 import { useAuth } from "@/features/auth/AuthModal";
 import { useDomainList } from "./useDomainList";
 import { StatsPanel } from "@/features/stats/StatsPanel";
 import { useStatsReport } from "@/features/stats/useStatsReport";
 import { cn } from "@/lib/utils";
 
-import { detectBlockConflicts, formatConflictsCounter, useBlockCheck } from "./block-check";
 import { useAddLabel } from "./CanvasLabels";
 import { CatalogSidebar } from "./CatalogSidebar";
 import { EdgePanel } from "./EdgePanel";
@@ -137,20 +133,6 @@ function ChainsPageInner() {
   const saveLog = useChainsStore((s) => s.saveLog);
   const selectedEdge = useChainsStore((s) => s.selectedEdge);
   const addLabel = useAddLabel();
-  const checkBlocks = useBlockCheck((s) => s.enabled);
-  const setCheckBlocks = useBlockCheck((s) => s.setEnabled);
-  const graph = useChainsStore(
-    useShallow((s) => ({
-      canvas: s.canvas,
-      edges: s.edges,
-      targetConfigs: s.targetConfigs,
-      dirtyTargets: s.dirtyTargets,
-    })),
-  );
-  const blockConflicts = useMemo(
-    () => (checkBlocks ? detectBlockConflicts(graph).conflicts : []),
-    [checkBlocks, graph],
-  );
 
   // Домен из popup/localStorage → store (сбрасывает канву и каталог); подписи — тоже.
   useEffect(() => {
@@ -355,27 +337,6 @@ function ChainsPageInner() {
             </ToolGroup>
 
             <div className="ml-auto flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <SwitchField
-                  label="Проверить блоки"
-                  checked={checkBlocks}
-                  onCheckedChange={setCheckBlocks}
-                  title="Подсветить параллельные задачи с кнопкой «Согласие игрока» и одинаковым целевым действием"
-                />
-                {checkBlocks ? (
-                  <Badge
-                    variant={blockConflicts.length ? "destructive" : "muted"}
-                    title={
-                      blockConflicts.length
-                        ? blockConflicts.map((c) => c.tooltip).join("\n")
-                        : "Число групп с блокирующим конфликтом на канве"
-                    }
-                  >
-                    {formatConflictsCounter(blockConflicts.length)}
-                  </Badge>
-                ) : null}
-              </div>
-              <div className="h-6 w-px bg-border" aria-hidden="true" />
               <Button
                 variant="primary"
                 size="sm"

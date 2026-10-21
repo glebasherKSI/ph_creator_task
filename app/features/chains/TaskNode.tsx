@@ -35,8 +35,6 @@ export type TaskNodeData = {
   incoming: string[];
   outgoing: string[];
   dirty: boolean;
-  /** Конфликт блокировки (режим «Проверить блоки»): бейдж «⚠ блок» с причиной в title. */
-  blockConflict?: { tooltip: string };
 };
 
 export type TaskFlowNode = Node<TaskNodeData, "task">;
@@ -317,7 +315,7 @@ function ContextMenu({
 }
 
 export const TaskNode = memo(function TaskNode({ data, selected }: NodeProps<TaskFlowNode>) {
-  const { task, meta, incoming, outgoing, dirty, blockConflict } = data;
+  const { task, meta, incoming, outgoing, dirty } = data;
   const [menu, setMenu] = useState<{ x: number; y: number; group: string[] | null } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
 
@@ -405,11 +403,6 @@ export const TaskNode = memo(function TaskNode({ data, selected }: NodeProps<Tas
           {localOnly ? (
             <Badge variant="muted" title="Только локально — не синхронизирована с бэком">
               Только локально
-            </Badge>
-          ) : null}
-          {blockConflict ? (
-            <Badge variant="destructive" title={blockConflict.tooltip}>
-              ⚠ блок
             </Badge>
           ) : null}
           {dirty ? (
