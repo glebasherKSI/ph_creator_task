@@ -1,5 +1,5 @@
-/** Мультивыделение карточек: выбрать все / снять / убрать выбранные (рамка — Shift + drag). */
-import { Trash2 } from "lucide-react";
+/** Группа «Выделение»: выбрать все / снять / убрать выбранные (рамка — Shift + drag). */
+import { BoxSelect, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -23,31 +23,43 @@ export function SelectionToolbar() {
     store.setStatus(`Убрано с канвы: ${ids.length}`);
   }
 
-  if (!total) return null;
+  if (!selectedCount) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={!total}
+        onClick={() => selectAll(true)}
+        title="Выбрать все карточки (или рамкой: Shift + перетаскивание)"
+      >
+        <BoxSelect /> Выбрать все
+      </Button>
+    );
+  }
 
   return (
-    <div className="flex items-center gap-1">
+    <>
+      <span className="px-1.5 text-caption font-semibold text-primary tabular-nums">
+        Выбрано {selectedCount}
+      </span>
       <Button
         variant="ghost"
-        size="sm"
-        onClick={() => selectAll(true)}
-        title="Выбрать все карточки"
+        size="icon-sm"
+        aria-label="Снять выделение"
+        title="Снять выделение"
+        onClick={() => selectAll(false)}
       >
-        Выбрать все
-      </Button>
-      <Button variant="ghost" size="sm" disabled={!selectedCount} onClick={() => selectAll(false)}>
-        Снять
+        <X />
       </Button>
       <Button
         variant="ghost"
         size="sm"
-        disabled={!selectedCount}
         onClick={removeSelected}
         className="text-destructive hover:text-destructive"
         title="Убрать выбранные карточки с канвы"
       >
-        <Trash2 /> Убрать{selectedCount ? ` (${selectedCount})` : ""}
+        <Trash2 /> Убрать
       </Button>
-    </div>
+    </>
   );
 }

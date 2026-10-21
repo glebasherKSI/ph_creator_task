@@ -1,11 +1,26 @@
 /** Страница «Конструктор связей»: домен → каталог → канва React Flow → панель связи и форма задачи. */
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
-import { BookmarkPlus, FolderOpen, Loader2, Tag, X } from "lucide-react";
+import {
+  BookmarkPlus,
+  Columns3,
+  Download,
+  FolderOpen,
+  Loader2,
+  Maximize2,
+  MoreHorizontal,
+  RefreshCw,
+  Save,
+  Tag,
+  Upload,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { BackupButtons } from "@/components/backup-buttons";
+import { exportBackup, importBackup } from "@/components/backup-buttons";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
 import { SwitchField } from "@/components/ui/switch";
@@ -57,6 +72,37 @@ function SaveLog({ entries, onClose }: { entries: SaveLogEntry[]; onClose: () =>
 }
 
 type MainView = "canvas" | "stats" | "packages";
+
+/** Группа инструментов: подпись слева и кнопки в общей подложке. */
+function ToolGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1.5" role="group" aria-label={label}>
+      <span className="text-caption text-muted-foreground uppercase tracking-wide">{label}</span>
+      <div className="flex items-center gap-0.5 rounded-md bg-surface-2/50 p-0.5">{children}</div>
+    </div>
+  );
+}
+
+function MenuItem({
+  icon: Icon,
+  onClick,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full cursor-pointer items-center gap-2 rounded-chip px-2 py-1.5 text-left text-subhead hover:bg-surface-2"
+    >
+      <Icon className="size-4 text-muted-foreground" />
+      {children}
+    </button>
+  );
+}
 
 function ChainsPageInner() {
   const { domains, domain, setDomain, loaded } = useDomainList();
@@ -173,132 +219,181 @@ function ChainsPageInner() {
 
   return (
     <div className="flex h-screen flex-col gap-3 p-3">
-      <header className="flex flex-wrap items-center gap-3 rounded-lg bg-surface px-4 py-3">
-        <h1 className="text-title-2">Конструктор связей</h1>
-        <Segmented<MainView>
-          size="sm"
-          value={view}
-          onValueChange={(next) => {
-            setView(next);
-            if (next === "stats") {
-              void report.loadProjects();
-              if (!report.rows.length && !report.loading) report.reload(0);
-            }
-          }}
-          options={[
-            { value: "canvas", label: "Канва" },
-            { value: "stats", label: "Статистика" },
-            { value: "packages", label: "Пакеты" },
-          ]}
-          aria-label="Раздел"
-        />
-        <SimpleSelect
-          value={domain}
-          onValueChange={setDomain}
-          options={domains.map((d) => ({ value: d, label: d }))}
-          placeholder={loaded ? "Нет доменов" : "Загрузка…"}
-          disabled={!domains.length}
-          size="sm"
-          className="w-64 font-mono"
-          aria-label="Домен админки"
-        />
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
+      <header className="flex flex-col rounded-lg bg-surface">
+        {/* Уровень 1: раздел и источник данных */}
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+          <h1 className="text-title-2">Конструктор связей</h1>
+          <Segmented<MainView>
             size="sm"
-            disabled={!domain || catalogLoading}
-            onClick={() => void loadTasks(true)}
-          >
-            {catalogLoading ? <Loader2 className="animate-spin" /> : null}
-            Загрузить задачи
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!catalogHasMore || catalogLoading}
-            onClick={() => void loadTasks(false)}
-          >
-            Загрузить ещё
-          </Button>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-caption text-muted-foreground tabular-nums">
-            {catalogSize} задач · на канве {canvasSize}
-          </span>
-          <BackupButtons />
-          <SelectionToolbar />
-          <SwitchField
-            label="Проверить блоки"
-            checked={checkBlocks}
-            onCheckedChange={setCheckBlocks}
-            title="Подсветить параллельные задачи с кнопкой «Согласие игрока» и одинаковым целевым действием"
-          />
-          {checkBlocks ? (
-            <span
-              className={cn(
-                "text-caption tabular-nums",
-                blockConflicts.length ? "text-destructive" : "text-muted-foreground",
-              )}
-              title={
-                blockConflicts.length
-                  ? blockConflicts.map((c) => c.tooltip).join("\n")
-                  : "Число групп с блокирующим конфликтом на канве"
+            value={view}
+            onValueChange={(next) => {
+              setView(next);
+              if (next === "stats") {
+                void report.loadProjects();
+                if (!report.rows.length && !report.loading) report.reload(0);
               }
+            }}
+            options={[
+              { value: "canvas", label: "Канва" },
+              { value: "stats", label: "Статистика" },
+              { value: "packages", label: "Пакеты" },
+            ]}
+            aria-label="Раздел"
+          />
+          <div className="ml-auto flex items-center gap-2">
+            <SimpleSelect
+              value={domain}
+              onValueChange={setDomain}
+              options={domains.map((d) => ({ value: d, label: d }))}
+              placeholder={loaded ? "Нет доменов" : "Загрузка…"}
+              disabled={!domains.length}
+              size="sm"
+              className="w-72 font-mono"
+              aria-label="Домен админки"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!domain || catalogLoading}
+              onClick={() => void loadTasks(true)}
+              title="Загрузить список задач домена (с входом в админку при необходимости)"
             >
-              {formatConflictsCounter(blockConflicts.length)}
-            </span>
-          ) : null}
-          <Button
-            variant="secondary"
-            size="sm"
-            title="Добавить подпись на канву"
-            onClick={() => addLabel()}
-          >
-            <Tag /> Подпись
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!canvasSize}
-            title="Сохранить раскладку канвы как шаблон"
-            onClick={() => useSaveTemplateDialog.getState().show()}
-          >
-            <BookmarkPlus /> Сохранить шаблон
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!domain}
-            title="Загрузить сохранённый шаблон канвы"
-            onClick={() => useLoadTemplateDialog.getState().show()}
-          >
-            <FolderOpen /> Загрузить шаблон
-          </Button>
-          <Button variant="secondary" size="sm" disabled={!canvasSize} onClick={align}>
-            Выровнять
-          </Button>
-          <Button variant="secondary" size="sm" disabled={!canvasSize} onClick={() => fit()}>
-            Вписать
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            disabled={!dirtyCount || saving}
-            onClick={() => void save()}
-          >
-            {saving ? <Loader2 className="animate-spin" /> : null}
-            Сохранить{dirtyCount ? ` (${dirtyCount})` : ""}
-          </Button>
+              {catalogLoading ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              Загрузить задачи
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label="Ещё" title="Ещё">
+                  <MoreHorizontal />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-60">
+                <MenuItem icon={Download} onClick={() => void exportBackup()}>
+                  Экспорт данных
+                </MenuItem>
+                <MenuItem icon={Upload} onClick={() => void importBackup()}>
+                  Импорт данных
+                </MenuItem>
+                <p className="px-2 pt-1 pb-1.5 text-caption text-muted-foreground">
+                  Домены, сессии, шаблоны и раскладки в JSON
+                </p>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
-        <p
-          role="status"
-          className={cn(
-            "basis-full text-caption",
-            status.error ? "text-destructive" : "text-muted-foreground",
-          )}
-        >
-          {status.text}
-        </p>
+
+        {/* Уровень 2: инструменты канвы */}
+        {view === "canvas" ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-4 py-2 [&>[role=group]+[role=group]]:border-l [&>[role=group]+[role=group]]:border-border [&>[role=group]+[role=group]]:pl-4">
+            <ToolGroup label="Вид">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!canvasSize}
+                onClick={() => fit()}
+                title="Показать все карточки"
+              >
+                <Maximize2 /> Вписать
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!canvasSize}
+                onClick={align}
+                title="Разложить карточки по колонкам цепочек"
+              >
+                <Columns3 /> Выровнять
+              </Button>
+            </ToolGroup>
+            <ToolGroup label="Добавить">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => addLabel()}
+                title="Добавить подпись в центр канвы"
+              >
+                <Tag /> Подпись
+              </Button>
+            </ToolGroup>
+            <ToolGroup label="Шаблон">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!canvasSize}
+                title="Сохранить раскладку канвы как шаблон"
+                onClick={() => useSaveTemplateDialog.getState().show()}
+              >
+                <BookmarkPlus /> Сохранить
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!domain}
+                title="Загрузить сохранённый шаблон канвы"
+                onClick={() => useLoadTemplateDialog.getState().show()}
+              >
+                <FolderOpen /> Загрузить
+              </Button>
+            </ToolGroup>
+            <ToolGroup label="Выделение">
+              <SelectionToolbar />
+            </ToolGroup>
+
+            <div className="ml-auto flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <SwitchField
+                  label="Проверить блоки"
+                  checked={checkBlocks}
+                  onCheckedChange={setCheckBlocks}
+                  title="Подсветить параллельные задачи с кнопкой «Согласие игрока» и одинаковым целевым действием"
+                />
+                {checkBlocks ? (
+                  <Badge
+                    variant={blockConflicts.length ? "destructive" : "muted"}
+                    title={
+                      blockConflicts.length
+                        ? blockConflicts.map((c) => c.tooltip).join("\n")
+                        : "Число групп с блокирующим конфликтом на канве"
+                    }
+                  >
+                    {formatConflictsCounter(blockConflicts.length)}
+                  </Badge>
+                ) : null}
+              </div>
+              <div className="h-6 w-px bg-border" aria-hidden="true" />
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!dirtyCount || saving}
+                onClick={() => void save()}
+                title={
+                  dirtyCount ? "Сохранить изменённые связи на бэк" : "Нет несохранённых изменений"
+                }
+              >
+                {saving ? <Loader2 className="animate-spin" /> : <Save />}
+                Сохранить{dirtyCount ? ` (${dirtyCount})` : ""}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Статус и счётчики */}
+        <div className="flex items-center gap-3 border-t border-border px-4 py-1.5 text-caption">
+          <p
+            role="status"
+            className={cn(
+              "min-w-0 flex-1 truncate",
+              status.error ? "text-destructive" : "text-muted-foreground",
+            )}
+            title={status.text}
+          >
+            {status.text}
+          </p>
+          <span className="shrink-0 text-muted-foreground tabular-nums">
+            {catalogSize} в каталоге · {canvasSize} на канве
+            {dirtyCount ? <span className="text-primary"> · {dirtyCount} не сохранено</span> : null}
+          </span>
+        </div>
       </header>
 
       {/* Канва всегда смонтирована: переключение вкладок не теряет viewport и выделение. */}
@@ -309,7 +404,13 @@ function ChainsPageInner() {
           selectedEdge ? "grid-cols-[22rem_minmax(0,1fr)_auto]" : "grid-cols-[22rem_minmax(0,1fr)]",
         )}
       >
-        <CatalogSidebar onAdd={addToCanvas} onFocusNode={focusNode} />
+        <CatalogSidebar
+          onAdd={addToCanvas}
+          onFocusNode={focusNode}
+          hasMore={catalogHasMore}
+          loadingMore={catalogLoading}
+          onLoadMore={() => void loadTasks(false)}
+        />
         <div className="relative min-h-0">
           <FlowCanvas />
           {logOpen && saveLog.length ? (

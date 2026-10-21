@@ -113,9 +113,15 @@ function CatalogRow({
 export function CatalogSidebar({
   onAdd,
   onFocusNode,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: {
   onAdd: (ids: string[]) => Promise<void>;
   onFocusNode: (id: string) => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }) {
   const catalog = useChainsStore((s) => s.catalog);
   const order = useChainsStore((s) => s.catalogOrder);
@@ -273,6 +279,12 @@ export function CatalogSidebar({
         )}
       </div>
 
+      {hasMore && onLoadMore ? (
+        <Button variant="ghost" size="sm" disabled={loadingMore} onClick={onLoadMore}>
+          {loadingMore ? <Loader2 className="animate-spin" /> : null}
+          Загрузить ещё задачи
+        </Button>
+      ) : null}
       <Button variant="primary" disabled={!toAdd.length || adding} onClick={() => void add()}>
         {adding ? <Loader2 className="animate-spin" /> : null}
         Добавить выбранные на канву{toAdd.length ? ` (${toAdd.length})` : ""}
