@@ -4,6 +4,7 @@ import { BookmarkPlus, FolderOpen, Loader2, Tag, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { BackupButtons } from "@/components/backup-buttons";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
@@ -224,6 +225,7 @@ function ChainsPageInner() {
           <span className="text-caption text-muted-foreground tabular-nums">
             {catalogSize} задач · на канве {canvasSize}
           </span>
+          <BackupButtons />
           <SelectionToolbar />
           <SwitchField
             label="Проверить блоки"

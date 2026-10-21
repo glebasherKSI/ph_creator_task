@@ -27,7 +27,7 @@ type Converter = (...args: unknown[]) => unknown;
  */
 function legacyFunction(name: string): Converter {
   const source = readFileSync(
-    path.resolve(import.meta.dirname, "../../src/shared/conditions-builder.js"),
+    path.resolve(import.meta.dirname, "../../tests/legacy/shared/conditions-builder.js"),
     "utf8",
   ).replace(/\r\n/g, "\n");
   const start = source.indexOf(`function ${name}(`);

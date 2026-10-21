@@ -9,7 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       // Старый код как эталон в тестах паритета (см. tests/legacy.d.ts).
-      legacy: path.resolve(import.meta.dirname, "src/shared"),
+      legacy: path.resolve(import.meta.dirname, "tests/legacy/shared"),
     },
   },
   test: {

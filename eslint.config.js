@@ -8,8 +8,7 @@ export default tseslint.config(
   {
     // Старый код (src/, background.js) и сборка не линтим — они уходят по мере миграции.
     ignores: [
-      "src/**",
-      "background.js",
+      "tests/legacy/**",
       ".output/**",
       ".wxt/**",
       "exports/**",

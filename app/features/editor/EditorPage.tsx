@@ -5,6 +5,7 @@ import { useState } from "react";
 import { browser } from "wxt/browser";
 import { toast } from "sonner";
 
+import { BackupButtons } from "@/components/backup-buttons";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
@@ -117,6 +118,7 @@ export function EditorPage() {
             className="w-72 font-mono"
             aria-label="Домен админки"
           />
+          <BackupButtons />
           <Button variant="secondary" size="sm" onClick={openChains}>
             Конструктор связей
           </Button>

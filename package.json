@@ -1,6 +1,6 @@
 {
   "name": "ph-creator-task",
-  "version": "3.0.0-dev.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "description": "PromoHub конструктор задач — Chrome MV3 extension",
