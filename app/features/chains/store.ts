@@ -5,7 +5,7 @@
 import { create } from "zustand";
 
 import { loadChainsLayout, saveChainsLayout, type CanvasPosition } from "@/lib/storage";
-import { fetchTask, fetchTasksPage, updateTask } from "@/lib/task-api";
+import { type TasksPage, fetchTask, fetchTasksPage, updateTask } from "@/lib/task-api";
 import { buildPatchPayload, isSequenceType } from "@/lib/tasks";
 import type { GamificationTask, TaskLike } from "@/lib/types";
 
@@ -25,9 +25,11 @@ import {
 } from "./graph";
 import { GRID_START_X, GRID_START_Y, type LayoutOptions, layoutCanvasTasks } from "./layout";
 
-/** Размер страницы каталога и предохранитель от бесконечного цикла (100 × 100 = 10 000 задач). */
-const CATALOG_PAGE_SIZE = 100;
+/** Размер страницы каталога и предохранитель от бесконечного цикла (250 × 100 = 25 000 задач). */
+const CATALOG_PAGE_SIZE = 250;
 const MAX_CATALOG_PAGES = 100;
+/** Сколько страниц каталога запрашивается одновременно. */
+const CATALOG_CONCURRENCY = 4;
 
 export interface CatalogProgress {
   phase: "auth" | "loading";
@@ -185,39 +187,77 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
       catalogError: "",
       catalogProgress: { phase: "loading", scanned: 0, total: null },
     });
+
+    /** Страницы применяются строго по порядку offset — каталог сохраняет порядок бэка. */
+    const commit = (page: TasksPage, offsetAfter: number, replace: boolean) => {
+      set((s) => {
+        const catalog = replace ? {} : { ...s.catalog };
+        const order = replace ? [] : [...s.catalogOrder];
+        for (const task of page.tasks) {
+          const entry = catalogEntry(task);
+          if (!catalog[entry.id]) order.push(entry.id);
+          catalog[entry.id] = entry;
+        }
+        return {
+          catalog,
+          catalogOrder: order,
+          catalogOffset: offsetAfter,
+          catalogHasMore: page.hasMore,
+          catalogHidden: (replace ? 0 : s.catalogHidden) + page.hidden,
+          catalogProgress: { phase: "loading", scanned: offsetAfter, total: page.total },
+          status: {
+            text: `Загружаю задачи… ${order.length} (просмотрено ${offsetAfter})`,
+            error: false,
+          },
+        };
+      });
+    };
+
     try {
-      // reset — полная перезагрузка: проходим все страницы, пока бэк их отдаёт
-      // (в каталог попадают только active и draft). Иначе — одна следующая страница.
-      let offset = reset ? 0 : get().catalogOffset;
-      let first = reset;
-      for (let pageNo = 0; pageNo < MAX_CATALOG_PAGES; pageNo += 1) {
-        const page = await fetchTasksPage(domain, offset, CATALOG_PAGE_SIZE);
-        if (get().domain !== domain) return;
-        const replace = first;
-        first = false;
-        offset += page.rawCount;
-        set((s) => {
-          const catalog = replace ? {} : { ...s.catalog };
-          const order = replace ? [] : [...s.catalogOrder];
-          for (const task of page.tasks) {
-            const entry = catalogEntry(task);
-            if (!catalog[entry.id]) order.push(entry.id);
-            catalog[entry.id] = entry;
+      const startOffset = reset ? 0 : get().catalogOffset;
+      const first = await fetchTasksPage(domain, startOffset, CATALOG_PAGE_SIZE);
+      if (get().domain !== domain) return;
+      let offset = startOffset + first.rawCount;
+      commit(first, offset, reset);
+      let last = first;
+
+      if (reset && first.hasMore && first.rawCount > 0) {
+        // Шаг — фактический размер страницы (бэк может урезать limit).
+        const step = first.rawCount;
+        if (first.total != null) {
+          const offsets: number[] = [];
+          for (let o = offset; o < first.total && offsets.length < MAX_CATALOG_PAGES; o += step) {
+            offsets.push(o);
           }
-          return {
-            catalog,
-            catalogOrder: order,
-            catalogOffset: offset,
-            catalogHasMore: page.hasMore,
-            catalogHidden: (replace ? 0 : s.catalogHidden) + page.hidden,
-            catalogProgress: { phase: "loading", scanned: offset, total: page.total },
-            status: {
-              text: `Загружаю задачи… ${order.length} (просмотрено ${offset})`,
-              error: false,
-            },
+          const results = new Map<number, TasksPage>();
+          let nextToCommit = 0;
+          let cursor = 0;
+          const worker = async () => {
+            while (cursor < offsets.length) {
+              const index = cursor++;
+              const page = await fetchTasksPage(domain, offsets[index]!, step);
+              if (get().domain !== domain) return;
+              results.set(index, page);
+              while (results.has(nextToCommit)) {
+                const ready = results.get(nextToCommit)!;
+                results.delete(nextToCommit);
+                offset = offsets[nextToCommit]! + ready.rawCount;
+                commit(ready, offset, false);
+                last = ready;
+                nextToCommit += 1;
+              }
+            }
           };
-        });
-        if (!reset || !page.hasMore) break;
+          await Promise.all(Array.from({ length: CATALOG_CONCURRENCY }, worker));
+          if (get().domain !== domain) return;
+        }
+        // Без count (или если задач стало больше, пока грузили) — дочитываем по одной.
+        for (let n = 0; last.hasMore && last.rawCount > 0 && n < MAX_CATALOG_PAGES; n += 1) {
+          last = await fetchTasksPage(domain, offset, step);
+          if (get().domain !== domain) return;
+          offset += last.rawCount;
+          commit(last, offset, false);
+        }
       }
       set({ catalogLoading: false, catalogProgress: null });
     } catch (err) {

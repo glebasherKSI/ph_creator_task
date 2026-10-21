@@ -16,13 +16,13 @@ function task(id: number, state = "active"): GamificationTask {
   return { id, name: `T${id}`, frontend_identifier: `fi${id}`, state } as GamificationTask;
 }
 
-function page(ids: number[], hasMore: boolean, hidden = 0) {
+function page(ids: number[], hasMore: boolean, hidden = 0, total: number | null = null) {
   return {
     tasks: ids.map((id) => task(id)),
     hidden,
     rawCount: ids.length + hidden,
     hasMore,
-    total: null,
+    total,
   };
 }
 
@@ -48,6 +48,28 @@ describe("loadCatalog", () => {
     expect(fetchTasksPage.mock.calls.map((c) => c[1])).toEqual([0, 3, 4]);
     expect(s.catalogLoading).toBe(false);
     expect(s.catalogProgress).toBeNull();
+  });
+
+  it("с известным total — остальные страницы параллельно, коммит по порядку offset", async () => {
+    // Первая страница: 2 строки, total 6 → ещё offsets 2 и 4 (шаг = 2).
+    fetchTasksPage.mockImplementation(async (_d: string, offset: number) => {
+      if (offset === 0) return page([1, 2], true, 0, 6);
+      if (offset === 2) {
+        await new Promise((r) => setTimeout(r, 20)); // медленнее следующей
+        return page([3, 4], true, 0, 6);
+      }
+      return page([5, 6], false, 0, 6);
+    });
+    await useChainsStore.getState().loadCatalog(true);
+    const s = useChainsStore.getState();
+    expect(s.catalogOrder).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(s.catalogOffset).toBe(6);
+    expect(s.catalogHasMore).toBe(false);
+    expect(fetchTasksPage.mock.calls.map((c) => [c[1], c[2]])).toEqual([
+      [0, 250],
+      [2, 2],
+      [4, 2],
+    ]);
   });
 
   it("без reset — одна следующая страница", async () => {

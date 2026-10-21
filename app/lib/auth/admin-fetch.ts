@@ -153,6 +153,17 @@ async function wakeAdminTab(tabId: number): Promise<void> {
   await wakeup;
 }
 
+/** Вкладка недавно прошла проверку — пинг и повторный поиск не нужны (пачка запросов подряд). */
+const TAB_VALIDATION_TTL_MS = 10_000;
+const validatedTabs = new Map<number, number>();
+
+async function validateAdminTabCached(tabId: number): Promise<void> {
+  const at = validatedTabs.get(tabId);
+  if (at != null && Date.now() - at < TAB_VALIDATION_TTL_MS) return;
+  await validateAdminTab(tabId);
+  validatedTabs.set(tabId, Date.now());
+}
+
 async function validateAdminTab(tabId: number): Promise<Tab> {
   let tab: Tab;
   try {
@@ -323,7 +334,7 @@ async function adminApiFetchViaTab(
   const tabId = options.tabId ?? (await findAdminTab(domain))?.id;
   if (!tabId) throw new Error(AUTH_FETCH_ERRORS.TAB_REQUIRED);
 
-  await validateAdminTab(tabId);
+  await validateAdminTabCached(tabId);
 
   const refererPage = options.refererPage || options.referer || null;
   const result = await fetchInAdminPageContext(
