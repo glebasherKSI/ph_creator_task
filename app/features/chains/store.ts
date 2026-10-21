@@ -4,7 +4,6 @@
  */
 import { create } from "zustand";
 
-import { PAGE_SIZE } from "@/lib/constants";
 import { loadChainsLayout, saveChainsLayout, type CanvasPosition } from "@/lib/storage";
 import { fetchTask, fetchTasksPage, updateTask } from "@/lib/task-api";
 import { buildPatchPayload, isSequenceType } from "@/lib/tasks";
@@ -25,6 +24,10 @@ import {
   setTargetConfig,
 } from "./graph";
 import { GRID_START_X, GRID_START_Y, type LayoutOptions, layoutCanvasTasks } from "./layout";
+
+/** Размер страницы каталога и предохранитель от бесконечного цикла (100 × 100 = 10 000 задач). */
+const CATALOG_PAGE_SIZE = 100;
+const MAX_CATALOG_PAGES = 100;
 
 export interface CatalogTask {
   id: string;
@@ -155,28 +158,43 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
   },
 
   loadCatalog: async (reset) => {
-    const { domain, catalogOffset } = get();
+    const { domain } = get();
     if (!domain) return;
     set({ catalogLoading: true, catalogError: "" });
     try {
-      const page = await fetchTasksPage(domain, reset ? 0 : catalogOffset, PAGE_SIZE);
-      set((s) => {
-        const catalog = reset ? {} : { ...s.catalog };
-        const order = reset ? [] : [...s.catalogOrder];
-        for (const task of page.tasks) {
-          const entry = catalogEntry(task);
-          if (!catalog[entry.id]) order.push(entry.id);
-          catalog[entry.id] = entry;
-        }
-        return {
-          catalog,
-          catalogOrder: order,
-          catalogOffset: (reset ? 0 : s.catalogOffset) + page.rawCount,
-          catalogHasMore: page.hasMore,
-          catalogHidden: (reset ? 0 : s.catalogHidden) + page.hidden,
-          catalogLoading: false,
-        };
-      });
+      // reset — полная перезагрузка: проходим все страницы, пока бэк их отдаёт
+      // (в каталог попадают только active и draft). Иначе — одна следующая страница.
+      let offset = reset ? 0 : get().catalogOffset;
+      let first = reset;
+      for (let pageNo = 0; pageNo < MAX_CATALOG_PAGES; pageNo += 1) {
+        const page = await fetchTasksPage(domain, offset, CATALOG_PAGE_SIZE);
+        if (get().domain !== domain) return;
+        const replace = first;
+        first = false;
+        offset += page.rawCount;
+        set((s) => {
+          const catalog = replace ? {} : { ...s.catalog };
+          const order = replace ? [] : [...s.catalogOrder];
+          for (const task of page.tasks) {
+            const entry = catalogEntry(task);
+            if (!catalog[entry.id]) order.push(entry.id);
+            catalog[entry.id] = entry;
+          }
+          return {
+            catalog,
+            catalogOrder: order,
+            catalogOffset: offset,
+            catalogHasMore: page.hasMore,
+            catalogHidden: (replace ? 0 : s.catalogHidden) + page.hidden,
+            status: {
+              text: `Загружаю задачи… ${order.length} (просмотрено ${offset})`,
+              error: false,
+            },
+          };
+        });
+        if (!reset || !page.hasMore) break;
+      }
+      set({ catalogLoading: false });
     } catch (err) {
       set({ catalogLoading: false, catalogError: errorText(err) });
       throw err;
