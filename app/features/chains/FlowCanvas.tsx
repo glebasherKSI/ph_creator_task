@@ -14,16 +14,29 @@ import {
   type OnConnect,
   type OnEdgesChange,
   type OnNodesChange,
+  type OnNodesDelete,
   ReactFlow,
 } from "@xyflow/react";
 import { useCallback, useMemo, useState } from "react";
 
+import { conflictsByTask, detectBlockConflicts, useBlockCheck } from "./block-check";
+import {
+  type LabelFlowNode,
+  LabelNode,
+  PaneContextMenu,
+  parseLabelNodeId,
+  useAddLabel,
+  useLabelNodes,
+} from "./CanvasLabels";
 import { edgeKey } from "./graph";
+import { useLabelsStore } from "./labels-store";
 import { useChainsStore } from "./store";
 import { type TaskFlowNode, TaskNode } from "./TaskNode";
 import { useTaskSheet } from "./TaskSheet";
 
-const nodeTypes = { task: TaskNode };
+const nodeTypes = { task: TaskNode, label: LabelNode };
+
+type CanvasFlowNode = TaskFlowNode | LabelFlowNode;
 
 type Measured = Record<string, { width: number; height: number }>;
 
@@ -74,9 +87,27 @@ export function FlowCanvas() {
   const storeEdges = useChainsStore((s) => s.edges);
   const catalog = useChainsStore((s) => s.catalog);
   const dirtyTargets = useChainsStore((s) => s.dirtyTargets);
+  const targetConfigs = useChainsStore((s) => s.targetConfigs);
   const selectedIds = useChainsStore((s) => s.selectedIds);
   const selectedEdge = useChainsStore((s) => s.selectedEdge);
+  const checkBlocks = useBlockCheck((s) => s.enabled);
   const [measured, setMeasured] = useState<Measured>({});
+  const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(null);
+  const closePaneMenu = useCallback(() => setPaneMenu(null), []);
+  const addLabel = useAddLabel();
+  const labelNodes = useLabelNodes();
+
+  // Конфликты блокировок считаются только при включённой проверке.
+  const conflictByTask = useMemo(
+    () =>
+      checkBlocks
+        ? conflictsByTask(
+            detectBlockConflicts({ canvas, edges: storeEdges, targetConfigs, dirtyTargets })
+              .conflicts,
+          )
+        : {},
+    [checkBlocks, canvas, storeEdges, targetConfigs, dirtyTargets],
+  );
 
   const nodes = useMemo<TaskFlowNode[]>(() => {
     const incoming: Record<string, string[]> = {};
@@ -97,9 +128,14 @@ export function FlowCanvas() {
         incoming: incoming[task.id] ?? [],
         outgoing: outgoing[task.id] ?? [],
         dirty: dirtyTargets.includes(task.id),
+        blockConflict: conflictByTask[task.id]
+          ? { tooltip: conflictByTask[task.id]!.tooltip }
+          : undefined,
       },
     }));
-  }, [canvas, storeEdges, catalog, dirtyTargets, selectedIds, measured]);
+  }, [canvas, storeEdges, catalog, dirtyTargets, selectedIds, measured, conflictByTask]);
+
+  const allNodes = useMemo<CanvasFlowNode[]>(() => [...nodes, ...labelNodes], [nodes, labelNodes]);
 
   const edges = useMemo<Edge[]>(
     () =>
@@ -125,11 +161,23 @@ export function FlowCanvas() {
     [storeEdges, selectedEdge, dirtyTargets],
   );
 
-  const onNodesChange = useCallback<OnNodesChange<TaskFlowNode>>((changes) => {
+  const onNodesChange = useCallback<OnNodesChange<CanvasFlowNode>>((changes) => {
     // Выделение копим за весь пакет изменений: рамка/Shift+клик дают несколько select сразу.
     let nextSelected: Set<string> | null = null;
     for (const change of changes) {
       const store = useChainsStore.getState();
+      // Ноды подписей живут в labels-store: позиция и выделение уходят туда.
+      const labelId = "id" in change ? parseLabelNodeId(change.id) : null;
+      if (labelId) {
+        const labels = useLabelsStore.getState();
+        if (change.type === "position" && change.position) {
+          labels.update(labelId, { x: change.position.x, y: change.position.y });
+        } else if (change.type === "select") {
+          if (change.selected) labels.select(labelId);
+          else if (labels.selectedLabelId === labelId) labels.select(null);
+        }
+        continue;
+      }
       if (change.type === "position" && change.position) {
         store.moveTask(change.id, change.position.x, change.position.y);
       } else if (change.type === "select") {
@@ -165,11 +213,26 @@ export function FlowCanvas() {
       useChainsStore.getState().connect(connection.source, connection.target);
   }, []);
 
-  // Delete убирает только рёбра: ноды снимаются через меню карточки или список.
-  const onBeforeDelete = useCallback<OnBeforeDelete<TaskFlowNode, Edge>>(
-    async ({ edges: toDelete }) => ({ nodes: [], edges: toDelete }),
+  // Delete убирает рёбра и подписи: карточки снимаются через меню карточки или список.
+  const onBeforeDelete = useCallback<OnBeforeDelete<CanvasFlowNode, Edge>>(
+    async ({ nodes: toDeleteNodes, edges: toDelete }) => ({
+      nodes: toDeleteNodes.filter((n) => n.type === "label"),
+      edges: toDelete,
+    }),
     [],
   );
+
+  const onNodesDelete = useCallback<OnNodesDelete<CanvasFlowNode>>((deleted) => {
+    const labels = useLabelsStore.getState();
+    let removed = 0;
+    for (const node of deleted) {
+      const labelId = parseLabelNodeId(node.id);
+      if (!labelId) continue;
+      labels.remove(labelId);
+      removed += 1;
+    }
+    if (removed) useChainsStore.getState().setStatus("Подпись удалена");
+  }, []);
 
   const onEdgesDelete = useCallback((deleted: Edge[]) => {
     const store = useChainsStore.getState();
@@ -180,28 +243,40 @@ export function FlowCanvas() {
     const store = useChainsStore.getState();
     store.select(null);
     store.selectEdge(null);
+    useLabelsStore.getState().select(null);
   }, []);
 
   return (
     <div className="relative h-full min-h-0 w-full overflow-hidden rounded-lg bg-background ring-1 ring-border">
       <style>{FLOW_THEME}</style>
-      <ReactFlow<TaskFlowNode, Edge>
+      <ReactFlow<CanvasFlowNode, Edge>
         className="chains-flow"
-        nodes={nodes}
+        nodes={allNodes}
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onBeforeDelete={onBeforeDelete}
+        onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
-        onNodeDragStop={() => void useChainsStore.getState().persistPositions()}
-        onNodeClick={(_, node) => useChainsStore.getState().select(node.id)}
-        onNodeDoubleClick={(_, node) => useTaskSheet.getState().open("edit", node.id)}
+        onNodeDragStop={(_, node) => {
+          if (node.type !== "label") void useChainsStore.getState().persistPositions();
+        }}
+        onNodeClick={(_, node) => {
+          if (node.type !== "label") useChainsStore.getState().select(node.id);
+        }}
+        onNodeDoubleClick={(_, node) => {
+          if (node.type !== "label") useTaskSheet.getState().open("edit", node.id);
+        }}
         onEdgeClick={(_, edge) =>
           useChainsStore.getState().selectEdge({ from: edge.source, to: edge.target })
         }
         onPaneClick={onPaneClick}
+        onPaneContextMenu={(e) => {
+          e.preventDefault();
+          setPaneMenu({ x: e.clientX, y: e.clientY });
+        }}
         connectionLineType={ConnectionLineType.SmoothStep}
         defaultEdgeOptions={{ type: "smoothstep" }}
         deleteKeyCode={["Delete", "Backspace"]}
@@ -213,8 +288,16 @@ export function FlowCanvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} />
         <Controls showInteractive={false} />
-        {nodes.length ? <MiniMap pannable zoomable /> : null}
+        {allNodes.length ? <MiniMap pannable zoomable /> : null}
       </ReactFlow>
+      {paneMenu ? (
+        <PaneContextMenu
+          x={paneMenu.x}
+          y={paneMenu.y}
+          onAddLabel={() => addLabel(paneMenu)}
+          onClose={closePaneMenu}
+        />
+      ) : null}
       {nodes.length === 0 ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
           <p className="max-w-sm text-center text-subhead text-muted-foreground">

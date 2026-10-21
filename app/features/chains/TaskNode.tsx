@@ -3,7 +3,7 @@
  * мета-сетка, чипы входящих/исходящих связей и контекстное меню (правка, копия, цвет, убрать).
  */
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
-import { Calendar, Clock, Coins, Copy, Pencil, Trash2, X } from "lucide-react";
+import { Calendar, Clock, Coins, Copy, FolderOutput, Pencil, Trash2, X } from "lucide-react";
 import { memo, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { CanvasTask } from "./graph";
 import { type CatalogTask, HEADER_COLORS, useChainsStore } from "./store";
 import { useTaskSheet } from "./TaskSheet";
+import { useCopyToProjectDialog } from "./TemplatesDialogs";
 
 export type TaskNodeData = {
   task: CanvasTask;
@@ -23,6 +24,8 @@ export type TaskNodeData = {
   incoming: string[];
   outgoing: string[];
   dirty: boolean;
+  /** Конфликт блокировки (режим «Проверить блоки»): бейдж «⚠ блок» с причиной в title. */
+  blockConflict?: { tooltip: string };
 };
 
 export type TaskFlowNode = Node<TaskNodeData, "task">;
@@ -94,7 +97,7 @@ function DepChip({ children }: { children: React.ReactNode }) {
 }
 
 const MENU_W = 224;
-const MENU_H = 200;
+const MENU_H = 236;
 
 function ContextMenu({
   x,
@@ -159,6 +162,16 @@ function ContextMenu({
       >
         <Copy className="size-4 text-muted-foreground" /> Создать копию…
       </button>
+      <button
+        type="button"
+        role="menuitem"
+        className={item}
+        onClick={run(() =>
+          useCopyToProjectDialog.getState().show({ mode: "task", taskId: task.id }),
+        )}
+      >
+        <FolderOutput className="size-4 text-muted-foreground" /> Копировать в проект…
+      </button>
 
       <div className="my-1 border-t border-border" />
       <div className="px-2 pt-1 pb-0.5 text-caption text-muted-foreground">Цвет шапки</div>
@@ -208,7 +221,7 @@ function ContextMenu({
 }
 
 export const TaskNode = memo(function TaskNode({ data, selected }: NodeProps<TaskFlowNode>) {
-  const { task, meta, incoming, outgoing, dirty } = data;
+  const { task, meta, incoming, outgoing, dirty, blockConflict } = data;
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
 
@@ -289,6 +302,11 @@ export const TaskNode = memo(function TaskNode({ data, selected }: NodeProps<Tas
           {localOnly ? (
             <Badge variant="muted" title="Только локально — не синхронизирована с бэком">
               Только локально
+            </Badge>
+          ) : null}
+          {blockConflict ? (
+            <Badge variant="destructive" title={blockConflict.tooltip}>
+              ⚠ блок
             </Badge>
           ) : null}
           {dirty ? (

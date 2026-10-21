@@ -1,24 +1,30 @@
 /** Страница «Конструктор связей»: домен → каталог → канва React Flow → панель связи и форма задачи. */
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
-import { Loader2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BookmarkPlus, FolderOpen, Loader2, Tag, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
+import { SwitchField } from "@/components/ui/switch";
 import { useAuth } from "@/features/auth/AuthModal";
 import { useDomainList } from "@/features/editor/useDomainList";
 import { StatsPanel } from "@/features/stats/StatsPanel";
 import { useStatsReport } from "@/features/stats/useStatsReport";
 import { cn } from "@/lib/utils";
 
+import { detectBlockConflicts, formatConflictsCounter, useBlockCheck } from "./block-check";
+import { useAddLabel } from "./CanvasLabels";
 import { CatalogSidebar } from "./CatalogSidebar";
 import { EdgePanel } from "./EdgePanel";
 import { FlowCanvas } from "./FlowCanvas";
+import { useLabelsStore } from "./labels-store";
 import { PackagesPanel } from "./PackagesPanel";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { type SaveLogEntry, useChainsStore } from "./store";
 import { TaskSheet } from "./TaskSheet";
+import { TemplatesDialogs, useLoadTemplateDialog, useSaveTemplateDialog } from "./TemplatesDialogs";
 
 function SaveLog({ entries, onClose }: { entries: SaveLogEntry[]; onClose: () => void }) {
   const tone: Record<SaveLogEntry["kind"], string> = {
@@ -73,10 +79,26 @@ function ChainsPageInner() {
   const saving = useChainsStore((s) => s.saving);
   const saveLog = useChainsStore((s) => s.saveLog);
   const selectedEdge = useChainsStore((s) => s.selectedEdge);
+  const addLabel = useAddLabel();
+  const checkBlocks = useBlockCheck((s) => s.enabled);
+  const setCheckBlocks = useBlockCheck((s) => s.setEnabled);
+  const graph = useChainsStore(
+    useShallow((s) => ({
+      canvas: s.canvas,
+      edges: s.edges,
+      targetConfigs: s.targetConfigs,
+      dirtyTargets: s.dirtyTargets,
+    })),
+  );
+  const blockConflicts = useMemo(
+    () => (checkBlocks ? detectBlockConflicts(graph).conflicts : []),
+    [checkBlocks, graph],
+  );
 
-  // Домен из popup/localStorage → store (сбрасывает канву и каталог).
+  // Домен из popup/localStorage → store (сбрасывает канву и каталог); подписи — тоже.
   useEffect(() => {
     void useChainsStore.getState().setDomain(domain);
+    useLabelsStore.getState().clear();
   }, [domain]);
 
   function fit(ids?: string[]) {
@@ -203,6 +225,53 @@ function ChainsPageInner() {
             {catalogSize} задач · на канве {canvasSize}
           </span>
           <SelectionToolbar />
+          <SwitchField
+            label="Проверить блоки"
+            checked={checkBlocks}
+            onCheckedChange={setCheckBlocks}
+            title="Подсветить параллельные задачи с кнопкой «Согласие игрока» и одинаковым целевым действием"
+          />
+          {checkBlocks ? (
+            <span
+              className={cn(
+                "text-caption tabular-nums",
+                blockConflicts.length ? "text-destructive" : "text-muted-foreground",
+              )}
+              title={
+                blockConflicts.length
+                  ? blockConflicts.map((c) => c.tooltip).join("\n")
+                  : "Число групп с блокирующим конфликтом на канве"
+              }
+            >
+              {formatConflictsCounter(blockConflicts.length)}
+            </span>
+          ) : null}
+          <Button
+            variant="secondary"
+            size="sm"
+            title="Добавить подпись на канву"
+            onClick={() => addLabel()}
+          >
+            <Tag /> Подпись
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!canvasSize}
+            title="Сохранить раскладку канвы как шаблон"
+            onClick={() => useSaveTemplateDialog.getState().show()}
+          >
+            <BookmarkPlus /> Сохранить шаблон
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!domain}
+            title="Загрузить сохранённый шаблон канвы"
+            onClick={() => useLoadTemplateDialog.getState().show()}
+          >
+            <FolderOpen /> Загрузить шаблон
+          </Button>
           <Button variant="secondary" size="sm" disabled={!canvasSize} onClick={align}>
             Выровнять
           </Button>
@@ -269,6 +338,7 @@ function ChainsPageInner() {
       ) : null}
 
       <TaskSheet />
+      <TemplatesDialogs domains={domains} />
     </div>
   );
 }
