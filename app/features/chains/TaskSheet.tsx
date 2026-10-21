@@ -21,6 +21,7 @@ import type { TaskFormMode } from "@/features/task-form/task-form";
 import { createTask, updateTask } from "@/lib/task-api";
 import type { TaskPayloadEnvelope } from "@/lib/types";
 
+import { notifyGraphicBackendCreated } from "./packages-actions";
 import { useChainsStore } from "./store";
 
 interface TaskSheetState {
@@ -46,6 +47,9 @@ export function TaskSheet() {
   const catalog = useChainsStore((s) => s.catalog);
   const catalogOrder = useChainsStore((s) => s.catalogOrder);
   const taskName = useChainsStore((s) => (taskId ? s.canvas[taskId]?.name : undefined));
+  const isDraft = useChainsStore((s) => (taskId ? s.canvas[taskId]?.localOnly === true : false));
+  const draftBody = useChainsStore((s) => (taskId ? s.canvas[taskId]?.full : null));
+  const draftPlannerId = (draftBody?._plannerTaskId as number | string | null | undefined) ?? null;
 
   const taskOptions = useMemo(
     () => catalogOrder.map((id) => ({ id, name: catalog[id]?.name ?? "" })),
@@ -64,6 +68,25 @@ export function TaskSheet() {
   async function submit(payload: TaskPayloadEnvelope): Promise<unknown> {
     if (!taskId) throw new Error("Задача не выбрана");
     const store = useChainsStore.getState();
+    if (isDraft) {
+      // Локальный черновик (из пакета графика): POST, карточка получает настоящий id,
+      // последователи перелинковываются, планировщику уходит mark-backend-created.
+      const { response, newId, task } = await createTask(domain, payload);
+      if (newId == null || !task) {
+        const msg = "Задача создана, но id не найден — нажмите «Загрузить задачи»";
+        toast.warning(msg);
+        store.setStatus(msg, true);
+        return response;
+      }
+      store.applyCreatedTask(task, taskId);
+      void notifyGraphicBackendCreated(draftPlannerId, newId);
+      toast.success(`Черновик сохранён на бэк как #${newId}`);
+      store.setStatus(`Локальный черновик сохранён на бэк как #${newId}`);
+      close();
+      const followers = useChainsStore.getState().dirtyTargets;
+      if (followers.length) void useChainsStore.getState().saveChanges(followers);
+      return response;
+    }
     if (mode === "edit") {
       const { response, task } = await updateTask(domain, taskId, payload);
       if (task) store.applyUpdatedTask(task);
@@ -86,8 +109,12 @@ export function TaskSheet() {
     return response;
   }
 
-  const title =
-    mode === "copy" ? `Копия задачи #${taskId ?? ""}` : `Правка задачи #${taskId ?? ""}`;
+  const title = isDraft
+    ? "Создать задачу на бэке"
+    : mode === "copy"
+      ? `Копия задачи #${taskId ?? ""}`
+      : `Правка задачи #${taskId ?? ""}`;
+  const sourceTask = isDraft ? draftBody : source.data;
 
   return (
     <Dialog open={taskId != null} onOpenChange={(open) => !open && close()}>
@@ -105,26 +132,25 @@ export function TaskSheet() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {source.isPending && taskId != null ? (
+          {!isDraft && source.isPending && taskId != null ? (
             <div className="flex items-center gap-2 py-8 text-subhead text-muted-foreground">
               <Loader2 className="size-4 animate-spin" /> Загружаю задачу #{taskId}…
             </div>
-          ) : source.error ? (
+          ) : !isDraft && source.error ? (
             <p className="text-subhead text-destructive">
               Не удалось загрузить задачу: {(source.error as Error).message}
             </p>
-          ) : source.data == null ? (
-            <p className="text-subhead text-muted-foreground">
-              Задача ещё не создана на бэке — форма недоступна.
-            </p>
+          ) : sourceTask == null ? (
+            <p className="text-subhead text-muted-foreground">Задача недоступна.</p>
           ) : (
             <TaskForm
               key={`${mode}:${taskId ?? "none"}`}
-              mode={mode}
+              mode={isDraft ? "copy" : mode}
               domain={domain}
-              sourceTask={source.data}
+              sourceTask={sourceTask}
               taskOptions={taskOptions}
               onSubmit={submit}
+              title={isDraft ? "Параметры новой задачи" : undefined}
             />
           )}
         </div>

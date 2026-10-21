@@ -4,14 +4,18 @@ import { Loader2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/AuthModal";
 import { useDomainList } from "@/features/editor/useDomainList";
+import { StatsPanel } from "@/features/stats/StatsPanel";
+import { useStatsReport } from "@/features/stats/useStatsReport";
 import { cn } from "@/lib/utils";
 
 import { CatalogSidebar } from "./CatalogSidebar";
 import { EdgePanel } from "./EdgePanel";
 import { FlowCanvas } from "./FlowCanvas";
+import { PackagesPanel } from "./PackagesPanel";
 import { type SaveLogEntry, useChainsStore } from "./store";
 import { TaskSheet } from "./TaskSheet";
 
@@ -44,11 +48,19 @@ function SaveLog({ entries, onClose }: { entries: SaveLogEntry[]; onClose: () =>
   );
 }
 
+type MainView = "canvas" | "stats" | "packages";
+
 function ChainsPageInner() {
   const { domains, domain, setDomain, loaded } = useDomainList();
   const auth = useAuth();
   const rf = useReactFlow();
   const [logOpen, setLogOpen] = useState(false);
+  const [view, setView] = useState<MainView>("canvas");
+  const [taskOnly, setTaskOnly] = useState(false);
+  const report = useStatsReport(domain);
+  const selectedTask = useChainsStore((s) =>
+    s.selectedTaskId ? (s.canvas[s.selectedTaskId] ?? null) : null,
+  );
 
   const status = useChainsStore((s) => s.status);
   const setStatus = useChainsStore((s) => s.setStatus);
@@ -134,6 +146,23 @@ function ChainsPageInner() {
     <div className="flex h-screen flex-col gap-3 p-3">
       <header className="flex flex-wrap items-center gap-3 rounded-lg bg-surface px-4 py-3">
         <h1 className="text-title-2">Конструктор связей</h1>
+        <Segmented<MainView>
+          size="sm"
+          value={view}
+          onValueChange={(next) => {
+            setView(next);
+            if (next === "stats") {
+              void report.loadProjects();
+              if (!report.rows.length && !report.loading) report.reload(0);
+            }
+          }}
+          options={[
+            { value: "canvas", label: "Канва" },
+            { value: "stats", label: "Статистика" },
+            { value: "packages", label: "Пакеты" },
+          ]}
+          aria-label="Раздел"
+        />
         <SimpleSelect
           value={domain}
           onValueChange={setDomain}
@@ -194,9 +223,11 @@ function ChainsPageInner() {
         </p>
       </header>
 
+      {/* Канва всегда смонтирована: переключение вкладок не теряет viewport и выделение. */}
       <div
         className={cn(
           "grid min-h-0 flex-1 gap-3",
+          view !== "canvas" && "hidden",
           selectedEdge ? "grid-cols-[22rem_minmax(0,1fr)_auto]" : "grid-cols-[22rem_minmax(0,1fr)]",
         )}
       >
@@ -209,6 +240,26 @@ function ChainsPageInner() {
         </div>
         {selectedEdge ? <EdgePanel /> : null}
       </div>
+      {view === "stats" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-background p-4 ring-1 ring-border">
+          <StatsPanel
+            report={report}
+            activeTask={selectedTask ? { id: selectedTask.id, name: selectedTask.name } : null}
+            taskOnly={taskOnly}
+            onTaskOnlyChange={setTaskOnly}
+          />
+        </main>
+      ) : null}
+      {view === "packages" ? (
+        <main className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-background p-4 ring-1 ring-border">
+          <PackagesPanel
+            onOpened={() => {
+              setView("canvas");
+              window.setTimeout(() => fit(), 50);
+            }}
+          />
+        </main>
+      ) : null}
 
       <TaskSheet />
     </div>
