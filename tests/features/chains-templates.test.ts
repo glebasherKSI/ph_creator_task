@@ -6,12 +6,16 @@ import { useLabelsStore, parseCanvasLabels } from "@/features/chains/labels-stor
 import { GRID_START_X, GRID_START_Y } from "@/features/chains/layout";
 import { type CatalogTask, useChainsStore } from "@/features/chains/store";
 import {
+  applyTemplateDraftMatches,
   buildLoadTemplateConfirmMessage,
   buildLocalDraftTemplateFromSourceTemplate,
   buildLocalDraftTemplateFromTask,
+  buildTemplateDraftMatches,
   buildTemplateSaveToastMessage,
   countTemplateLocalDrafts,
+  findCatalogMatchForDraftName,
   flowViewportFromTemplate,
+  parseTaskNameSeason,
   planTemplateCanvas,
   restoreGraphFromTemplate,
   serializeCanvasTemplate,
@@ -19,7 +23,11 @@ import {
   templateCatalogIds,
   templateMetaLine,
 } from "@/features/chains/templates";
-import { applyCanvasTemplate, saveCanvasTemplate } from "@/features/chains/templates-actions";
+import {
+  applyCanvasTemplate,
+  computeTemplateDraftMatches,
+  saveCanvasTemplate,
+} from "@/features/chains/templates-actions";
 import { MAX_CANVAS_TEMPLATES_PER_DOMAIN } from "@/lib/constants";
 import { type CanvasTemplate, getDomainCanvasTemplates } from "@/lib/storage";
 import type { GamificationTask } from "@/lib/types";
@@ -518,5 +526,125 @@ describe("templates — сохранение и загрузка через stor
     const ok = await saveCanvasTemplate({ mode: "new", name: "T0" }, { x: 0, y: 0, scale: 1 });
     expect(ok.isUpdate).toBe(true);
     expect(await getDomainCanvasTemplates(DOMAIN)).toHaveLength(MAX_CANVAS_TEMPLATES_PER_DOMAIN);
+  });
+});
+
+describe("templates — сопоставление черновиков с каталогом по имени (Season N)", () => {
+  it("parseTaskNameSeason: разбирает маркер в конце имени, регистр и пробелы не важны", () => {
+    expect(parseTaskNameSeason("Ивент, лутбоксы Season 3")).toEqual({
+      base: "Ивент, лутбоксы",
+      season: 3,
+    });
+    expect(parseTaskNameSeason("Name   season10")).toEqual({ base: "Name", season: 10 });
+    expect(parseTaskNameSeason("Без сезона")).toBeNull();
+    expect(parseTaskNameSeason("Season 1")).toBeNull(); // пустая база
+    expect(parseTaskNameSeason("")).toBeNull();
+  });
+
+  it("findCatalogMatchForDraftName: без маркера сезона — точное совпадение по полному имени", () => {
+    const catalog = {
+      "1": catalogEntry("1"),
+      "2": { ...catalogEntry("2"), name: "Task 1" }, // дубликат имени "Task 1"
+    };
+    expect(findCatalogMatchForDraftName("Task 1", catalog)).toEqual({
+      status: "ambiguous",
+    });
+    expect(findCatalogMatchForDraftName("Task 404", catalog)).toEqual({ status: "unmatched" });
+    const unique = { "1": catalogEntry("1") };
+    expect(findCatalogMatchForDraftName("task 1", unique)).toEqual({
+      status: "matched",
+      id: "1",
+    });
+  });
+
+  it("findCatalogMatchForDraftName: с маркером — берёт максимальный сезон среди совпадений базы", () => {
+    const catalog = {
+      s2: { ...catalogEntry("s2"), name: "Ивент Season 2" },
+      s5: { ...catalogEntry("s5"), name: "ивент   season 5" },
+      s3other: { ...catalogEntry("s3other"), name: "Другой Season 3" },
+    };
+    // Номер сезона в самом черновике (хоть 1, хоть 99) не важен — берём максимум в каталоге.
+    expect(findCatalogMatchForDraftName("Ивент Season 1", catalog)).toEqual({
+      status: "matched",
+      id: "s5",
+      season: 5,
+    });
+    expect(findCatalogMatchForDraftName("Ивент Season 99", catalog)).toEqual({
+      status: "matched",
+      id: "s5",
+      season: 5,
+    });
+  });
+
+  it("findCatalogMatchForDraftName: несколько задач с одинаковым максимальным сезоном — ambiguous", () => {
+    const catalog = {
+      a: { ...catalogEntry("a"), name: "X Season 5" },
+      b: { ...catalogEntry("b"), name: "x season 5" },
+    };
+    expect(findCatalogMatchForDraftName("X Season 1", catalog)).toEqual({ status: "ambiguous" });
+  });
+
+  it("buildTemplateDraftMatches: matched/ambiguous/unmatched, коллизия с id уже на канве", () => {
+    const tpl = buildLocalDraftTemplateFromTask("ignored", { name: "Ивент Season 1" }, "", {
+      targetDomain: DOMAIN,
+      sourceDomain: DOMAIN,
+      newTemplateId: () => "t",
+      newDraftId: () => "local_1",
+    });
+    // Второй черновик без совпадения, третий — с совпадением, но id занят на канве.
+    tpl.canvas.local_2 = { x: 0, y: 0, localOnly: true };
+    tpl.taskBodies!.local_2 = { name: "Нет совпадения вообще" };
+    tpl.canvas.local_3 = { x: 0, y: 0, localOnly: true };
+    tpl.taskBodies!.local_3 = { name: "Занято" };
+    tpl.canvas["occupied"] = { x: 0, y: 0 }; // уже есть карточка с этим реальным id
+
+    const catalog = {
+      s5: { ...catalogEntry("s5"), name: "Ивент Season 5" },
+      occupied: { ...catalogEntry("occupied"), name: "Занято" },
+    };
+
+    const result = buildTemplateDraftMatches(tpl, catalog);
+    expect(result.matched).toEqual([
+      { oldId: "local_1", newId: "s5", name: "Ивент Season 1", season: 5 },
+    ]);
+    expect(result.unmatched.map((d) => d.id).sort()).toEqual(["local_2", "local_3"]);
+    expect(result.ambiguous).toEqual([]);
+  });
+
+  it("applyTemplateDraftMatches: переносит canvas/taskBodies/edges/targetConfigs на новый id", () => {
+    let seq = 0;
+    const tpl = buildLocalDraftTemplateFromSourceTemplate(
+      serializeSample("Исходный"),
+      { local_a: { name: "Ивент Season 1" } },
+      {
+        targetDomain: DOMAIN,
+        sourceDomain: DOMAIN,
+        newTemplateId: () => "t",
+        newDraftId: () => `local_n${++seq}`,
+      },
+    );
+    const draftId = Object.keys(tpl.taskBodies!)[0]!;
+    const updated = applyTemplateDraftMatches(tpl, [
+      { oldId: draftId, newId: "999", name: "Ивент Season 1", season: 5 },
+    ]);
+    expect(updated.canvas["999"]).toBeDefined();
+    expect(updated.canvas["999"]!.localOnly).toBeUndefined();
+    expect(updated.canvas["999"]!.configuredOnBackend).toBeUndefined();
+    expect(updated.canvas[draftId]).toBeUndefined();
+    expect(updated.taskBodies?.[draftId]).toBeUndefined();
+    expect(updated.updatedAt).toBeTruthy();
+    // Без совпадений — та же ссылка на объект (no-op).
+    expect(applyTemplateDraftMatches(tpl, [])).toBe(tpl);
+  });
+
+  it("computeTemplateDraftMatches: требует загруженный каталог домена", async () => {
+    useChainsStore.setState({ domain: DOMAIN, catalog: {}, catalogOrder: [] });
+    const saved = await saveCanvasTemplate(
+      { mode: "new", name: "Пустой" },
+      { x: 0, y: 0, scale: 1 },
+    );
+    await expect(computeTemplateDraftMatches(saved.template.id)).rejects.toThrow(
+      "Сначала загрузите задачи",
+    );
   });
 });

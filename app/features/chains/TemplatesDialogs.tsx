@@ -6,7 +6,7 @@
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useReactFlow } from "@xyflow/react";
-import { FolderOutput, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeftRight, FolderOutput, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { create } from "zustand";
@@ -34,12 +34,15 @@ import {
 import { useChainsStore } from "./store";
 import {
   buildLoadTemplateConfirmMessage,
+  countTemplateLocalDrafts,
   templateMetaLine,
   templateOptionLabel,
   templateViewportFromFlow,
 } from "./templates";
 import {
   applyCanvasTemplate,
+  applyTemplateDraftMatchesAndSave,
+  computeTemplateDraftMatches,
   copyTaskToProject,
   copyTemplateToProject,
   saveCanvasTemplate,
@@ -321,6 +324,55 @@ export function LoadTemplateDialog() {
     useCopyToProjectDialog.getState().show({ mode: "template", templateId: template.id });
   }
 
+  /**
+   * Сопоставляет локальные черновики шаблона (например, после копирования с другого проекта)
+   * с уже созданными на бэке задачами по имени — с учётом маркера «Season N»: если имя
+   * заканчивается на «… Season N», берётся задача с тем же базовым именем и максимальным
+   * номером сезона в каталоге, а не обязательно тем же N, что в черновике.
+   */
+  async function matchDrafts(template: CanvasTemplate) {
+    setBusyId(template.id);
+    try {
+      const { matched, ambiguous, unmatched } = await computeTemplateDraftMatches(template.id);
+
+      if (!matched.length) {
+        const reasonParts: string[] = [];
+        if (ambiguous.length)
+          reasonParts.push(`${ambiguous.length} — несколько задач с таким именем`);
+        if (unmatched.length) reasonParts.push(`${unmatched.length} — совпадений не найдено`);
+        toast.warning(
+          reasonParts.length
+            ? `Не удалось сопоставить черновики: ${reasonParts.join(", ")}`
+            : "В шаблоне нет черновиков для сопоставления",
+          { duration: 6000 },
+        );
+        return;
+      }
+
+      const lines = matched.map(
+        (m) =>
+          `«${m.name}» → #${m.newId}${m.season != null ? ` (последний сезон: ${m.season})` : ""}`,
+      );
+      const confirmParts = [
+        `Заменить ${matched.length} черновик${matched.length === 1 ? "" : "ов"} в шаблоне «${template.name}» на созданные задачи?`,
+        lines.slice(0, 10).join("\n") + (lines.length > 10 ? `\n…и ещё ${lines.length - 10}` : ""),
+      ];
+      if (ambiguous.length) confirmParts.push(`Пропущено (неоднозначно): ${ambiguous.length}`);
+      if (unmatched.length) confirmParts.push(`Пропущено (нет совпадений): ${unmatched.length}`);
+      if (!window.confirm(confirmParts.join("\n\n"))) return;
+
+      await applyTemplateDraftMatchesAndSave(template, matched);
+      await queryClient.invalidateQueries({ queryKey: [TEMPLATES_KEY] });
+      toast.success(
+        `Шаблон «${template.name}»: заменено ${matched.length} черновик${matched.length === 1 ? "" : "ов"} на созданные задачи`,
+      );
+    } catch (err) {
+      toast.warning(errorText(err) || "Не удалось обновить шаблон");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const list = templates.data ?? [];
 
   return (
@@ -362,6 +414,22 @@ export function LoadTemplateDialog() {
                   {busyId === template.id ? <Loader2 className="animate-spin" /> : null}
                   Загрузить
                 </Button>
+                {countTemplateLocalDrafts(template) > 0 ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Заменить черновики шаблона ${template.name} на созданные задачи`}
+                    title="Заменить черновики на созданные задачи с таким же названием"
+                    disabled={busyId != null}
+                    onClick={() => void matchDrafts(template)}
+                  >
+                    {busyId === template.id ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <ArrowLeftRight />
+                    )}
+                  </Button>
+                ) : null}
                 <Button
                   variant="ghost"
                   size="icon-sm"

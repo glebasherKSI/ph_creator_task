@@ -3,6 +3,7 @@
  * старого расширения), план раскладки шаблона на канву, восстановление рёбер и настроек,
  * сборка локальных черновиков для копирования на другой проект. Без chrome.* и React.
  */
+import { normalizeTaskNameForMatch } from "@/lib/reports";
 import type { CanvasLabel, CanvasPosition, CanvasTemplate, CanvasViewport } from "@/lib/storage";
 import { cloneJson, normalizeGamificationTasksCondition } from "@/lib/tasks";
 import type { GamificationTasksCondition, TaskLike } from "@/lib/types";
@@ -169,6 +170,190 @@ export function countTemplateLocalDrafts(template: CanvasTemplate | null | undef
     ...Object.keys(canvas).filter((id) => canvas[id]?.localOnly === true),
   ]);
   return ids.size;
+}
+
+/** Черновики шаблона (localOnly-задачи без реального id) с их именами из taskBodies. */
+export function getTemplateDraftEntries(template: CanvasTemplate): { id: string; name: string }[] {
+  const canvas = isRecord(template.canvas) ? template.canvas : {};
+  const bodies = isRecord(template.taskBodies) ? template.taskBodies : {};
+  const ids = new Set<string>([
+    ...Object.keys(bodies),
+    ...Object.keys(canvas).filter((id) => canvas[id]?.localOnly === true),
+  ]);
+  return [...ids].map((id) => ({ id, name: String(bodies[id]?.name ?? "").trim() }));
+}
+
+/**
+ * Разбирает маркер сезона в конце имени задачи, например «Ивент, лутбоксы Season 3» →
+ * `{ base: "Ивент, лутбоксы", season: 3 }`. Маркер должен идти самым последним словом в имени.
+ */
+export function parseTaskNameSeason(name: string): { base: string; season: number } | null {
+  const raw = String(name ?? "").trim();
+  const match = /^(.*?)\s*season\s*(\d+)\s*$/i.exec(raw);
+  if (!match) return null;
+  const base = match[1]!.trim();
+  const season = Number(match[2]);
+  if (!base || !Number.isFinite(season)) return null;
+  return { base, season };
+}
+
+export type CatalogNameMatch =
+  | { status: "unmatched" }
+  | { status: "ambiguous" }
+  | { status: "matched"; id: string; season?: number };
+
+/** Ищет в каталоге домена задачу с точно таким же (нормализованным) именем. */
+export function findCatalogMatchByName(
+  name: string,
+  catalog: Record<string, CatalogTask>,
+): CatalogNameMatch {
+  const target = normalizeTaskNameForMatch(name);
+  if (!target) return { status: "unmatched" };
+  const matches = Object.values(catalog).filter(
+    (meta) => normalizeTaskNameForMatch(meta.name) === target,
+  );
+  if (!matches.length) return { status: "unmatched" };
+  if (matches.length > 1) return { status: "ambiguous" };
+  return { status: "matched", id: matches[0]!.id };
+}
+
+/**
+ * Если имя черновика оканчивается на «… Season N» — ищет в каталоге задачи с тем же базовым
+ * именем (без учёта номера сезона в самом черновике) и берёт ту, у которой номер сезона
+ * максимальный (последний добавленный сезон). Если маркера сезона нет — обычное сравнение
+ * по полному имени (findCatalogMatchByName).
+ */
+export function findCatalogMatchForDraftName(
+  name: string,
+  catalog: Record<string, CatalogTask>,
+): CatalogNameMatch {
+  const seasonInfo = parseTaskNameSeason(name);
+  if (!seasonInfo) return findCatalogMatchByName(name, catalog);
+
+  const targetBase = normalizeTaskNameForMatch(seasonInfo.base);
+  if (!targetBase) return { status: "unmatched" };
+
+  const bySeason = new Map<number, string[]>();
+  for (const meta of Object.values(catalog)) {
+    const metaSeasonInfo = parseTaskNameSeason(meta.name);
+    if (!metaSeasonInfo) continue;
+    if (normalizeTaskNameForMatch(metaSeasonInfo.base) !== targetBase) continue;
+    const list = bySeason.get(metaSeasonInfo.season) ?? [];
+    list.push(meta.id);
+    bySeason.set(metaSeasonInfo.season, list);
+  }
+
+  if (!bySeason.size) return { status: "unmatched" };
+
+  const maxSeason = Math.max(...bySeason.keys());
+  const candidates = bySeason.get(maxSeason)!;
+  if (candidates.length > 1) return { status: "ambiguous" };
+  return { status: "matched", id: candidates[0]!, season: maxSeason };
+}
+
+export interface TemplateDraftMatch {
+  oldId: string;
+  newId: string;
+  name: string;
+  season: number | null;
+}
+
+export interface TemplateDraftMatchResult {
+  matched: TemplateDraftMatch[];
+  ambiguous: { id: string; name: string }[];
+  unmatched: { id: string; name: string }[];
+}
+
+/**
+ * Сопоставляет локальные черновики шаблона с уже созданными на бэке задачами по имени
+ * (с учётом маркера «Season N» — см. findCatalogMatchForDraftName).
+ * Возвращает matched (можно заменить), ambiguous (несколько кандидатов) и unmatched.
+ */
+export function buildTemplateDraftMatches(
+  template: CanvasTemplate,
+  catalog: Record<string, CatalogTask>,
+): TemplateDraftMatchResult {
+  const canvas = isRecord(template.canvas) ? template.canvas : {};
+  const drafts = getTemplateDraftEntries(template);
+  const matched: TemplateDraftMatch[] = [];
+  const ambiguous: { id: string; name: string }[] = [];
+  const unmatched: { id: string; name: string }[] = [];
+  const usedTargets = new Set<string>();
+
+  for (const draft of drafts) {
+    if (!draft.name) {
+      unmatched.push(draft);
+      continue;
+    }
+    const result = findCatalogMatchForDraftName(draft.name, catalog);
+    if (result.status !== "matched") {
+      if (result.status === "ambiguous") ambiguous.push(draft);
+      else unmatched.push(draft);
+      continue;
+    }
+    // На канве уже есть карточка с этим реальным id — заменять черновик им нельзя (коллизия id).
+    if ((canvas[result.id] && result.id !== draft.id) || usedTargets.has(result.id)) {
+      unmatched.push(draft);
+      continue;
+    }
+    usedTargets.add(result.id);
+    matched.push({
+      oldId: draft.id,
+      newId: result.id,
+      name: draft.name,
+      season: result.season ?? null,
+    });
+  }
+
+  return { matched, ambiguous, unmatched };
+}
+
+/** Возвращает копию шаблона, в которой указанные черновики заменены реальными id задач. */
+export function applyTemplateDraftMatches(
+  template: CanvasTemplate,
+  matches: TemplateDraftMatch[],
+): CanvasTemplate {
+  if (!matches.length) return template;
+  const idMap = new Map(matches.map((m) => [m.oldId, m.newId]));
+
+  const canvas: Record<string, CanvasPosition> = {};
+  for (const [id, layout] of Object.entries(template.canvas ?? {})) {
+    const newId = idMap.get(id);
+    if (!newId) {
+      canvas[id] = layout;
+      continue;
+    }
+    const next = { ...layout };
+    delete next.localOnly;
+    delete next.configuredOnBackend;
+    canvas[newId] = next;
+  }
+
+  const taskBodies: Record<string, TaskLike> = {};
+  for (const [id, body] of Object.entries(template.taskBodies ?? {})) {
+    if (!idMap.has(id)) taskBodies[id] = body;
+  }
+
+  const edges = (Array.isArray(template.edges) ? template.edges : []).map((e) => ({
+    from: idMap.get(e.from) ?? e.from,
+    to: idMap.get(e.to) ?? e.to,
+  }));
+
+  const targetConfigs: CanvasTemplate["targetConfigs"] = {};
+  for (const [id, cfg] of Object.entries(template.targetConfigs ?? {})) {
+    targetConfigs[idMap.get(id) ?? id] = cfg;
+  }
+
+  const next: CanvasTemplate = {
+    ...template,
+    canvas,
+    edges,
+    targetConfigs,
+    updatedAt: new Date().toISOString(),
+  };
+  if (Object.keys(taskBodies).length) next.taskBodies = taskBodies;
+  else delete next.taskBodies;
+  return next;
 }
 
 /** Подпись шаблона в списках: «Имя (N задач)». */

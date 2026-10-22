@@ -17,9 +17,12 @@ import { useLabelsStore } from "./labels-store";
 import { useChainsStore } from "./store";
 import {
   type FlowViewport,
+  type TemplateDraftMatch,
   buildLocalDraftTemplateFromSourceTemplate,
   buildLocalDraftTemplateFromTask,
+  buildTemplateDraftMatches,
   buildTemplateSaveToastMessage,
+  applyTemplateDraftMatches,
   countTemplateTasks,
   flowViewportFromTemplate,
   planTemplateCanvas,
@@ -199,6 +202,44 @@ export async function applyCanvasTemplate(
     message,
     warning: plan.missing.length > 0,
   };
+}
+
+export interface MatchTemplateDraftsResult {
+  template: CanvasTemplate;
+  matched: TemplateDraftMatch[];
+  ambiguous: { id: string; name: string }[];
+  unmatched: { id: string; name: string }[];
+}
+
+/**
+ * Находит шаблон домена и сопоставляет его локальные черновики с уже созданными на бэке
+ * задачами по имени (с учётом маркера «Season N» — см. findCatalogMatchForDraftName в
+ * templates.ts). Требует предварительно загруженный каталог домена.
+ */
+export async function computeTemplateDraftMatches(
+  templateId: string,
+): Promise<MatchTemplateDraftsResult> {
+  const store = useChainsStore.getState();
+  const domain = store.domain;
+  const templates = domain ? await getDomainCanvasTemplates(domain) : [];
+  const template = templates.find((t) => t.id === templateId);
+  if (!template) throw new Error("Шаблон не найден");
+  if (!Object.keys(store.catalog).length) {
+    throw new Error("Сначала загрузите задачи для домена — кнопка «Загрузить»");
+  }
+  const { matched, ambiguous, unmatched } = buildTemplateDraftMatches(template, store.catalog);
+  return { template, matched, ambiguous, unmatched };
+}
+
+/** Применяет найденные совпадения (замена черновиков реальными id) и сохраняет шаблон. */
+export async function applyTemplateDraftMatchesAndSave(
+  template: CanvasTemplate,
+  matched: TemplateDraftMatch[],
+): Promise<CanvasTemplate> {
+  const domain = useChainsStore.getState().domain;
+  const updated = applyTemplateDraftMatches(template, matched);
+  await upsertDomainCanvasTemplate(domain, updated);
+  return updated;
 }
 
 /** Полное тело задачи для копирования: с канвы (у черновика — без локальных id в связях) или с бэка. */
