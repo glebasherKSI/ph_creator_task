@@ -14,7 +14,7 @@ import type { TaskLike } from "@/lib/types";
 
 import { EMPTY_GRAPH, stripLocalTaskIds } from "./graph";
 import { useLabelsStore } from "./labels-store";
-import { useChainsStore } from "./store";
+import { fetchTasksForCanvas, useChainsStore } from "./store";
 import {
   type FlowViewport,
   buildLocalDraftTemplateFromSourceTemplate,
@@ -134,47 +134,56 @@ export async function applyCanvasTemplate(
   const store = useChainsStore.getState();
   const domain = store.domain;
   if (!domain) throw new Error("Выберите домен");
+  const title = `Шаблон «${template.name}»`;
+  const stage = (note: string) =>
+    useChainsStore.setState({ addProgress: { title, note, done: 0, total: null } });
 
-  const catalogIds = templateCatalogIds(template);
-  if (catalogIds.length) {
-    const authed = await ensureAuthenticated(domain);
-    const absent = catalogIds.filter((id) => !store.catalog[id]);
-    if (absent.length) {
-      if (!authed) throw new Error("Вход не выполнен — задачи шаблона не загружены");
-      store.setStatus("Загружаю список задач для шаблона…");
-      await ensureCatalogHas(absent);
+  let plan: ReturnType<typeof planTemplateCanvas>;
+  let loaded: Map<string, TaskLike>;
+  try {
+    const catalogIds = templateCatalogIds(template);
+    if (catalogIds.length) {
+      stage("Проверяю вход в админку…");
+      const authed = await ensureAuthenticated(domain);
+      const absent = catalogIds.filter((id) => !store.catalog[id]);
+      if (absent.length) {
+        if (!authed) throw new Error("Вход не выполнен — задачи шаблона не загружены");
+        stage("Ищу задачи шаблона в каталоге…");
+        await ensureCatalogHas(absent);
+      }
     }
+
+    plan = planTemplateCanvas(template, useChainsStore.getState().catalog);
+    // Сначала все задачи с бэка, потом канва — одним обновлением (без перерисовки на каждый ответ).
+    ({ loaded } = await fetchTasksForCanvas(domain, plan.catalogIds, title));
+  } finally {
+    useChainsStore.setState({ addProgress: null });
   }
 
-  const plan = planTemplateCanvas(template, useChainsStore.getState().catalog);
-
+  const canvas = { ...plan.placed };
+  for (const id of plan.catalogIds) {
+    const task = canvas[id];
+    if (!task) continue;
+    const full = loaded.get(id);
+    // Не загрузилась — карточка остаётся с данными каталога и без условий.
+    canvas[id] = full
+      ? {
+          ...task,
+          full,
+          conditions: (full.conditions as typeof task.conditions) ?? [],
+          name: String(full.name || task.name),
+          frontend_identifier: String(full.frontend_identifier || task.frontend_identifier),
+        }
+      : { ...task, conditions: [] };
+  }
   useChainsStore.setState({
-    ...EMPTY_GRAPH,
-    canvas: plan.placed,
+    ...restoreGraphFromTemplate({ ...EMPTY_GRAPH, canvas }, template),
+    detachedDeps: {},
     selectedTaskId: null,
+    selectedIds: [],
     selectedEdge: null,
   });
   useLabelsStore.getState().clear();
-
-  let done = 0;
-  await Promise.all(
-    plan.catalogIds.map(async (id) => {
-      try {
-        await useChainsStore.getState().ensureFull(id);
-      } catch {
-        useChainsStore.setState((s) => {
-          const task = s.canvas[id];
-          if (!task || task.conditions != null) return {};
-          return { canvas: { ...s.canvas, [id]: { ...task, conditions: [] } } };
-        });
-      } finally {
-        done += 1;
-        useChainsStore.getState().setStatus(`Загрузка условий: ${done}/${plan.catalogIds.length}`);
-      }
-    }),
-  );
-
-  useChainsStore.setState((s) => restoreGraphFromTemplate(s, template));
   useLabelsStore.getState().load(template.labels);
   await useChainsStore.getState().persistPositions();
 

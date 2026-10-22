@@ -42,9 +42,48 @@ const CATALOG_CONCURRENCY = 4;
 const ADD_CONCURRENCY = 6;
 
 export interface AddProgress {
+  /** Заголовок оверлея («Загружаю задачи», «Шаблон …»). */
+  title: string;
+  /** Что происходит сейчас; при total = null полоса бегущая. */
+  note: string;
   /** Загружено задач (включая неудачные). */
   done: number;
-  total: number;
+  total: number | null;
+}
+
+/**
+ * Полные задачи с бэка — по ADD_CONCURRENCY одновременно, без изменений канвы
+ * (она обновляется один раз, когда всё загружено). Прогресс — в addProgress.
+ */
+export async function fetchTasksForCanvas(
+  domain: string,
+  ids: string[],
+  title: string,
+): Promise<{ loaded: Map<string, GamificationTask>; failed: string[] }> {
+  const loaded = new Map<string, GamificationTask>();
+  const failed: string[] = [];
+  let done = 0;
+  let cursor = 0;
+  const total = ids.length;
+  const progress = () =>
+    useChainsStore.setState({
+      addProgress: { title, note: "затем добавлю на канву и выровняю", done, total },
+    });
+  progress();
+  const worker = async () => {
+    while (cursor < ids.length) {
+      const id = ids[cursor++]!;
+      try {
+        loaded.set(id, await fetchTask(domain, id));
+      } catch {
+        failed.push(id);
+      }
+      done += 1;
+      progress();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(ADD_CONCURRENCY, ids.length) }, worker));
+  return { loaded, failed };
 }
 
 export interface CatalogProgress {
@@ -303,28 +342,13 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
 
     // Сначала загружаем все задачи (канва не перерисовывается на каждый ответ),
     // затем добавляем их одним обновлением и раскладываем.
-    const loaded = new Map<string, GamificationTask>();
-    const failed: string[] = [];
-    let done = 0;
-    let cursor = 0;
-    set({ addProgress: { done: 0, total: fresh.length } });
-    const worker = async () => {
-      while (cursor < fresh.length) {
-        const id = fresh[cursor++]!;
-        try {
-          loaded.set(id, await fetchTask(domain, id));
-        } catch {
-          failed.push(id);
-        }
-        done += 1;
-        set({ addProgress: { done, total: fresh.length } });
-      }
-    };
+    let result: Awaited<ReturnType<typeof fetchTasksForCanvas>>;
     try {
-      await Promise.all(Array.from({ length: Math.min(ADD_CONCURRENCY, fresh.length) }, worker));
+      result = await fetchTasksForCanvas(domain, fresh, "Загружаю задачи");
     } finally {
       set({ addProgress: null });
     }
+    const { loaded, failed } = result;
     if (get().domain !== domain) return;
 
     const added = fresh.filter((id) => loaded.has(id) && !get().canvas[id]);

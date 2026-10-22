@@ -50,9 +50,9 @@ function AddProgressOverlay() {
 
   const open = progress != null;
   const view = progress ?? shown;
-  const done = open ? (view?.done ?? 0) : (view?.total ?? 0);
-  const total = view?.total ?? 0;
-  const percent = total ? Math.round((done / total) * 100) : 0;
+  const total = view?.total ?? null;
+  const done = open ? (view?.done ?? 0) : (total ?? 0);
+  const percent = total ? Math.round((done / total) * 100) : null;
 
   return (
     <div
@@ -64,7 +64,7 @@ function AddProgressOverlay() {
     >
       <div
         role="progressbar"
-        aria-valuenow={percent}
+        aria-valuenow={percent ?? undefined}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-label="Загрузка задач для канвы"
@@ -75,17 +75,23 @@ function AddProgressOverlay() {
       >
         <div className="flex items-center gap-2">
           <Loader2 className="size-4 animate-spin text-primary" />
-          <span className="text-headline">Загружаю задачи</span>
-          <span className="ml-auto font-semibold text-primary tabular-nums">{percent}%</span>
+          <span className="min-w-0 truncate text-headline">{view?.title ?? "Загружаю задачи"}</span>
+          {percent != null ? (
+            <span className="ml-auto font-semibold text-primary tabular-nums">{percent}%</span>
+          ) : null}
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-            style={{ width: `${percent}%` }}
-          />
+        <div className="relative h-2 overflow-hidden rounded-full bg-surface-2">
+          {percent != null ? (
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+              style={{ width: `${percent}%` }}
+            />
+          ) : (
+            <div className="absolute inset-y-0 w-1/3 animate-[progress-indeterminate_1.2s_ease-in-out_infinite] rounded-full bg-primary" />
+          )}
         </div>
         <div className="text-caption text-muted-foreground tabular-nums">
-          {done} из {total} · затем добавлю на канву и выровняю
+          {total != null ? `Задачи: ${done} из ${total} · ${view?.note ?? ""}` : view?.note}
         </div>
       </div>
     </div>

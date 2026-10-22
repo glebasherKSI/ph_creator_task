@@ -278,7 +278,6 @@ export function LoadTemplateDialog() {
   const rf = useReactFlow();
   const queryClient = useQueryClient();
   const templates = useDomainTemplates(domain, open);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function load(template: CanvasTemplate) {
     const store = useChainsStore.getState();
@@ -289,13 +288,13 @@ export function LoadTemplateDialog() {
       }),
     );
     if (!ok) return;
-    setBusyId(template.id);
+    // Диалог закрывается сразу — прогресс показывает оверлей канвы.
+    close();
     try {
       const result = await applyCanvasTemplate(template, {
         ensureAuthenticated: (d) =>
           auth.ensureAuthenticated(d, { message: `Для загрузки шаблона нужен вход в ${d}` }),
       });
-      close();
       if (result.viewport) void rf.setViewport(result.viewport);
       else window.setTimeout(() => void rf.fitView({ padding: 0.2, maxZoom: 1 }), 50);
       if (result.warning) toast.warning(result.message, { duration: 7000 });
@@ -304,8 +303,6 @@ export function LoadTemplateDialog() {
       const message = `Ошибка загрузки шаблона: ${errorText(err)}`;
       useChainsStore.getState().setStatus(message, true);
       toast.warning(message);
-    } finally {
-      setBusyId(null);
     }
   }
 
@@ -353,13 +350,7 @@ export function LoadTemplateDialog() {
                     {templateMetaLine(template)}
                   </div>
                 </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={busyId != null}
-                  onClick={() => void load(template)}
-                >
-                  {busyId === template.id ? <Loader2 className="animate-spin" /> : null}
+                <Button variant="primary" size="sm" onClick={() => void load(template)}>
                   Загрузить
                 </Button>
                 <Button
@@ -367,7 +358,6 @@ export function LoadTemplateDialog() {
                   size="icon-sm"
                   aria-label={`Копировать шаблон ${template.name} в проект`}
                   title="Копировать шаблон в проект…"
-                  disabled={busyId != null}
                   onClick={() => copyToProject(template)}
                 >
                   <FolderOutput />
@@ -377,7 +367,6 @@ export function LoadTemplateDialog() {
                   size="icon-sm"
                   aria-label={`Удалить шаблон ${template.name}`}
                   title="Удалить шаблон"
-                  disabled={busyId != null}
                   className="text-destructive hover:text-destructive"
                   onClick={() => void remove(template)}
                 >
