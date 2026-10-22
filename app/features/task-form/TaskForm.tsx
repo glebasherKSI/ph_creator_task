@@ -242,6 +242,19 @@ export function TaskForm({
   const form = useForm<TaskFormValues>({ defaultValues: emptyFormValues(), resolver });
   const { control, register, handleSubmit, reset, formState } = form;
 
+  // Языки проекта (если справочник загрузился) объединяем с тем, что уже заполнено в
+  // форме — на случай задачи с языком вне текущего списка проекта (например, скопирована
+  // из другого проекта) или пока справочник ещё не загрузился (запасной статический список).
+  const formLocales = useWatch({ control, name: "locales" });
+  const localeCodes = useMemo(() => {
+    const dynamic = countries.data?.locales;
+    const base = dynamic?.length ? dynamic : KNOWN_LOCALE_CODES;
+    return [...new Set([...base, ...Object.keys(formLocales ?? {})])];
+  }, [countries.data?.locales, formLocales]);
+  const filledLocalesCount = localeCodes.filter((code) =>
+    (formLocales?.[code] ?? "").trim(),
+  ).length;
+
   // Новая исходная задача → форма перезаполняется (как fillFromTask).
   useEffect(() => {
     reset(sourceTask ? taskToFormValues(sourceTask, { mode }) : emptyFormValues());
@@ -401,10 +414,10 @@ export function TaskForm({
           </Field>
           <details className="col-span-2 rounded-md bg-surface-2/40 p-3" open>
             <summary className="cursor-pointer text-subhead select-none">
-              Названия по языкам
+              Названия по языкам — заполнено {filledLocalesCount}/{localeCodes.length}
             </summary>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {KNOWN_LOCALE_CODES.map((code) => (
+              {localeCodes.map((code) => (
                 <Field key={code} label={code} htmlFor={`tf-locale-${code}`}>
                   <Input
                     id={`tf-locale-${code}`}

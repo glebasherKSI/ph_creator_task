@@ -93,6 +93,20 @@ describe("parseCountriesData — паритет со старой реализа
     expect(data.countriesLists.map((item) => item.id)).toContain("welcome_level_1");
     expect(data.source).toBe("fixture");
   });
+
+  it("достаёт реальные языки проекта из constants.locales", () => {
+    const data = parseCountriesData(FIXTURE, "fixture");
+    expect(data.locales).toEqual(["en", "ru", "fr", "de", "pl", "ua"]);
+  });
+
+  it("locales: без поля — пустой список; дубликаты и регистр нормализуются", () => {
+    expect(parseCountriesData({}, "x").locales).toEqual([]);
+    expect(parseCountriesData({ locales: ["RU", "ru", " En ", "de"] }, "x").locales).toEqual([
+      "ru",
+      "en",
+      "de",
+    ]);
+  });
 });
 
 describe("enrichFromConditions", () => {
@@ -113,7 +127,10 @@ describe("enrichFromConditions", () => {
   });
 
   it("дополняет пустые списки из схемы", () => {
-    const data = enrichFromConditions({ countries: [], countriesLists: [], source: "x" }, schema);
+    const data = enrichFromConditions(
+      { countries: [], countriesLists: [], locales: [], source: "x" },
+      schema,
+    );
     expect(data.countries).toEqual([
       { code: "BY", en: "Беларусь", ru: "Беларусь" },
       { code: "US", en: "США", ru: "США" },

@@ -41,6 +41,8 @@ export interface CountryListOption {
 export interface CountriesData {
   countries: CountryOption[];
   countriesLists: CountryListOption[];
+  /** Языки, реально настроенные на проекте (constants.locales), нижний регистр. */
+  locales: string[];
   source: string;
 }
 
@@ -110,7 +112,21 @@ export function parseCountriesData(raw: unknown, source = "unknown"): CountriesD
     });
   }
 
-  return { countries, countriesLists, source };
+  const locales: string[] = [];
+  if (Array.isArray(constants.locales)) {
+    const seen = new Set<string>();
+    for (const item of constants.locales) {
+      const code = String(item ?? "")
+        .trim()
+        .toLowerCase();
+      if (code && !seen.has(code)) {
+        seen.add(code);
+        locales.push(code);
+      }
+    }
+  }
+
+  return { countries, countriesLists, locales, source };
 }
 
 /** Пустые списки дополняем из схемы условий (collection / extra.countriesLists profile_country). */

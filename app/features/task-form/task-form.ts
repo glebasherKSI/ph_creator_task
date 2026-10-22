@@ -167,9 +167,13 @@ export function taskToFormValues(task: TaskLike, { mode }: { mode: TaskFormMode 
       ? [String(task.event)]
       : [];
 
+  // Поля на случай, если языки проекта ещё не загружены (см. KNOWN_LOCALE_CODES), плюс
+  // любые языки, реально заданные в задаче — даже если их нет в текущем списке проекта
+  // (например, задача скопирована из проекта с другим набором языков), чтобы не терять данные.
   const locales: Record<string, string> = {};
   const sourceLocales = isRecord(task.locales) ? task.locales : {};
-  for (const code of KNOWN_LOCALE_CODES) {
+  const localeCodes = new Set<string>([...KNOWN_LOCALE_CODES, ...Object.keys(sourceLocales)]);
+  for (const code of localeCodes) {
     locales[code] = sourceLocales[code] == null ? "" : String(sourceLocales[code]);
   }
 
@@ -258,9 +262,12 @@ export function formValuesToOverrides(
   const type = values.type.trim() || undefined;
   const category = values.category.trim() || undefined;
 
+  // Отправляем все заполненные языки из формы — не только статический список: поля для
+  // реальных языков проекта рендерятся динамически (см. TaskForm.tsx), а эта функция не
+  // должна зависеть от того, какой именно набор там оказался.
   const locales: Record<string, string> = {};
-  for (const code of KNOWN_LOCALE_CODES) {
-    const text = (values.locales[code] ?? "").trim();
+  for (const [code, raw] of Object.entries(values.locales)) {
+    const text = (raw ?? "").trim();
     if (text) locales[code] = text;
   }
 
