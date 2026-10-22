@@ -1,14 +1,15 @@
-/** Вкладка «Пакеты»: сессия Promo Graphic, список пакетов, «Открыть на канве». */
+/** Вкладка «Пакеты»: список пакетов Promo Graphic, «Открыть на канве». Вход — только в popup расширения. */
 import { Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/segmented";
+import { SimpleSelect } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/AuthModal";
-import { GraphicCard } from "@/features/popup/GraphicCard";
 import { useGraphic } from "@/features/popup/useGraphic";
 import { graphicApiGet } from "@/lib/graphic-api";
+import { getGraphicProjectForDomain } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 import { openPackageOnCanvas } from "./packages-actions";
@@ -31,6 +32,26 @@ export function PackagesPanel({ onOpened }: { onOpened: () => void }) {
   const [error, setError] = useState("");
   const [opening, setOpening] = useState<string | null>(null);
   const seq = useRef(0);
+  const domain = useChainsStore((s) => s.domain);
+  /** Код проекта ("" — все). По умолчанию — проект, выбранный для домена в «Отправить в пакет». */
+  const [project, setProject] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    void getGraphicProjectForDomain(domain).then((code) => {
+      if (alive) setProject(code);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [domain]);
+
+  const projectOptions = useMemo(() => {
+    const codes = new Set(items.map((p) => p.project_code).filter((c): c is string => !!c));
+    if (project) codes.add(project);
+    return [...codes].sort().map((code) => ({ value: code, label: code }));
+  }, [items, project]);
+  const shown = project ? items.filter((p) => p.project_code === project) : items;
 
   const load = useCallback((filter: PackageStatusFilter) => {
     const mySeq = ++seq.current;
@@ -112,18 +133,28 @@ export function PackagesPanel({ onOpened }: { onOpened: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-title-2">Пакеты Promo Graphic</h2>
-      <div className="max-w-md">
-        <GraphicCard state={graphic} />
-      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Segmented<PackageStatusFilter>
-          size="sm"
-          value={status}
-          onValueChange={setStatus}
-          options={PACKAGE_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-          aria-label="Статус пакета"
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented<PackageStatusFilter>
+            size="sm"
+            value={status}
+            onValueChange={setStatus}
+            options={PACKAGE_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+            aria-label="Статус пакета"
+          />
+          <div className="w-48">
+            <SimpleSelect
+              size="sm"
+              value={project}
+              onValueChange={setProject}
+              options={projectOptions}
+              nullable
+              nullLabel="Все проекты"
+              aria-label="Проект"
+            />
+          </div>
+        </div>
         <Button
           variant="secondary"
           size="sm"
@@ -140,21 +171,27 @@ export function PackagesPanel({ onOpened }: { onOpened: () => void }) {
         </p>
       ) : null}
 
-      {!authenticated ? (
+      {graphic.status === null ? (
+        <p className="flex items-center gap-2 text-subhead text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" /> Проверяю вход в Promo Graphic…
+        </p>
+      ) : !authenticated ? (
         <p className="rounded-md border border-dashed border-border p-4 text-center text-subhead text-muted-foreground">
-          Сначала войдите в Promo Graphic
+          Войдите в Promo Graphic в окне расширения: иконка на панели браузера → вкладка «Graphic».
+          <br />
+          После входа список пакетов загрузится сам.
         </p>
       ) : loading && !items.length ? (
         <p className="flex items-center gap-2 text-subhead text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Загрузка пакетов…
         </p>
-      ) : !items.length ? (
+      ) : !shown.length ? (
         <p className="rounded-md border border-dashed border-border p-4 text-center text-subhead text-muted-foreground">
-          Пакетов нет
+          {items.length ? `Нет пакетов проекта ${project}` : "Пакетов нет"}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {items.map((pkg) => {
+          {shown.map((pkg) => {
             const key = String(pkg.id);
             return (
               <li

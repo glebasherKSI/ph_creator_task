@@ -22,7 +22,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
-import { GraphicCard } from "@/features/popup/GraphicCard";
 import { useGraphic } from "@/features/popup/useGraphic";
 import { getGraphicProjectForDomain } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -773,7 +772,11 @@ export function SendToPackageDialog() {
         {authenticated ? (
           <SendFlow key={seq} taskIds={taskIds} onClose={close} />
         ) : (
-          <GraphicCard state={graphic} />
+          <p className="rounded-md border border-dashed border-border p-4 text-center text-subhead text-muted-foreground">
+            {graphic.status === null
+              ? "Проверяю вход в Promo Graphic…"
+              : "Войдите в Promo Graphic в окне расширения: иконка на панели браузера → вкладка «Graphic». Диалог продолжит работу сам."}
+          </p>
         )}
       </DialogContent>
     </Dialog>
