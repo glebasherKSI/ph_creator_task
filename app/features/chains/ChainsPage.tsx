@@ -35,6 +35,7 @@ import { useLabelsStore } from "./labels-store";
 import { PackagesPanel } from "./PackagesPanel";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { SendToPackageDialog } from "./SendToPackageDialog";
+import { TitlesSyncDialog } from "./TitlesSyncDialog";
 import { measuredHeights } from "./layout";
 import { type CatalogProgress, type SaveLogEntry, useChainsStore } from "./store";
 import { TaskSheet } from "./TaskSheet";
@@ -420,6 +421,7 @@ function ChainsPageInner() {
       <TaskSheet />
       <TemplatesDialogs domains={domains} />
       <SendToPackageDialog />
+      <TitlesSyncDialog />
     </div>
   );
 }

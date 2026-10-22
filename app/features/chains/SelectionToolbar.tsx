@@ -1,6 +1,6 @@
 /** Группа «Выделение»: выбрать все / снять / цвет / выровнять / в пакет / убрать (рамка — Shift + drag). */
 import { useReactFlow } from "@xyflow/react";
-import { BoxSelect, LayoutGrid, PackagePlus, Palette, Trash2, X } from "lucide-react";
+import { BoxSelect, Languages, LayoutGrid, PackagePlus, Palette, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { measuredHeights } from "./layout";
 import { useSendToPackageDialog } from "./SendToPackageDialog";
 import { useChainsStore } from "./store";
 import { HeaderColorPalette, commonHeaderColor, removeTasksWithConfirm } from "./TaskNode";
+import { runTitlesSync } from "./titles-sync";
 
 export function SelectionToolbar() {
   const rf = useReactFlow();
@@ -89,6 +90,14 @@ export function SelectionToolbar() {
         title="Отправить выбранные задачи в пакет Promo Graphic"
       >
         <PackagePlus /> В пакет
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => void runTitlesSync(ids)}
+        title="Подтянуть названия по локалям из Promo Graphic для выбранных задач"
+      >
+        <Languages /> Названия
       </Button>
       <Button
         variant="ghost"

@@ -2,7 +2,7 @@
  * Форма задачи (копия / правка) — замена copy-panel.js.
  * Состояние формы — react-hook-form; все сложные поля — controlled-компоненты через Controller.
  */
-import { ChevronDown, Info } from "lucide-react";
+import { ChevronDown, Info, Languages, Loader2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -24,6 +24,7 @@ import {
   toLabeledOptions,
   typeLabel,
 } from "@/lib/labels-ru";
+import { lookupFrontTitles, mergeLocales } from "@/lib/front-titles";
 import { DEFAULT_CATEGORIES, DEFAULT_PRIORITIES, DEFAULT_TASK_TYPES } from "@/lib/meta";
 import { isSequenceType } from "@/lib/tasks";
 import type { TaskLike, TaskPayloadEnvelope } from "@/lib/types";
@@ -240,7 +241,50 @@ export function TaskForm({
   const countries = useCountriesData(domain);
 
   const form = useForm<TaskFormValues>({ defaultValues: emptyFormValues(), resolver });
-  const { control, register, handleSubmit, reset, formState } = form;
+  const { control, register, handleSubmit, reset, formState, getValues, setValue } = form;
+  const [titlesSync, setTitlesSync] = useState<{
+    busy: boolean;
+    text: string;
+    tone: "muted" | "ok" | "warn" | "error";
+  }>({ busy: false, text: "", tone: "muted" });
+
+  /** Названия по локалям из словаря Promo Graphic по frontend_identifier — в поля формы. */
+  async function pullTitlesFromGraphic() {
+    const frontId = String(getValues("frontendIdentifier") ?? "").trim();
+    if (!frontId) {
+      setTitlesSync({ busy: false, text: "Сначала заполните frontend_identifier", tone: "warn" });
+      return;
+    }
+    setTitlesSync({ busy: true, text: "Ищу в словаре Promo Graphic…", tone: "muted" });
+    try {
+      const titles = await lookupFrontTitles(frontId);
+      if (!titles) {
+        setTitlesSync({
+          busy: false,
+          text: `«${frontId}» нет в словаре «Названия фронт»`,
+          tone: "warn",
+        });
+        return;
+      }
+      const merged = mergeLocales(getValues("locales"), titles, KNOWN_LOCALE_CODES);
+      for (const code of KNOWN_LOCALE_CODES) {
+        if (titles[code]) setValue(`locales.${code}`, titles[code], { shouldDirty: true });
+      }
+      setTitlesSync({
+        busy: false,
+        text: merged.missing.length
+          ? `Подставлено. Не заполнены: ${merged.missing.join(", ")}`
+          : "Подставлено — все локали заполнены. Не забудьте сохранить задачу.",
+        tone: merged.missing.length ? "warn" : "ok",
+      });
+    } catch (err) {
+      setTitlesSync({
+        busy: false,
+        text: `${err instanceof Error ? err.message : String(err)} — вход в Promo Graphic в окне расширения`,
+        tone: "error",
+      });
+    }
+  }
 
   // Новая исходная задача → форма перезаполняется (как fillFromTask).
   useEffect(() => {
@@ -413,6 +457,33 @@ export function TaskForm({
                   />
                 </Field>
               ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={titlesSync.busy}
+                onClick={() => void pullTitlesFromGraphic()}
+                title="Найти переводы по frontend_identifier в словаре «Названия фронт» Promo Graphic"
+              >
+                {titlesSync.busy ? <Loader2 className="animate-spin" /> : <Languages />}
+                Подтянуть из графика
+              </Button>
+              {titlesSync.text ? (
+                <span
+                  role="status"
+                  className={cn(
+                    "text-caption",
+                    titlesSync.tone === "ok" && "text-success",
+                    titlesSync.tone === "warn" && "text-primary",
+                    titlesSync.tone === "error" && "text-destructive",
+                    titlesSync.tone === "muted" && "text-muted-foreground",
+                  )}
+                >
+                  {titlesSync.text}
+                </span>
+              ) : null}
             </div>
           </details>
           <Field

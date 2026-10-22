@@ -9,6 +9,7 @@ import {
   Coins,
   Copy,
   FolderOutput,
+  Languages,
   LayoutGrid,
   PackagePlus,
   Pencil,
@@ -28,6 +29,7 @@ import type { CanvasTask } from "./graph";
 import { measuredHeights } from "./layout";
 import { type CatalogTask, HEADER_COLORS, useChainsStore } from "./store";
 import { useTaskSheet } from "./TaskSheet";
+import { runTitlesSync } from "./titles-sync";
 import { useSendToPackageDialog } from "./SendToPackageDialog";
 import { useCopyToProjectDialog } from "./TemplatesDialogs";
 
@@ -242,6 +244,14 @@ function ContextMenu({
           })}
         >
           <LayoutGrid className="size-4 text-muted-foreground" /> Выровнять выбранные
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          className={item}
+          onClick={run(() => void runTitlesSync(group))}
+        >
+          <Languages className="size-4 text-muted-foreground" /> Названия из графика
         </button>
         <button
           type="button"
