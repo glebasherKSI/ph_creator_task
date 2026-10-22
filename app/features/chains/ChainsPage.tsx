@@ -10,11 +10,13 @@ import {
   MoreHorizontal,
   RefreshCw,
   Save,
+  ShieldCheck,
   Tag,
   Upload,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { exportBackup, importBackup } from "@/components/backup-buttons";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/AuthModal";
+import { isDomainAuthenticated } from "@/features/auth/auth-flow";
 import { useDomainList } from "./useDomainList";
 import { StatsPanel } from "@/features/stats/StatsPanel";
 import { useStatsReport } from "@/features/stats/useStatsReport";
@@ -117,6 +120,7 @@ function ChainsPageInner() {
   const [logOpen, setLogOpen] = useState(false);
   const [view, setView] = useState<MainView>("canvas");
   const [taskOnly, setTaskOnly] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(false);
   const report = useStatsReport(domain);
   const selectedTask = useChainsStore((s) =>
     s.selectedTaskId ? (s.canvas[s.selectedTaskId] ?? null) : null,
@@ -148,6 +152,37 @@ function ChainsPageInner() {
       duration: 300,
       ...(ids ? { nodes: ids.map((id) => ({ id })) } : {}),
     });
+  }
+
+  /**
+   * «Проверить вход»: лёгкая проверка статуса без принудительного логина — если сессия уже
+   * активна (например, вы уже были залогинены ранее), просто сообщает об этом тостом,
+   * не открывая модалку входа.
+   */
+  async function handleCheckAuth() {
+    if (!domain) {
+      toast.warning("Выберите домен админки");
+      return;
+    }
+    setCheckingAuth(true);
+    try {
+      const status = await auth.queryDomainAuthStatus(domain, { force: true });
+      if (isDomainAuthenticated(status)) {
+        toast.success(status.email ? `Вход выполнен: ${status.email}` : "Вход выполнен");
+      } else if (status.pendingOtp) {
+        toast.warning(
+          "Magic link принят — осталось ввести OTP. Нажмите «Загрузить», чтобы завершить вход.",
+        );
+      } else if (status.awaitingMagicLink) {
+        toast.warning("Ожидание magic link — проверьте почту");
+      } else {
+        toast.warning(
+          status.error || "Вход не выполнен — нажмите «Загрузить», чтобы авторизоваться",
+        );
+      }
+    } finally {
+      setCheckingAuth(false);
+    }
   }
 
   async function loadTasks(reset: boolean) {
@@ -249,6 +284,16 @@ function ChainsPageInner() {
               className="w-72 font-mono"
               aria-label="Домен админки"
             />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={!domain || checkingAuth}
+              onClick={() => void handleCheckAuth()}
+              title="Проверить, выполнен ли вход в выбранный домен (без запроса OTP, если сессия уже активна)"
+              aria-label="Проверить вход в выбранный домен"
+            >
+              {checkingAuth ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+            </Button>
             <Button
               variant="secondary"
               size="sm"
