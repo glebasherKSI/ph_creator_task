@@ -3924,9 +3924,26 @@ function normalizeFrontIdKey(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+/** Заголовок столбца похож на короткий код локали — "RU", "EN", "pt" и т.п. (2-3 латинские буквы). */
+function isLocaleHeaderCode(header) {
+  return /^[a-z]{2,3}$/i.test(String(header || "").trim());
+}
+
+/** Заголовок столбца похож на front_id — "Front ID", "front_id", "FrontID", "frontend_identifier". */
+function isFrontIdHeader(header) {
+  const normalized = String(header || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_.-]+/g, "");
+  return normalized.includes("frontid") || normalized.includes("frontendid");
+}
+
 /**
- * Разбирает листы .xlsx (каждый лист — локаль, напр. "RU"/"EN") в карту
- * front_id → (код локали → название). Первый столбец листа — front_id, второй — название.
+ * Разбирает листы .xlsx в карту front_id → (код локали → название) по заголовкам столбцов:
+ * первая строка каждого листа — заголовки, среди них ищем столбец front_id (по названию,
+ * см. isFrontIdHeader) и столбцы-локали (короткие буквенные коды, напр. RU/EN/DE — см.
+ * isLocaleHeaderCode). Остальные столбцы (название, описание, ставка и т.п.) игнорируются.
+ * Лист без столбца front_id или без ни одной локали пропускается целиком.
  * Сопоставление по front_id регистронезависимое; исходное написание из файла сохраняется
  * отдельно — для сообщений в логе.
  */
@@ -3937,21 +3954,44 @@ function buildLocaleUpdatesFromSheets(sheets) {
   let skippedEmptyRows = 0;
 
   for (const sheet of sheets) {
-    const localeCode = String(sheet.name || "").trim().toLowerCase();
-    if (!localeCode) continue;
+    const rows = sheet.rows || [];
+    if (!rows.length) continue;
 
-    for (const row of sheet.rows || []) {
-      const frontId = String(row[0] ?? "").trim();
+    const headerRow = rows[0] || [];
+    let frontIdCol = -1;
+    /** @type {{ col: number, code: string }[]} */
+    const localeCols = [];
+
+    headerRow.forEach((header, col) => {
+      const text = String(header || "").trim();
+      if (!text) return;
+      if (frontIdCol < 0 && isFrontIdHeader(text)) {
+        frontIdCol = col;
+        return;
+      }
+      if (isLocaleHeaderCode(text)) {
+        localeCols.push({ col, code: text.toLowerCase() });
+      }
+    });
+
+    if (frontIdCol < 0 || !localeCols.length) continue;
+
+    for (let r = 1; r < rows.length; r += 1) {
+      const row = rows[r] || [];
+      const frontId = String(row[frontIdCol] ?? "").trim();
       if (!frontId) continue;
       const key = normalizeFrontIdKey(frontId);
-      const name = String(row[1] ?? "").trim();
-      totalRows += 1;
-      if (!name) {
-        skippedEmptyRows += 1;
-        continue;
+
+      for (const { col, code } of localeCols) {
+        const name = String(row[col] ?? "").trim();
+        totalRows += 1;
+        if (!name) {
+          skippedEmptyRows += 1;
+          continue;
+        }
+        if (!byFrontId.has(key)) byFrontId.set(key, { frontId, locales: new Map() });
+        byFrontId.get(key).locales.set(code, name);
       }
-      if (!byFrontId.has(key)) byFrontId.set(key, { frontId, locales: new Map() });
-      byFrontId.get(key).locales.set(localeCode, name);
     }
   }
 
@@ -4027,7 +4067,7 @@ async function readAndMatchLocalesFile(file) {
   const { byFrontId, skippedEmptyRows } = buildLocaleUpdatesFromSheets(sheets);
   if (!byFrontId.size) {
     throw new Error(
-      "В файле не найдено строк с front_id и названием (1-й столбец — front_id, 2-й — название)"
+      "В файле не найдено строк с front_id и названием — нужен столбец «Front ID» и хотя бы один столбец-локаль (RU, EN, DE...)"
     );
   }
 
@@ -4055,8 +4095,8 @@ async function readAndMatchLocalesFile(file) {
   }
 
   const localeCodesUsed = [
-    ...new Set(sheets.map((s) => String(s.name || "").trim().toLowerCase()).filter(Boolean)),
-  ];
+    ...new Set([...byFrontId.values()].flatMap((entry) => [...entry.locales.keys()])),
+  ].sort();
 
   // Задачи на канве, для которых в файле не нашлось ни одной строки (по front_id,
   // регистронезависимо) — их язык импорт не тронул.
@@ -4143,11 +4183,11 @@ async function handleImportLocalesFile(file, { immediate = true } = {}) {
   const confirmParts = immediate
     ? [
         `Импортировать и сразу сохранить на сервер названия по языкам для ${matchedTasks.size} задач на канве?`,
-        `Листы (языки): ${localeCodesUsed.join(", ") || "—"}`,
+        `Языки: ${localeCodesUsed.join(", ") || "—"}`,
       ]
     : [
         `Загрузить названия по языкам для ${matchedTasks.size} задач на канву БЕЗ сохранения на сервер?`,
-        `Листы (языки): ${localeCodesUsed.join(", ") || "—"}`,
+        `Языки: ${localeCodesUsed.join(", ") || "—"}`,
         "Изменения появятся только на канве — проверьте их (например, кнопкой «Изменить» на карточке) и нажмите общую «Сохранить», когда всё в порядке.",
       ];
   if (notFound.length) confirmParts.push(`Не найдено на канве: ${notFound.length} front_id`);
