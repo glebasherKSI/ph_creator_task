@@ -17,6 +17,7 @@ import {
   addEdge,
   conditionsForSave,
   importGraphFromConditions,
+  isLocalCanvasId,
   remapTaskId,
   removeEdge,
   removeTasks,
@@ -100,6 +101,10 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export interface ChainsStore extends GraphState {
   domain: string;
   catalog: Record<string, CatalogTask>;
@@ -152,6 +157,14 @@ export interface ChainsStore extends GraphState {
   /** Полная задача с бэка для карточки (и кэш в full). */
   ensureFull: (id: string) => Promise<TaskLike | null>;
   saveChanges: (onlyIds?: string[]) => Promise<{ ok: number; err: number }>;
+  /**
+   * Правит full.locales карточки на канве (импорт перевода по front_id) и помечает её грязной
+   * для обычного saveChanges — PATCH уйдёт с текущими locales, когда карточка сохранится
+   * (сразу через saveChanges или позже — изменение просто ждёт на канве до нажатия «Сохранить»).
+   */
+  applyLocaleUpdates: (id: string, locales: Record<string, string>) => Promise<void>;
+  /** Принудительный ресинк: помечает все не-черновиковые карточки канвы грязными и сохраняет их. */
+  saveAllCanvasTasks: () => Promise<{ ok: number; err: number }>;
   /** Задача создана через форму: в каталог и на канву (если была локальным черновиком — переносим id). */
   applyCreatedTask: (task: GamificationTask, localId?: string | null, near?: string | null) => void;
   applyUpdatedTask: (task: GamificationTask) => void;
@@ -554,6 +567,33 @@ export const useChainsStore = create<ChainsStore>((set, get) => ({
     }
     set({ saving: false });
     return { ok, err };
+  },
+
+  applyLocaleUpdates: async (id, locales) => {
+    const task = get().canvas[id];
+    if (!task) throw new Error("задачи нет на канве");
+    const full = task.full ?? (await get().ensureFull(id));
+    const current = get().canvas[id];
+    if (!current) return;
+    const base = full ?? current.full;
+    const baseLocales = isRecord(base?.locales) ? base.locales : {};
+    const nextFull: TaskLike = { ...(base ?? {}), locales: { ...baseLocales, ...locales } };
+    set((s) => {
+      const existing = s.canvas[id];
+      if (!existing) return {};
+      return {
+        canvas: { ...s.canvas, [id]: { ...existing, full: nextFull } },
+        dirtyTargets: s.dirtyTargets.includes(id) ? s.dirtyTargets : [...s.dirtyTargets, id],
+      };
+    });
+  },
+
+  saveAllCanvasTasks: async () => {
+    const state = get();
+    const realIds = Object.keys(state.canvas).filter((id) => !isLocalCanvasId(state, id));
+    if (!realIds.length) return { ok: 0, err: 0 };
+    set((s) => ({ dirtyTargets: [...new Set([...s.dirtyTargets, ...realIds])] }));
+    return get().saveChanges(realIds);
   },
 
   applyCreatedTask: (task, localId = null, near = null) => {

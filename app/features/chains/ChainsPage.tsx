@@ -4,12 +4,15 @@ import {
   BookmarkPlus,
   Columns3,
   Download,
+  FileSpreadsheet,
+  FileUp,
   FolderOpen,
   Loader2,
   Maximize2,
   MoreHorizontal,
   RefreshCw,
   Save,
+  SendHorizonal,
   ShieldCheck,
   Tag,
   Upload,
@@ -35,6 +38,8 @@ import { CatalogSidebar } from "./CatalogSidebar";
 import { EdgePanel } from "./EdgePanel";
 import { FlowCanvas } from "./FlowCanvas";
 import { useLabelsStore } from "./labels-store";
+import { pickXlsxFile, readAndMatchLocaleImport } from "./locale-import-actions";
+import type { LocaleImportMatch } from "./locale-import";
 import { PackagesPanel } from "./PackagesPanel";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { SendToPackageDialog } from "./SendToPackageDialog";
@@ -121,6 +126,8 @@ function ChainsPageInner() {
   const [view, setView] = useState<MainView>("canvas");
   const [taskOnly, setTaskOnly] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(false);
+  const [importingLocales, setImportingLocales] = useState(false);
+  const [sendingAll, setSendingAll] = useState(false);
   const report = useStatsReport(domain);
   const selectedTask = useChainsStore((s) =>
     s.selectedTaskId ? (s.canvas[s.selectedTaskId] ?? null) : null,
@@ -248,6 +255,123 @@ function ChainsPageInner() {
     setLogOpen(true);
     const { ok, err } = await useChainsStore.getState().saveChanges();
     setStatus(err ? `Сохранено ${ok}, ошибок ${err}` : `Сохранено ${ok} задач`, err > 0);
+  }
+
+  async function saveAll() {
+    if (!window.confirm("Отправить обновление на бэк для всех задач на канве?")) return;
+    setSendingAll(true);
+    setLogOpen(true);
+    try {
+      const { ok, err } = await useChainsStore.getState().saveAllCanvasTasks();
+      setStatus(err ? `Отправлено ${ok}, ошибок ${err}` : `Отправлено ${ok} задач`, err > 0);
+    } finally {
+      setSendingAll(false);
+    }
+  }
+
+  /**
+   * Импорт переводов из .xlsx (сопоставление с канвой по front_id): immediate=true — сразу
+   * сохраняет на сервер, immediate=false — только правит карточки на канве, без PATCH
+   * (проверяется вручную, отправка — общей кнопкой «Сохранить»).
+   */
+  async function handleImportLocales(immediate: boolean) {
+    const canvas = useChainsStore.getState().canvas;
+    if (!Object.keys(canvas).length) {
+      toast.warning("На канве нет задач — импортировать некуда");
+      return;
+    }
+    const file = await pickXlsxFile();
+    if (!file) return;
+
+    setImportingLocales(true);
+    let match: LocaleImportMatch;
+    try {
+      match = await readAndMatchLocaleImport(file, useChainsStore.getState().canvas);
+    } catch (err) {
+      toast.warning(
+        `Не удалось прочитать файл: ${err instanceof Error ? err.message : String(err)}`,
+        {
+          duration: 7000,
+        },
+      );
+      setImportingLocales(false);
+      return;
+    }
+    setImportingLocales(false);
+
+    const {
+      matchedTasks,
+      notFound,
+      ambiguous,
+      missingFromFile,
+      localeCodesUsed,
+      skippedEmptyRows,
+    } = match;
+
+    if (!matchedTasks.size) {
+      toast.warning("Совпадений с задачами на канве не найдено", { duration: 7000 });
+      return;
+    }
+
+    const confirmParts = immediate
+      ? [
+          `Импортировать и сразу сохранить на сервер названия по языкам для ${matchedTasks.size} задач на канве?`,
+          `Языки: ${localeCodesUsed.join(", ") || "—"}`,
+        ]
+      : [
+          `Загрузить названия по языкам для ${matchedTasks.size} задач на канву БЕЗ сохранения на сервер?`,
+          `Языки: ${localeCodesUsed.join(", ") || "—"}`,
+          "Изменения появятся только на канве — нажмите общую «Сохранить», когда всё в порядке.",
+        ];
+    if (notFound.length) confirmParts.push(`Не найдено на канве: ${notFound.length} front_id`);
+    if (ambiguous.length) {
+      confirmParts.push(
+        `Неоднозначно (несколько задач с одним front_id на канве): ${ambiguous.length}`,
+      );
+    }
+    if (missingFromFile.length) {
+      confirmParts.push(
+        `Задач на канве без строки в файле (не будут обновлены): ${missingFromFile.length}`,
+      );
+    }
+    if (skippedEmptyRows)
+      confirmParts.push(`Пропущено пустых ячеек с названием: ${skippedEmptyRows}`);
+    if (!window.confirm(confirmParts.join("\n"))) return;
+
+    setImportingLocales(true);
+    let okCount = 0;
+    let errCount = 0;
+    for (const [taskId, localeUpdates] of matchedTasks) {
+      try {
+        await useChainsStore.getState().applyLocaleUpdates(taskId, localeUpdates);
+        okCount += 1;
+      } catch {
+        errCount += 1;
+      }
+    }
+
+    if (immediate && okCount) {
+      setLogOpen(true);
+      const { ok, err } = await useChainsStore.getState().saveChanges([...matchedTasks.keys()]);
+      okCount = ok;
+      errCount += err;
+    }
+    setImportingLocales(false);
+
+    const notAppliedCount = errCount + notFound.length + ambiguous.length + missingFromFile.length;
+    const summaryParts = immediate
+      ? [`Импорт завершён: ${okCount} задач обновлено`]
+      : [`Загружено на канву: ${okCount} задач (не сохранено)`];
+    if (errCount) summaryParts.push(`${errCount} ошибок`);
+    if (notFound.length) summaryParts.push(`${notFound.length} front_id не найдено на канве`);
+    if (ambiguous.length) summaryParts.push(`${ambiguous.length} неоднозначно`);
+    if (missingFromFile.length)
+      summaryParts.push(`${missingFromFile.length} задач на канве без строки в файле`);
+    if (!immediate && okCount) summaryParts.push("нажмите «Сохранить», чтобы отправить на сервер");
+    if (notAppliedCount) summaryParts.push("часть не применена — проверьте front_id в файле");
+    toast[errCount || notAppliedCount ? "warning" : "success"](summaryParts.join(", "), {
+      duration: 8000,
+    });
   }
 
   return (
@@ -381,8 +505,40 @@ function ChainsPageInner() {
             <ToolGroup label="Выделение">
               <SelectionToolbar />
             </ToolGroup>
+            <ToolGroup label="Переводы">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!canvasSize || importingLocales}
+                title="Импортировать названия по языкам из .xlsx (сопоставление по front_id) и сразу сохранить на сервер"
+                onClick={() => void handleImportLocales(true)}
+              >
+                {importingLocales ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />}
+                Импорт
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!canvasSize || importingLocales}
+                title="Загрузить названия по языкам из .xlsx на канву без сохранения — проверьте и сохраните вручную"
+                onClick={() => void handleImportLocales(false)}
+              >
+                {importingLocales ? <Loader2 className="animate-spin" /> : <FileUp />}
+                Без сохранения
+              </Button>
+            </ToolGroup>
 
             <div className="ml-auto flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!canvasSize || saving || sendingAll}
+                onClick={() => void saveAll()}
+                title="Отправить на бэк ВСЕ задачи на канве (не только изменённые) — принудительный ресинк"
+              >
+                {sendingAll ? <Loader2 className="animate-spin" /> : <SendHorizonal />}
+                Отправить все
+              </Button>
               <Button
                 variant="primary"
                 size="sm"
