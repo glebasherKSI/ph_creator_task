@@ -152,7 +152,14 @@ export async function getAuthStatus(
   }
 
   const hasSession = Boolean(cookie?.value || stored?.value);
-  const otpIncomplete = pendingOtp || stored?.verified === false;
+
+  // current_user может ответить успешно ещё до прохождения OTP (см. probeFullAuth ниже).
+  // Поэтому "не нужно перепроверять полный доступ" — это отдельный факт, который должен
+  // быть явно подтверждён (verified === true) предыдущей успешной проверкой, а не просто
+  // "мы ничего плохого не знаем". Иначе первая же проверка нового/чужого cookie (magic
+  // link принят, OTP ещё не введён) отрапортует authenticated:true.
+  const sessionChanged = Boolean(cookie?.value) && cookie?.value !== stored?.value;
+  const otpIncomplete = pendingOtp || stored?.verified !== true || sessionChanged;
 
   if (hasSession) {
     try {
@@ -202,7 +209,11 @@ export async function getAuthStatus(
         ? formatAuthFetchError(cachedResult.error, domain)
         : undefined;
 
-      if (otpIncomplete) {
+      // Здесь current_user не ответил успешно — это либо реальный разлогин (нет смысла
+      // предполагать OTP), либо действительно начатый magic-link flow (сам флаг pendingOtp).
+      // Широкий otpIncomplete тут не подходит — иначе любой первый неудачный запрос
+      // (истёкшая кука и т.п.) ошибочно покажет шаг OTP вместо формы входа.
+      if (pendingOtp) {
         return {
           domain,
           authenticated: false,
@@ -227,7 +238,7 @@ export async function getAuthStatus(
       return {
         domain,
         authenticated: false,
-        pendingOtp: otpIncomplete && Boolean(stored?.value),
+        pendingOtp: pendingOtp && Boolean(stored?.value),
         awaitingMagicLink: false,
         email: stored?.email ?? null,
         error: formatAuthFetchError(err, domain),
@@ -235,7 +246,7 @@ export async function getAuthStatus(
     }
   }
 
-  if (otpIncomplete) {
+  if (pendingOtp) {
     return {
       domain,
       authenticated: false,

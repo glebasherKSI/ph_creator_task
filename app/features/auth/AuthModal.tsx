@@ -3,7 +3,7 @@
  * `AuthProvider` монтирует модалку один раз; страницы зовут `ensureAuthenticated(domain)`
  * и получают `true`, когда вход выполнен (модалка открывается только если входа нет).
  */
-import { ArrowLeft, Check, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, Loader2, RotateCw } from "lucide-react";
 import {
   type ReactNode,
   createContext,
@@ -103,6 +103,7 @@ interface ModalSession {
   email: string;
   token: string;
   otp: string;
+  showSteps: boolean;
 }
 
 interface PendingAuth {
@@ -186,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: view.email,
             token: "",
             otp: "",
+            showSteps: view.showSteps,
           });
         })();
       });
@@ -281,6 +283,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [patchSession],
   );
 
+  /** Кнопка «Проверить снова»: перепроверяет статус без пересоздания промиса ensureAuthenticated. */
+  const handleRetryStatus = useCallback(
+    async (domain: string) => {
+      patchSession(domain, { busy: true, status: pendingLine("Проверяю вход…") });
+      const status = await queryDomainAuthStatus(domain, { force: true });
+      if (pendingRef.current?.domain !== domain) return;
+
+      if (isAuthenticatedStatus(status)) {
+        patchSession(domain, { busy: false, status: authenticatedStatusLine(status.email) });
+        finish(true);
+        return;
+      }
+
+      const view = initialModalView(domain, status, { message: session?.message });
+      patchSession(domain, {
+        busy: false,
+        step: view.step,
+        status: view.status,
+        submittedMagicLogin: view.submittedMagicLogin,
+        showSteps: view.showSteps,
+      });
+    },
+    [patchSession, finish, session?.message],
+  );
+
   // Background принял magic link из вкладки (флаг pending OTP в storage) — переходим к OTP.
   const sessionDomain = session?.domain ?? null;
   useEffect(() => {
@@ -336,6 +363,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             onVerifyOtp={() => void handleVerifyOtp(session.domain, session.otp)}
             onBackToEmail={() => void handleBackToEmail(session.domain)}
             onOpenAdmin={() => void handleOpenAdmin(session.domain)}
+            onRetry={() => void handleRetryStatus(session.domain)}
             onCancel={() => finish(false)}
           />
         ) : null}
@@ -356,6 +384,7 @@ interface AuthDialogContentProps {
   onVerifyOtp: () => void;
   onBackToEmail: () => void;
   onOpenAdmin: () => void;
+  onRetry: () => void;
   onCancel: () => void;
 }
 
@@ -367,9 +396,10 @@ function AuthDialogContent({
   onVerifyOtp,
   onBackToEmail,
   onOpenAdmin,
+  onRetry,
   onCancel,
 }: AuthDialogContentProps) {
-  const { step, busy } = session;
+  const { step, busy, showSteps } = session;
 
   return (
     <DialogContent className="max-w-md">
@@ -381,10 +411,10 @@ function AuthDialogContent({
         <DialogDescription>{session.message}</DialogDescription>
       </DialogHeader>
 
-      <Stepper step={step} />
+      {showSteps ? <Stepper step={step} /> : null}
       <StatusLineView status={session.status} busy={busy} />
 
-      {step === "email" ? (
+      {showSteps && step === "email" ? (
         <StepForm onSubmit={onSendMagicLink}>
           <Label htmlFor="auth-email">Email</Label>
           <Input
@@ -404,7 +434,7 @@ function AuthDialogContent({
         </StepForm>
       ) : null}
 
-      {step === "magic-link" ? (
+      {showSteps && step === "magic-link" ? (
         <StepForm onSubmit={onMagicLogin}>
           <p className="text-subhead text-muted-foreground">
             Откройте ссылку из письма в браузере (token подставится автоматически) или вставьте
@@ -438,7 +468,7 @@ function AuthDialogContent({
         </StepForm>
       ) : null}
 
-      {step === "otp" ? (
+      {showSteps && step === "otp" ? (
         <StepForm onSubmit={onVerifyOtp}>
           <Label htmlFor="auth-otp">OTP-код из письма</Label>
           <Input
@@ -461,10 +491,16 @@ function AuthDialogContent({
 
       <DialogFooter>
         {session.status.showOpenAdmin ? (
-          <Button type="button" variant="outline" onClick={onOpenAdmin}>
-            <ExternalLink />
-            Открыть админку в браузере
-          </Button>
+          <>
+            <Button type="button" variant="outline" onClick={onOpenAdmin} disabled={busy}>
+              <ExternalLink />
+              Открыть админку в браузере
+            </Button>
+            <Button type="button" variant="outline" onClick={onRetry} disabled={busy}>
+              <RotateCw />
+              Проверить снова
+            </Button>
+          </>
         ) : null}
         <Button type="button" variant="ghost" onClick={onCancel}>
           Отмена

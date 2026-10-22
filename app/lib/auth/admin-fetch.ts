@@ -401,9 +401,28 @@ async function adminApiFetchViaServiceWorker(
 
 type Transport = { mode: "tab"; tabId: number } | { mode: "service_worker" };
 
+/**
+ * Вкладка в принципе может использоваться как транспорт (её можно разбудить, если выгружена) —
+ * в отличие от isAdminTabUsable это НЕ требует "готова прямо сейчас": discarded/frozen тут
+ * нормально (их поднимет wakeAdminTab внутри validateAdminTab), а вот реальная страница ошибки
+ * (chrome-error, непринятый сертификат) — нет, ревёрт её не починит.
+ */
+function isAdminTabRecoverable(tab: Tab | null | undefined): boolean {
+  if (!tab?.id) return false;
+  const url = String(tab.url || "");
+  if (!url.startsWith("https://")) return false;
+  if (isChromeErrorPageUrl(url)) return false;
+  return true;
+}
+
 async function resolveAdminApiTransport(domain: string): Promise<Transport> {
   const tab = await findAdminTab(domain);
-  if (tab?.id) return { mode: "tab", tabId: tab.id };
+  // Вкладка есть, но показывает страницу ошибки (например, сертификат ещё не приняли) —
+  // не форсим её: пробуем сначала обычный fetch из service worker. Он часто срабатывает
+  // (self-signed exception уже принят на уровне профиля браузера), и только если и это
+  // упадёт по SSL/сети — adminApiFetch откатится на вкладку (увидит ту же ошибку, но хотя
+  // бы не раньше времени).
+  if (tab?.id && isAdminTabRecoverable(tab)) return { mode: "tab", tabId: tab.id };
   if (isPrivateAdminDomain(domain)) {
     throw new Error(AUTH_FETCH_ERRORS.TAB_REQUIRED);
   }

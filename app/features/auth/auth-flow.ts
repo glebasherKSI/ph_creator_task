@@ -363,6 +363,13 @@ export interface InitialModalView {
   email: string;
   /** Magic link уже принят (pendingOtp) — шаг token пропущен. */
   submittedMagicLogin: boolean;
+  /**
+   * Показывать степпер и форму текущего шага. false — когда проблема транспортная
+   * (нет открытой вкладки админки / SSL), а не с логином: сессия может быть валидна,
+   * форма email тут не нужна и только путает — пользователю нужно открыть вкладку
+   * и повторить проверку, а не "входить" заново.
+   */
+  showSteps: boolean;
 }
 
 export function emailStepStatus(domain: string): StatusLine {
@@ -422,6 +429,7 @@ export function initialModalView(
       message,
       email,
       submittedMagicLogin: true,
+      showSteps: true,
     };
   }
 
@@ -433,6 +441,7 @@ export function initialModalView(
       message,
       email,
       submittedMagicLogin: false,
+      showSteps: !formatted.showOpenAdmin,
     };
   }
 
@@ -442,5 +451,6 @@ export function initialModalView(
     message,
     email,
     submittedMagicLogin: false,
+    showSteps: true,
   };
 }
