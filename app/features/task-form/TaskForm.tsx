@@ -65,6 +65,28 @@ export interface TaskFormProps {
   className?: string;
   /** Какие секции раскрыты при открытии (по умолчанию — «Основное»). */
   initialOpenSections?: ReadonlyArray<SectionId>;
+  /** Ключ localStorage: раскрытые секции запоминаются между открытиями формы. */
+  sectionsStorageKey?: string;
+}
+
+function readOpenSections(key: string | undefined): SectionId[] | null {
+  if (!key) return null;
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(key) ?? "null");
+    if (!Array.isArray(raw)) return null;
+    return raw.filter((id): id is SectionId => SECTION_IDS.includes(id as SectionId));
+  } catch {
+    return null;
+  }
+}
+
+function writeOpenSections(key: string | undefined, open: Record<SectionId, boolean>) {
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(SECTION_IDS.filter((id) => open[id])));
+  } catch {
+    /* хранилище недоступно — просто не запоминаем */
+  }
 }
 
 const MODE_LABELS: Record<
@@ -210,6 +232,7 @@ export function TaskForm({
   title,
   className,
   initialOpenSections = ["basic"],
+  sectionsStorageKey,
 }: TaskFormProps) {
   const labels = MODE_LABELS[mode];
   const meta = useTaskMeta(domain);
@@ -224,13 +247,21 @@ export function TaskForm({
     reset(sourceTask ? taskToFormValues(sourceTask, { mode }) : emptyFormValues());
   }, [sourceTask, mode, reset]);
 
-  const [openSections, setOpenSections] = useState<Record<SectionId, boolean>>(
-    () =>
-      Object.fromEntries(SECTION_IDS.map((id) => [id, initialOpenSections.includes(id)])) as Record<
-        SectionId,
-        boolean
-      >,
-  );
+  const [openSections, setOpenSectionsState] = useState<Record<SectionId, boolean>>(() => {
+    const initial = readOpenSections(sectionsStorageKey) ?? initialOpenSections;
+    return Object.fromEntries(SECTION_IDS.map((id) => [id, initial.includes(id)])) as Record<
+      SectionId,
+      boolean
+    >;
+  });
+  const setOpenSections = (
+    update: (prev: Record<SectionId, boolean>) => Record<SectionId, boolean>,
+  ) =>
+    setOpenSectionsState((prev) => {
+      const next = update(prev);
+      writeOpenSections(sectionsStorageKey, next);
+      return next;
+    });
   const [status, setStatus] = useState<{ text: string; error: boolean }>({
     text: "Загрузите исходную задачу",
     error: false,

@@ -151,6 +151,7 @@ export function TaskSheet() {
               taskOptions={taskOptions}
               onSubmit={submit}
               title={isDraft ? "Параметры новой задачи" : undefined}
+              sectionsStorageKey="ph_task_form_open_sections"
             />
           )}
         </div>
