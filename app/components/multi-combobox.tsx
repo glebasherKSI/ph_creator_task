@@ -38,6 +38,8 @@ export interface MultiComboboxProps {
 
 export const ALL_VALUE = "all";
 const EMPTY_OPTIONS: MultiComboboxOption[] = [];
+/** Клавиши, которые поле поиска отдаёт списку cmdk: подсветка стрелками, выбор Enter. */
+const LIST_NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter"]);
 /** Сколько строк рисуем сразу и добавляем при прокрутке: сотни строк cmdk открываются с задержкой. */
 const RENDER_STEP = 60;
 
@@ -65,6 +67,7 @@ export function MultiCombobox({
   const [loading, setLoading] = React.useState(false);
   const searchSeq = React.useRef(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const commandRef = React.useRef<HTMLDivElement>(null);
   const [limit, setLimit] = React.useState(RENDER_STEP);
   // Новый запрос — снова с первой порции («состояние из прошлого рендера», без эффекта).
   const [limitQuery, setLimitQuery] = React.useState(query);
@@ -256,6 +259,12 @@ export function MultiCombobox({
               } else if ((e.key === "ArrowDown" || e.key === "Enter") && !open) {
                 e.preventDefault();
                 setOpen(true);
+              } else if (open && LIST_NAV_KEYS.has(e.key)) {
+                // Поле живёт вне cmdk — пересылаем клавишу его корню, навигацию и выбор делает он.
+                e.preventDefault();
+                commandRef.current?.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: e.key, bubbles: true }),
+                );
               }
             }}
           />
@@ -274,7 +283,7 @@ export function MultiCombobox({
         }}
       >
         {/* Поиск живёт в поле контрола, cmdk получает его через value и не фильтрует сам. */}
-        <Command shouldFilter={false}>
+        <Command ref={commandRef} shouldFilter={false}>
           <CommandList onScroll={onListScroll}>
             {loading ? (
               <div className="flex items-center justify-center gap-2 py-4 text-subhead text-muted-foreground">

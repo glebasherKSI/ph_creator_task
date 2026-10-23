@@ -6,7 +6,10 @@ import {
   formToDurationMinutes,
   groupPlannerHints,
   parseNullableField,
+  findBonusIdByPoints,
+  findTagIdByName,
   tagRawFromForm,
+  withPrerequisiteCondition,
   taskToFormValues,
 } from "@/features/task-form/task-form";
 import { validateTaskPayload } from "@/lib/task-schema";
@@ -113,6 +116,43 @@ describe("task-form — форма → payload", () => {
     expect(tagRawFromForm("5", META_TAGS)).toBe("5");
     expect(tagRawFromForm("", META_TAGS)).toBe("");
     expect(tagRawFromForm("5", null)).toBe("");
+  });
+
+  it("findTagIdByName", () => {
+    expect(findTagIdByName("test2202", META_TAGS)).toBe("20213");
+    expect(findTagIdByName(" TEST2202 ", META_TAGS)).toBe("20213");
+    expect(findTagIdByName("gamification_s8", META_TAGS)).toBe("");
+    expect(findTagIdByName("", META_TAGS)).toBe("");
+  });
+
+  it("findBonusIdByPoints", () => {
+    const bonuses = [
+      { id: "1:GAMIFICATION BONUS POINTS 1", title: "GAMIFICATION BONUS POINTS 1" },
+      { id: "2:GAMIFICATION BONUS POINTS 10", title: "GAMIFICATION BONUS POINTS 10" },
+    ];
+    expect(findBonusIdByPoints(10, bonuses)).toBe("2:GAMIFICATION BONUS POINTS 10");
+    expect(findBonusIdByPoints(1, bonuses)).toBe("1:GAMIFICATION BONUS POINTS 1");
+    expect(findBonusIdByPoints(5, bonuses)).toBe("");
+    expect(findBonusIdByPoints(null, bonuses)).toBe("");
+  });
+
+  it("withPrerequisiteCondition", () => {
+    const options = [
+      { id: "1365", name: "Сотня — и точка LOW SEASON 8" },
+      { id: "1366", name: "Monday Challenge" },
+    ];
+    const base = [{ fraud: false }];
+    const gt = (list: string[]) => ({
+      gamification_tasks: { list, type: "enabled", extra_type: "or", only_completed: true },
+    });
+    expect(withPrerequisiteCondition(base, " monday challenge ", options)).toEqual([
+      ...base,
+      gt(["1366"]),
+    ]);
+    // Нет точного совпадения — условие с пустым списком.
+    expect(withPrerequisiteCondition(base, "Monday", options)).toEqual([...base, gt([])]);
+    expect(withPrerequisiteCondition(base, "", options)).toBeNull();
+    expect(withPrerequisiteCondition([gt(["1"])], "Monday Challenge", options)).toBeNull();
   });
 });
 

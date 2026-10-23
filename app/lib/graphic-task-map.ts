@@ -28,13 +28,6 @@ export type PlannerTask = Record<string, unknown> & {
   secondary_actions?: unknown[];
 };
 
-export type PlannerTasksById =
-  Map<unknown, PlannerTask> | Record<string, PlannerTask> | null | undefined;
-
-export interface PlannerContext {
-  tasksById?: PlannerTasksById;
-}
-
 export interface PlannerHint {
   title: string;
   body: string[];
@@ -197,6 +190,17 @@ function mapLocales(nameFrontend: unknown): Record<string, string> {
   return locales;
 }
 
+/**
+ * Дата графика → ISO в UTC. График хранит DATETIME в UTC и отдаёт без зоны
+ * («2026-10-31 23:59:00»), а new Date() прочитал бы такую строку как местное время.
+ */
+function plannerDateToIso(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const naive = text.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::(\d{2}))?(\.\d+)?$/);
+  return naive ? `${naive[1]}T${naive[2]}:${naive[3] ?? "00"}.000Z` : text;
+}
+
 function mapTime(task: PlannerTask) {
   const time = asObject(task.time_availability);
   const events = asArray(task.events).map(String);
@@ -204,8 +208,8 @@ function mapTime(task: PlannerTask) {
   const infinite = Boolean(time.infinite ?? task.infinite);
   const hasScheduler = events.includes("scheduler");
   return {
-    available_from: time.available_from || task.available_from || null,
-    available_till: time.available_till || task.available_till || null,
+    available_from: plannerDateToIso(time.available_from || task.available_from),
+    available_till: plannerDateToIso(time.available_till || task.available_till),
     max_repetitions: time.max_repetitions ?? task.max_repetitions ?? null,
     duration: infinite ? null : duration,
     infinite,
@@ -386,17 +390,10 @@ function leftoverPlannerFields(
   }
   for (const [key, value] of Object.entries(targeting)) {
     if (KNOWN_TARGETING_KEYS.has(key) || !isPresent(value)) continue;
-    push("targeting", `targeting.${key}: ${formatHintValue(value)}`);
+    // Бриф таргетинга — только текст из графика, служебные поля — в общий бриф.
+    push(null, `targeting.${key}: ${formatHintValue(value)}`);
   }
   return { bySection, leftover };
-}
-
-function lookupPlannerTask(tasksById: PlannerTasksById, id: unknown): PlannerTask | null {
-  if (!tasksById || id == null || id === "") return null;
-  if (tasksById instanceof Map) {
-    return tasksById.get(id) || tasksById.get(String(id)) || tasksById.get(Number(id)) || null;
-  }
-  return tasksById[String(id)] || null;
 }
 
 function pushHint(target: PlannerHint[], title: string, bodyLines: unknown[]): void {
@@ -424,11 +421,7 @@ function flattenPlannerHints(
   return lines.join("\n").trim();
 }
 
-function buildPlannerHints(
-  task: PlannerTask,
-  leftoverNotes: string[],
-  context: PlannerContext = {},
-): PlannerHints {
+function buildPlannerHints(task: PlannerTask, leftoverNotes: string[]): PlannerHints {
   const targeting = asObject(task.targeting);
   const sections: Record<string, PlannerHint[]> = {};
   const leftover: PlannerHint[] = [];
@@ -437,30 +430,11 @@ function buildPlannerHints(
     pushHint((sections[sectionId] ??= []), title, bodyLines);
   }
 
-  const targetingLines: string[] = [];
+  // В брифе таргетинга — только текст «Как настроить таргетинг» из графика.
   const extra = String(targeting.extra ?? "")
     .replace(/^\n+/, "")
     .replace(/\s+$/g, "");
-  if (extra) targetingLines.push(extra);
-
-  const prereqId = targeting.prerequisite_task_id;
-  const prereqFrontId = String(
-    lookupPlannerTask(context.tasksById, prereqId)?.frontend_identifier || "",
-  ).trim();
-  if (prereqFrontId) targetingLines.push(`Предшественник: ${prereqFrontId}`);
-  else if (isPresent(prereqId)) {
-    targetingLines.push(`Предшественник: ${formatHintValue(prereqId)}`);
-  }
-  if (isPresent(asArray(targeting.completed_task_ids))) {
-    targetingLines.push(`Выполненные задачи: ${formatHintValue(targeting.completed_task_ids)}`);
-  }
-  if (isPresent(asArray(targeting.exclude_tags))) {
-    targetingLines.push(`Исключить теги: ${formatHintValue(targeting.exclude_tags)}`);
-  }
-  if (isPresent(asArray(targeting.groups))) {
-    targetingLines.push(`Группы игроков: ${formatHintValue(targeting.groups)}`);
-  }
-  if (targetingLines.length) add("targeting", "Таргетинг", targetingLines);
+  if (extra) add("targeting", "Таргетинг", [extra]);
 
   if (isPresent(task.tag)) {
     add("classification", "Тег", [formatHintValue(task.tag)]);
@@ -588,16 +562,13 @@ export function orderPlannerTasksByChain(tasks: unknown): OrderedPlannerTask[] {
 }
 
 /** Только бриф/мета планировщика — без полей формы PromoHub. */
-export function buildPlannerBriefOverlay(
-  task: unknown,
-  context: PlannerContext = {},
-): PlannerBriefOverlay {
+export function buildPlannerBriefOverlay(task: unknown): PlannerBriefOverlay {
   const source = asObject(task) as PlannerTask;
   const targeting = asObject(source.targeting);
   const main = mapActionList(source.main_actions);
   const secondary = mapActionList(source.secondary_actions);
   const leftoverNotes = [...main.leftoverNotes, ...secondary.leftoverNotes];
-  const hints = buildPlannerHints(source, leftoverNotes, context);
+  const hints = buildPlannerHints(source, leftoverNotes);
   return {
     _plannerNote: hints.note,
     _plannerHints: { sections: hints.sections, leftover: hints.leftover },
@@ -619,20 +590,25 @@ function clonePlain<T>(value: T): Record<string, unknown> {
 export function mergeBackendTaskWithPlannerBrief(
   backendTask: unknown,
   graphicTask: unknown,
-  context: PlannerContext = {},
 ): TaskLike {
-  return { ...clonePlain(backendTask), ...buildPlannerBriefOverlay(graphicTask, context) };
+  return { ...clonePlain(backendTask), ...buildPlannerBriefOverlay(graphicTask) };
+}
+
+function rewardPoints(value: unknown): number | null {
+  if (!isPresent(value)) return null;
+  const points = Number(value);
+  return Number.isFinite(points) ? points : null;
 }
 
 /** Планировщик → тело локального черновика для формы и buildCreatePayload. */
-export function mapPlannerTaskToDraft(task: unknown, context: PlannerContext = {}): TaskLike {
+export function mapPlannerTaskToDraft(task: unknown): TaskLike {
   const source = asObject(task) as PlannerTask;
   const events = asArray(source.events).map(String).filter(Boolean);
   const main = mapActionList(source.main_actions);
   const secondary = mapActionList(source.secondary_actions);
   const countries = mapCountries(source.countries);
   const time = mapTime(source);
-  const brief = buildPlannerBriefOverlay(source, context);
+  const brief = buildPlannerBriefOverlay(source);
 
   return {
     name: backendTaskName(source),
@@ -657,6 +633,9 @@ export function mapPlannerTaskToDraft(task: unknown, context: PlannerContext = {
     state: "draft",
     filter_id: null,
     tag_id: null,
+    _plannerTag: String(source.tag ?? "").trim() || null,
+    _plannerRewardPoints: rewardPoints(source.reward_points),
+    _plannerSecondaryRewardPoints: rewardPoints(source.secondary_reward_points),
     ...brief,
   };
 }

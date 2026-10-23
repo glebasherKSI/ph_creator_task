@@ -83,6 +83,13 @@ export type GamificationTask = {
   _plannerHints?: unknown;
   _plannerTaskId?: number | string | null;
   _plannerPrerequisiteId?: number | string | null;
+  /** Имя тега из графика — форма подставит тег из справочника по имени. */
+  _plannerTag?: string | null;
+  /** Награды из графика (pts) — форма выберет группу бонусов с этим числом в конце. */
+  _plannerRewardPoints?: number | null;
+  _plannerSecondaryRewardPoints?: number | null;
+  /** name предшественника, связь с которым не нашлась по id, — форма добавит gamification_tasks. */
+  _plannerPrerequisiteName?: string | null;
 };
 
 /**

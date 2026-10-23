@@ -3,7 +3,7 @@
  * Состояние формы — react-hook-form; все сложные поля — controlled-компоненты через Controller.
  */
 import { ChevronDown, Info, Languages, Loader2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, type Resolver, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
@@ -48,6 +48,9 @@ import {
   buildTaskPayload,
   emptyFormValues,
   eventsIncludeScheduler,
+  findBonusIdByPoints,
+  findTagIdByName,
+  withPrerequisiteCondition,
   groupPlannerHints,
   taskToFormValues,
 } from "./task-form";
@@ -291,6 +294,37 @@ export function TaskForm({
     reset(sourceTask ? taskToFormValues(sourceTask, { mode }) : emptyFormValues());
   }, [sourceTask, mode, reset]);
 
+  // Черновик из графика: тег и группы бонусов из брифа, когда справочники загрузятся.
+  const metaTags = meta.data?.tags;
+  const metaBonuses = meta.data?.bonuses;
+  useEffect(() => {
+    if (!sourceTask) return;
+    const fill = (name: "tag" | "mainBonusGroupId" | "secondaryBonusGroupId", value: string) => {
+      if (value && !getValues(name)) setValue(name, value, { shouldDirty: true });
+    };
+    if (metaTags) fill("tag", findTagIdByName(String(sourceTask._plannerTag ?? ""), metaTags));
+    if (metaBonuses) {
+      fill(
+        "mainBonusGroupId",
+        findBonusIdByPoints(sourceTask._plannerRewardPoints as number | null, metaBonuses),
+      );
+      fill(
+        "secondaryBonusGroupId",
+        findBonusIdByPoints(sourceTask._plannerSecondaryRewardPoints as number | null, metaBonuses),
+      );
+    }
+  }, [sourceTask, metaTags, metaBonuses, getValues, setValue]);
+
+  // Предшественник из графика → gamification_tasks, один раз на черновик (удалённое не вернётся).
+  const prereqAppliedFor = useRef<TaskLike | null>(null);
+  useEffect(() => {
+    const prereqName = String(sourceTask?._plannerPrerequisiteName ?? "");
+    if (!prereqName || !taskOptions.length || prereqAppliedFor.current === sourceTask) return;
+    prereqAppliedFor.current = sourceTask;
+    const next = withPrerequisiteCondition(getValues("conditions"), prereqName, taskOptions);
+    if (next) setValue("conditions", next, { shouldDirty: true });
+  }, [sourceTask, taskOptions, getValues, setValue]);
+
   const [openSections, setOpenSectionsState] = useState<Record<SectionId, boolean>>(() => {
     const initial = readOpenSections(sectionsStorageKey) ?? initialOpenSections;
     return Object.fromEntries(SECTION_IDS.map((id) => [id, initial.includes(id)])) as Record<
@@ -498,7 +532,7 @@ export function TaskForm({
               className="font-mono"
             />
           </Field>
-          <div className="flex items-end pb-2">
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-2 pb-2">
             <Controller
               control={control}
               name="hidden"
@@ -510,6 +544,19 @@ export function TaskForm({
                 />
               )}
             />
+            {sequence ? (
+              <Controller
+                control={control}
+                name="manualReward"
+                render={({ field }) => (
+                  <CheckboxField
+                    label="Ручное получение награды"
+                    checked={field.value}
+                    onCheckedChange={(c) => field.onChange(c === true)}
+                  />
+                )}
+              />
+            ) : null}
           </div>
           <Field label="Тип">
             <Controller

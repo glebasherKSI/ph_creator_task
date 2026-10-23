@@ -18,15 +18,20 @@ import {
 } from "@/components/ui/dialog";
 import { TaskForm } from "@/features/task-form/TaskForm";
 import type { TaskFormMode } from "@/features/task-form/task-form";
+import { errorMessage } from "@/lib/auth/errors";
 import { createTask, updateTask } from "@/lib/task-api";
+import { type TaskEvent, type TaskEventSource, logTaskEvent } from "@/lib/task-events";
 import type { TaskPayloadEnvelope } from "@/lib/types";
 
+import { draftBodyWithCanvasLinks } from "./graph";
 import { notifyGraphicBackendCreated } from "./packages-actions";
 import { useChainsStore } from "./store";
 
 interface TaskSheetState {
   mode: TaskFormMode;
   taskId: string | null;
+  /** Когда открыли форму — сколько человек провёл в ней до сохранения (журнал задач). */
+  openedAt: number;
   open: (mode: TaskFormMode, taskId: string) => void;
   close: () => void;
 }
@@ -35,7 +40,8 @@ interface TaskSheetState {
 export const useTaskSheet = create<TaskSheetState>((set) => ({
   mode: "edit",
   taskId: null,
-  open: (mode, taskId) => set({ mode, taskId }),
+  openedAt: 0,
+  open: (mode, taskId) => set({ mode, taskId, openedAt: Date.now() }),
   close: () => set({ taskId: null }),
 }));
 
@@ -65,13 +71,60 @@ export function TaskSheet() {
     gcTime: 0,
   });
 
+  // Связи черновика живут в рёбрах канвы — форма должна их видеть и отправить в conditions.
+  const draftConditions = useChainsStore((s) => (taskId ? s.canvas[taskId]?.conditions : null));
+  const draftTask = useMemo(
+    () =>
+      isDraft && draftBody
+        ? draftBodyWithCanvasLinks(useChainsStore.getState(), draftBody, draftConditions)
+        : null,
+    [isDraft, draftBody, draftConditions],
+  );
+  const sourceTask = isDraft ? draftTask : source.data;
+
+  /** Событие журнала задач: draft — то, с чем открылась форма, payload — что ушло в админку. */
+  function eventFor(payload: TaskPayloadEnvelope, event: Partial<TaskEvent>): TaskEvent {
+    const eventSource: TaskEventSource = isDraft
+      ? draftPlannerId != null
+        ? "package"
+        : "draft"
+      : mode === "copy"
+        ? "copy"
+        : "edit";
+    return {
+      event: "created",
+      source: eventSource,
+      domain,
+      planner_task_id: draftPlannerId,
+      draft: sourceTask,
+      payload,
+      duration_ms: Date.now() - useTaskSheet.getState().openedAt,
+      ...event,
+    };
+  }
+
+  async function createLogged(payload: TaskPayloadEnvelope) {
+    try {
+      const created = await createTask(domain, payload);
+      if (created.newId != null) {
+        void logTaskEvent(
+          eventFor(payload, { ph_backend_id: created.newId, result: created.task }),
+        );
+      }
+      return created;
+    } catch (err) {
+      void logTaskEvent(eventFor(payload, { event: "create_failed", error: errorMessage(err) }));
+      throw err;
+    }
+  }
+
   async function submit(payload: TaskPayloadEnvelope): Promise<unknown> {
     if (!taskId) throw new Error("Задача не выбрана");
     const store = useChainsStore.getState();
     if (isDraft) {
       // Локальный черновик (из пакета графика): POST, карточка получает настоящий id,
       // последователи перелинковываются, планировщику уходит mark-backend-created.
-      const { response, newId, task } = await createTask(domain, payload);
+      const { response, newId, task } = await createLogged(payload);
       if (newId == null || !task) {
         const msg = "Задача создана, но id не найден — нажмите «Загрузить задачи»";
         toast.warning(msg);
@@ -89,13 +142,16 @@ export function TaskSheet() {
     }
     if (mode === "edit") {
       const { response, task } = await updateTask(domain, taskId, payload);
+      void logTaskEvent(
+        eventFor(payload, { event: "updated", ph_backend_id: taskId, result: task }),
+      );
       if (task) store.applyUpdatedTask(task);
       toast.success(`Задача #${taskId} сохранена`);
       store.setStatus(`Задача #${taskId} сохранена`);
       close();
       return response;
     }
-    const { response, newId, task } = await createTask(domain, payload);
+    const { response, newId, task } = await createLogged(payload);
     if (newId == null || !task) {
       const msg = "Задача создана, но id не найден — нажмите «Загрузить задачи»";
       toast.warning(msg);
@@ -114,7 +170,6 @@ export function TaskSheet() {
     : mode === "copy"
       ? `Копия задачи #${taskId ?? ""}`
       : `Правка задачи #${taskId ?? ""}`;
-  const sourceTask = isDraft ? draftBody : source.data;
 
   return (
     <Dialog open={taskId != null} onOpenChange={(open) => !open && close()}>

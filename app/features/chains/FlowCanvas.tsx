@@ -42,7 +42,7 @@ const nodeTypes = { task: TaskNode, label: LabelNode };
  * Прогресс загрузки задач перед добавлением на канву. Всегда в разметке —
  * плавно появляется и исчезает; канва под ним затемняется и не принимает клики.
  */
-function AddProgressOverlay() {
+export function AddProgressOverlay() {
   const progress = useChainsStore((s) => s.addProgress);
   const [shown, setShown] = useState<AddProgress | null>(progress);
   // «Состояние из прошлого рендера»: при исчезновении показываем последний прогресс.

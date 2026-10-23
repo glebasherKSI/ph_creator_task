@@ -108,12 +108,32 @@ export function linkPrerequisite(
   return { state: next, result: "linked" };
 }
 
+interface OpenPackageOptions {
+  ensureAuthenticated: (domain: string) => Promise<boolean>;
+}
+
+/** Открывает пакет на канве; пока идёт загрузка — оверлей прогресса (addProgress). */
 export async function openPackageOnCanvas(
   pkgRef: GraphicPackage,
-  { ensureAuthenticated }: { ensureAuthenticated: (domain: string) => Promise<boolean> },
+  options: OpenPackageOptions,
+): Promise<OpenPackageResult> {
+  try {
+    return await openPackage(pkgRef, options);
+  } finally {
+    useChainsStore.setState({ addProgress: null });
+  }
+}
+
+async function openPackage(
+  pkgRef: GraphicPackage,
+  { ensureAuthenticated }: OpenPackageOptions,
 ): Promise<OpenPackageResult> {
   const id = Number(pkgRef.id);
   if (!Number.isInteger(id) || id <= 0) throw new Error("Некорректный id пакета");
+  let title = `Пакет «${pkgRef.name || id}»`;
+  const progress = (note: string, done = 0, total: number | null = null) =>
+    useChainsStore.setState({ addProgress: { title, note, done, total } });
+  progress("Загружаю задачи пакета из графика…");
 
   const pkg = (await graphicApiGet(
     `/api/promohub-planner/packages/${id}`,
@@ -123,6 +143,7 @@ export async function openPackageOnCanvas(
     tasks = extractPackageTasks(await graphicApiGet(`/api/promohub-planner/packages/${id}/tasks`));
   }
   if (!tasks.length) throw new Error("В пакете нет задач");
+  title = `Пакет «${pkg?.name || pkgRef.name || id}»`;
 
   const store = useChainsStore.getState();
   const domain = store.domain;
@@ -130,6 +151,7 @@ export async function openPackageOnCanvas(
   if (linkedTasks.length && !domain) {
     throw new Error("Выберите домен админки — без него нельзя подгрузить задачи с ph_backend_id");
   }
+  if (linkedTasks.length) progress("Проверяю вход в админку…");
   if (linkedTasks.length && !(await ensureAuthenticated(domain))) {
     throw new Error("Вход не выполнен — задачи с бэка не загружены");
   }
@@ -154,14 +176,16 @@ export async function openPackageOnCanvas(
 
   const newCanvas: Record<string, CanvasTask> = {};
   const newCatalog: Record<string, CatalogTask> = {};
+  const backendTotal = placements.filter((p) => p.phBackendId != null).length;
+  let backendDone = 0;
   for (const p of placements) {
     const { task } = p;
     if (p.phBackendId != null) {
       const backendId = String(p.phBackendId);
-      store.setStatus(`Загружаю с бэка #${backendId}…`);
+      progress(`с бэка #${backendId} · ${plannerTaskLabel(task, "")}`, backendDone++, backendTotal);
       try {
         const backendTask = await fetchTask(domain, backendId);
-        const body = mergeBackendTaskWithPlannerBrief(backendTask, task, { tasksById });
+        const body = mergeBackendTaskWithPlannerBrief(backendTask, task);
         const existing = useChainsStore.getState().canvas[backendId];
         newCanvas[backendId] = {
           id: backendId,
@@ -188,7 +212,7 @@ export async function openPackageOnCanvas(
       }
       continue;
     }
-    const body: TaskLike = mapPlannerTaskToDraft(task, { tasksById });
+    const body: TaskLike = mapPlannerTaskToDraft(task);
     const draftId = newLocalDraftId();
     newCanvas[draftId] = {
       id: draftId,
@@ -206,6 +230,7 @@ export async function openPackageOnCanvas(
     canvasIdByPlannerId.set(Number(task.id), draftId);
   }
 
+  progress("Связываю задачи…", backendTotal, backendTotal || null);
   // Предшественники из других пакетов — по их ph_backend_id (GET задачи графика).
   const links = collectPlannerLinks(placements, canvasIdByPlannerId);
   const outside = new Map<number, PlannerTask | null>();
@@ -234,6 +259,15 @@ export async function openPackageOnCanvas(
       }
     }
     resolvedSources.set(link.prereqPlannerId, sourceId);
+  }
+
+  // Связь не нашлась по id — черновик запомнит name предшественника, форма подберёт его по имени.
+  for (const link of links) {
+    const draft = newCanvas[link.targetId];
+    if (link.cycle || !draft?.localOnly || resolvedSources.get(link.prereqPlannerId)) continue;
+    const prereq = tasksById.get(link.prereqPlannerId) ?? outside.get(link.prereqPlannerId);
+    const prereqName = plannerTaskLabel(prereq, "").trim();
+    if (prereqName) draft.full = { ...draft.full, _plannerPrerequisiteName: prereqName };
   }
 
   useChainsStore.setState((s) => {

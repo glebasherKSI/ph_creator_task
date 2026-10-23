@@ -120,6 +120,20 @@ export function stripLocalTaskIds(state: GraphState, conditions: Condition[]): C
   return mergeGamificationTasks(conditions, list.length ? { ...gt, list } : null);
 }
 
+/**
+ * Тело локального черновика для формы: связи с канвы (рёбра) — в его conditions.
+ * Id других черновиков не попадают: их связь перелинкуется, когда они получат id на бэке.
+ */
+export function draftBodyWithCanvasLinks(
+  state: GraphState,
+  full: TaskLike,
+  canvasConditions: Condition[] | null | undefined,
+): TaskLike {
+  const gt = getGamificationTasksCondition(stripLocalTaskIds(state, canvasConditions ?? []));
+  const own = Array.isArray(full.conditions) ? (full.conditions as Condition[]) : [];
+  return gt ? { ...full, conditions: mergeGamificationTasks(own, gt) } : full;
+}
+
 function withTask(state: GraphState, id: string, patch: Partial<CanvasTask>): GraphState {
   const task = state.canvas[id];
   if (!task) return state;

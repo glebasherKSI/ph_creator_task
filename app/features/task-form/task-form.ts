@@ -3,16 +3,19 @@
  * Порт логики copy-panel.js (fillCopyForm / buildCopyPayload / applyPlannerHint) без DOM.
  */
 import { datetimeLocalToIso, isoToDatetimeLocal } from "@/lib/format";
-import type { MetaRef } from "@/lib/meta";
+import type { MetaBonus, MetaRef } from "@/lib/meta";
 import {
   SEQUENCE_FIELD_OVERRIDES,
   type TaskOverrides,
   boolValue,
   buildCreatePayload,
+  getGamificationTasksCondition,
   isSequenceType,
+  parseBonusPointsFromGroupId,
 } from "@/lib/tasks";
 import type { Condition, TaskAction, TaskLike, TaskPayloadEnvelope } from "@/lib/types";
 
+import type { TaskOption } from "./conditions-builder";
 import { type RepeatScheduleValue, scheduleFromCron, scheduleToCron } from "./repeat-schedule";
 
 export const KNOWN_LOCALE_CODES = ["de", "en", "es", "fr", "it", "pt", "ru"] as const;
@@ -41,6 +44,8 @@ export interface TaskFormValues {
   hidden: boolean;
   type: string;
   playerConsentRequired: boolean;
+  /** Ручное получение награды — только у цепочек. */
+  manualReward: boolean;
   countries: TaskFormCountries;
   /** "" — не выбрано (в payload категория исходной задачи не перезаписывается). */
   category: string;
@@ -137,6 +142,7 @@ export function emptyFormValues(): TaskFormValues {
     hidden: false,
     type: "interactive",
     playerConsentRequired: false,
+    manualReward: false,
     countries: { matchingType: "countries", countries: [], countriesLists: [] },
     category: "",
     priority: "0",
@@ -184,6 +190,7 @@ export function taskToFormValues(task: TaskLike, { mode }: { mode: TaskFormMode 
     hidden: boolValue(task.hidden, false),
     type: String(task.type ?? ""),
     playerConsentRequired: boolValue(task.player_consent_required, false),
+    manualReward: boolValue(task.manual_reward, false),
     countries: {
       matchingType: String(task.countries_matching_type || "countries"),
       countries: stringArray(task.countries),
@@ -233,6 +240,50 @@ export function tagRawFromForm(tag: string, metaTags: MetaRef[] | null): string 
   const tagId = Number(raw);
   const found = metaTags.find((item) => Number(item.id) === tagId);
   return found ? JSON.stringify(found) : raw;
+}
+
+/** id тега справочника по имени (без учёта регистра); "" — не нашли. */
+export function findTagIdByName(name: string, metaTags: MetaRef[]): string {
+  const wanted = name.trim().toLowerCase();
+  const found = wanted ? metaTags.find((t) => t.name.trim().toLowerCase() === wanted) : undefined;
+  return found ? String(found.id) : "";
+}
+
+/** id группы бонусов, у которой в конце названия это число pts; "" — не нашли. */
+export function findBonusIdByPoints(
+  points: number | null | undefined,
+  bonuses: MetaBonus[],
+): string {
+  if (points == null) return "";
+  return bonuses.find((b) => parseBonusPointsFromGroupId(b.id) === points)?.id ?? "";
+}
+
+/**
+ * Условие «Полученные задания геймификации» с предшественником из графика по name.
+ * Нет точного совпадения — условие с пустым списком; уже есть gamification_tasks — null.
+ */
+export function withPrerequisiteCondition(
+  conditions: Condition[],
+  prereqName: string,
+  taskOptions: ReadonlyArray<TaskOption>,
+): Condition[] | null {
+  const wanted = prereqName.trim().toLowerCase();
+  if (!wanted || getGamificationTasksCondition(conditions)) return null;
+  const match = taskOptions.find(
+    (t) =>
+      String(t.name ?? t.label ?? "")
+        .trim()
+        .toLowerCase() === wanted,
+  );
+  const matchId = match?.id ?? match?.value;
+  // Как DEFAULT_GT_CONFIG связей на канве.
+  const block = {
+    list: matchId == null ? [] : [String(matchId)],
+    type: "enabled",
+    extra_type: "or",
+    only_completed: true,
+  };
+  return [...conditions, { gamification_tasks: block }];
 }
 
 function nullableSelect(value: string, metaMode: boolean): string | number | null {
@@ -297,6 +348,7 @@ export function formValuesToOverrides(
 
   if (isSequenceType(type)) {
     Object.assign(overrides, SEQUENCE_FIELD_OVERRIDES);
+    overrides.manual_reward = values.manualReward;
   }
   return overrides;
 }

@@ -112,6 +112,10 @@ export const STRIP_FROM_CREATE: ReadonlySet<string> = new Set([
   "_plannerHints",
   "_plannerTaskId",
   "_plannerPrerequisiteId",
+  "_plannerTag",
+  "_plannerRewardPoints",
+  "_plannerSecondaryRewardPoints",
+  "_plannerPrerequisiteName",
 ]);
 
 /** Тип задания-цепочки: у него нет событий, таргетинга, расписания, дат, стран и кампании. */

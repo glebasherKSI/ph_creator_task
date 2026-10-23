@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { useAddLabel } from "./CanvasLabels";
 import { CatalogSidebar } from "./CatalogSidebar";
 import { EdgePanel } from "./EdgePanel";
-import { FlowCanvas } from "./FlowCanvas";
+import { AddProgressOverlay, FlowCanvas } from "./FlowCanvas";
 import { useLabelsStore } from "./labels-store";
 import { PackagesPanel } from "./PackagesPanel";
 import { SelectionToolbar } from "./SelectionToolbar";
@@ -408,7 +408,8 @@ function ChainsPageInner() {
         </main>
       ) : null}
       {view === "packages" ? (
-        <main className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-background p-4 ring-1 ring-border">
+        <main className="relative min-h-0 flex-1 overflow-y-auto rounded-lg bg-background p-4 ring-1 ring-border">
+          <AddProgressOverlay />
           <PackagesPanel
             onOpened={() => {
               setView("canvas");

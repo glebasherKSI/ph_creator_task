@@ -80,32 +80,63 @@ const PLANNER_TASK = {
   notification_channel: "push",
 };
 
-const PREREQ_TASK = { id: 100, frontend_identifier: "wlc_reg", name_backend: "Reg" };
+/** Без брифа: бриф таргетинга теперь только текст из графика, у старой реализации — больше. */
+function withoutBrief<T extends object>(value: T) {
+  const { _plannerNote, _plannerHints, ...rest } = value as T & Record<string, unknown>;
+  return rest;
+}
 
-const CONTEXT = { tasksById: new Map([[100, PREREQ_TASK]]) };
+/** Черновик без подсказок для автоподстановки и брифа — их нет в старой реализации. */
+function draftForParity(task: unknown) {
+  const { _plannerTag, _plannerRewardPoints, _plannerSecondaryRewardPoints, ...draft } =
+    mapPlannerTaskToDraft(task);
+  return withoutBrief(draft);
+}
 
 describe("graphic-task-map — паритет со старой реализацией", () => {
   it("mapPlannerTaskToDraft", () => {
-    expect(mapPlannerTaskToDraft(PLANNER_TASK, CONTEXT)).toEqual(
-      legacy.mapPlannerTaskToDraft(PLANNER_TASK, CONTEXT),
+    expect(draftForParity(PLANNER_TASK)).toEqual(
+      withoutBrief(legacy.mapPlannerTaskToDraft(PLANNER_TASK)),
     );
   });
 
   it("mapPlannerTaskToDraft без контекста и с пустой задачей", () => {
-    expect(mapPlannerTaskToDraft(PLANNER_TASK)).toEqual(legacy.mapPlannerTaskToDraft(PLANNER_TASK));
-    expect(mapPlannerTaskToDraft({})).toEqual(legacy.mapPlannerTaskToDraft({}));
-    expect(mapPlannerTaskToDraft(null)).toEqual(legacy.mapPlannerTaskToDraft(null));
+    expect(draftForParity({})).toEqual(withoutBrief(legacy.mapPlannerTaskToDraft({})));
+    expect(draftForParity(null)).toEqual(withoutBrief(legacy.mapPlannerTaskToDraft(null)));
+  });
+
+  it("mapPlannerTaskToDraft запоминает имя тега из графика", () => {
+    expect(mapPlannerTaskToDraft(PLANNER_TASK)._plannerTag).toBe("welcome");
+    expect(mapPlannerTaskToDraft({})._plannerTag).toBeNull();
+  });
+
+  it("mapPlannerTaskToDraft: даты графика без зоны — это UTC", () => {
+    const draft = mapPlannerTaskToDraft({
+      time_availability: {
+        available_from: "2026-10-31 23:59:00",
+        available_till: "2026-11-30T23:59",
+      },
+    });
+    expect(draft.available_from).toBe("2026-10-31T23:59:00.000Z");
+    expect(draft.available_till).toBe("2026-11-30T23:59:00.000Z");
+    expect(mapPlannerTaskToDraft({}).available_from).toBeNull();
+  });
+
+  it("mapPlannerTaskToDraft запоминает награды из графика", () => {
+    const draft = mapPlannerTaskToDraft(PLANNER_TASK);
+    expect(draft._plannerRewardPoints).toBe(50);
+    expect(draft._plannerSecondaryRewardPoints).toBeNull();
   });
 
   it("buildPlannerBriefOverlay", () => {
-    expect(buildPlannerBriefOverlay(PLANNER_TASK, CONTEXT)).toEqual(
-      legacy.buildPlannerBriefOverlay(PLANNER_TASK, CONTEXT),
+    expect(withoutBrief(buildPlannerBriefOverlay(PLANNER_TASK))).toEqual(
+      withoutBrief(legacy.buildPlannerBriefOverlay(PLANNER_TASK)),
     );
   });
 
   it("mergeBackendTaskWithPlannerBrief", () => {
-    expect(mergeBackendTaskWithPlannerBrief(taskInteractive, PLANNER_TASK, CONTEXT)).toEqual(
-      legacy.mergeBackendTaskWithPlannerBrief(taskInteractive, PLANNER_TASK, CONTEXT),
+    expect(withoutBrief(mergeBackendTaskWithPlannerBrief(taskInteractive, PLANNER_TASK))).toEqual(
+      withoutBrief(legacy.mergeBackendTaskWithPlannerBrief(taskInteractive, PLANNER_TASK)),
     );
   });
 
@@ -153,12 +184,14 @@ describe("graphic-task-map — паритет со старой реализац
 
 describe("graphic-task-map — содержимое", () => {
   it("черновик из графика превращается в тот же create payload, что и в старом коде", () => {
-    const draft = mapPlannerTaskToDraft(PLANNER_TASK, CONTEXT);
+    const draft = mapPlannerTaskToDraft(PLANNER_TASK);
     expect(withoutV3Keys(buildCreatePayload(draft))).toEqual(legacyTasks.buildCreatePayload(draft));
     const payload = buildCreatePayload(draft);
     // Служебные поля брифа не уходят на бэк.
     expect(payload).not.toHaveProperty("_plannerNote");
     expect(payload).not.toHaveProperty("_plannerHints");
+    expect(payload).not.toHaveProperty("_plannerTag");
+    expect(payload).not.toHaveProperty("_plannerRewardPoints");
     expect(payload.type).toBe("interactive");
     expect(payload.priority).toBe(1);
     expect(payload.countries).toEqual(["RU", "KZ"]);
@@ -170,10 +203,14 @@ describe("graphic-task-map — содержимое", () => {
     ]);
   });
 
-  it("бриф: предшественник по frontend_identifier, неизвестные поля — в «Прочее»", () => {
-    const brief = buildPlannerBriefOverlay(PLANNER_TASK, CONTEXT);
-    expect(brief._plannerNote).toContain("Предшественник: wlc_reg");
-    expect(brief._plannerNote).toContain("targeting.custom_rule: x > 1");
+  it("бриф: таргетинг — только текст из графика, неизвестные поля — в «Прочее»", () => {
+    const brief = buildPlannerBriefOverlay(PLANNER_TASK);
+    expect(brief._plannerHints.sections.targeting).toEqual([
+      { title: "Таргетинг", body: ["Только новые игроки"] },
+    ]);
+    expect(brief._plannerNote).not.toContain("Предшественник");
+    expect(brief._plannerNote).not.toContain("Исключить теги");
+    expect(brief._plannerHints.leftover[0]?.body).toContain("targeting.custom_rule: x > 1");
     expect(brief._plannerNote).toContain("deposit: unknown_field");
     expect(brief._plannerHints.sections.notifications?.[0]?.body).toContain(
       "notification_channel: push",

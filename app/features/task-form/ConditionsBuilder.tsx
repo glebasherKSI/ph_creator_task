@@ -920,8 +920,7 @@ export function ConditionsBuilder({
       value: defaultValueForDef(getConditionDef(schema, name)),
     };
     setSelectedId(item.id);
-    setPickerOpen(false);
-    setPickerQuery("");
+    // Список не закрываем — можно добавить несколько условий подряд, закроется кликом вне.
     emit([...items, item]);
   };
 

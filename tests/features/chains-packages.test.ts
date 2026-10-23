@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { type GraphState, EMPTY_GRAPH, addEdge } from "@/features/chains/graph";
+import {
+  type GraphState,
+  EMPTY_GRAPH,
+  addEdge,
+  draftBodyWithCanvasLinks,
+} from "@/features/chains/graph";
 import {
   CARD_MIN_H,
   CARD_W,
@@ -151,5 +156,35 @@ describe("packages — linkPrerequisite", () => {
     const { state } = linkPrerequisite({ ...base, dirtyTargets: [] }, "local_a", "2");
     expect(state.edges).toContainEqual({ from: "local_a", to: "2" });
     expect(state.dirtyTargets).toEqual([]);
+  });
+});
+
+describe("packages — форма черновика", () => {
+  it("draftBodyWithCanvasLinks: связи с канвы в conditions, без id черновиков", () => {
+    let state = graph(["1529", "local_a", "local_b"], ["local_a", "local_b"]);
+    state = addEdge(state, "1529", "local_b");
+    state = addEdge(state, "local_a", "local_b");
+    const full = { name: "B", conditions: [{ fraud: false }] };
+    const body = draftBodyWithCanvasLinks(state, full, state.canvas["local_b"]!.conditions);
+    expect(body.conditions).toEqual([
+      { fraud: false },
+      {
+        gamification_tasks: {
+          list: ["1529"],
+          type: "enabled",
+          extra_type: "or",
+          only_completed: true,
+        },
+      },
+    ]);
+    // Связь только с черновиком — тело без изменений.
+    const onlyLocal = addEdge(
+      graph(["local_a", "local_c"], ["local_a", "local_c"]),
+      "local_a",
+      "local_c",
+    );
+    expect(draftBodyWithCanvasLinks(onlyLocal, full, onlyLocal.canvas["local_c"]!.conditions)).toBe(
+      full,
+    );
   });
 });
