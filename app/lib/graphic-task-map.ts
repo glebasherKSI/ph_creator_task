@@ -8,6 +8,7 @@ import {
   getAllRequirementFieldKeys,
   getFieldRoleForAction,
   getRequirementFieldDef,
+  isComparisonFieldKey,
   splitActionFieldsForApi,
 } from "./actions-schema";
 import { getGamificationTasksCondition, parseBonusPointsFromGroupId } from "./tasks";
@@ -73,7 +74,122 @@ function asArray(value: unknown): unknown[] {
 
 const COMPARISON_TEXT = /^(>=|<=|==|=|>|<)\s*(-?\d+(?:[.,]\d+)?)$/;
 
-function coerceRowValue(value: unknown): unknown {
+/**
+ * Числовые поля действий. В графике это поле ввода числа, но значение приходит текстом
+ * («1 000», «1,5», «от 100») — разбираем мягко, иначе админка молча теряет поле.
+ */
+const NUMERIC_ROW_KEYS: ReadonlySet<string> = new Set([
+  "bets_count",
+  "bet_points_sum",
+  "min_bet_amount",
+  "sport_bets_count",
+  "sport_bet_points_sum",
+  "payments_count",
+  "points_sum",
+  "min_points",
+  "max_points",
+  "achievements_count",
+  "bonuses_count",
+  "bonuses_points_sum",
+  "tasks_count",
+  "tournaments_count",
+  "games_taken_min",
+  "place_min",
+  "place_max",
+]);
+
+/** Ровно одно число в тексте (пробелы-разделители тысяч, запятая — десятичная), иначе undefined. */
+export function parseLooseNumber(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  const text = String(value ?? "").trim();
+  const numbers = text.match(/-?\d[\d\s\u00a0]*(?:[.,]\d+)?/g);
+  if (!numbers || numbers.length !== 1) return undefined;
+  const num = Number(numbers[0]!.replace(/[\s\u00a0]/g, "").replace(",", "."));
+  return Number.isFinite(num) ? num : undefined;
+}
+
+/**
+ * Слова и знаки сравнения, которыми коэффициент пишут в графике руками.
+ * Конец слова — пробел/цифра/конец строки: `\b` в JS не работает с кириллицей.
+ */
+const COMPARISON_WORDS: ReadonlyArray<[RegExp, string]> = [
+  [/^(>=|≥|=>)/, ">="],
+  [/^(<=|≤|=<)/, "<="],
+  [/^(==|=)/, "="],
+  [/^>/, ">"],
+  [/^</, "<"],
+  [/^(от|не менее|не меньше|минимум|мин\.?|min)(?=[\s\d]|$)/i, ">="],
+  [/^(до|не более|не больше|максимум|макс\.?|max)(?=[\s\d]|$)/i, "<="],
+  [/^(больше|более|выше|свыше)(?=[\s\d]|$)/i, ">"],
+  [/^(меньше|менее|ниже)(?=[\s\d]|$)/i, "<"],
+  [/^(ровно|равно)(?=[\s\d]|$)/i, "="],
+];
+
+const TYPE_TO_OPERATOR: Record<string, string> = {
+  min: ">=",
+  gte: ">=",
+  max: "<=",
+  lte: "<=",
+  gt: ">",
+  lt: "<",
+  eq: "=",
+};
+
+/**
+ * Коэффициент из графика → `{ operator, value }` админки. Понимает «>= 1.5», «1,5», «от 2»,
+ * «x2», объект/JSON и «operator:>=, value:1.5» (так график показывает объект в строке).
+ * Голое число — «не меньше» (>=), как сравнение по умолчанию в админке.
+ */
+export function parseComparisonText(
+  value: unknown,
+): { operator: string; value: string } | undefined {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    const operator =
+      obj.operator != null
+        ? String(obj.operator).trim()
+        : TYPE_TO_OPERATOR[String(obj.type ?? "min").trim()];
+    const num = parseLooseNumber(obj.value ?? obj.min ?? obj.max);
+    return operator && num !== undefined
+      ? { operator: operator === "==" ? "=" : operator, value: String(num) }
+      : undefined;
+  }
+  if (typeof value === "number") return parseComparisonText({ operator: ">=", value });
+  const text = String(value ?? "").trim();
+  if (!text) return undefined;
+  if (text.startsWith("{")) {
+    try {
+      return parseComparisonText(JSON.parse(text));
+    } catch {
+      return undefined;
+    }
+  }
+  // «operator:>=, value:1.5» / «type:min, value:2»
+  if (/(operator|type)\s*:/i.test(text) && /value\s*:/i.test(text)) {
+    const pairs: Record<string, string> = {};
+    for (const part of text.split(",")) {
+      const [k, ...rest] = part.split(":");
+      if (k && rest.length) pairs[k.trim().toLowerCase()] = rest.join(":").trim();
+    }
+    return parseComparisonText(pairs);
+  }
+  let operator = ">=";
+  let rest = text;
+  for (const [pattern, op] of COMPARISON_WORDS) {
+    const match = pattern.exec(rest);
+    if (match) {
+      operator = op;
+      rest = rest.slice(match[0].length).trim();
+      break;
+    }
+  }
+  // «x2», «х2» (кириллица), «×2», «2x»
+  rest = rest.replace(/^[xх×]\s*/i, "").replace(/\s*[xх×]$/i, "");
+  const num = /^-?\d[\d\s\u00a0]*(?:[.,]\d+)?$/.test(rest) ? parseLooseNumber(rest) : undefined;
+  return num === undefined ? undefined : { operator, value: String(num) };
+}
+
+function coerceRowValue(value: unknown, isList: boolean): unknown {
   if (Array.isArray(value)) return value;
   if (typeof value === "number" || typeof value === "boolean") return value;
   const text = String(value ?? "").trim();
@@ -84,7 +200,8 @@ function coerceRowValue(value: unknown): unknown {
   // «>= 1.5» пишет mapPhTaskToPlannerImport — так сравнение переживает поездку через график.
   const comparison = COMPARISON_TEXT.exec(text);
   if (comparison) return { operator: comparison[1], value: comparison[2]!.replace(",", ".") };
-  if (text.includes(",")) {
+  // Через запятую — только списки: «1,5» или название с запятой остаются одним значением.
+  if (isList && text.includes(",")) {
     return text
       .split(",")
       .map((part) => part.trim())
@@ -93,18 +210,30 @@ function coerceRowValue(value: unknown): unknown {
   return text;
 }
 
-/** Строки планировщика `[{ key, value }]` → объект. */
-function rowsToObject(rows: unknown): Record<string, unknown> {
+/** Значение строки по типу поля: сравнение, число, список или как есть. */
+function rowFieldValue(key: string, raw: unknown): unknown {
+  if (isComparisonFieldKey(key)) return parseComparisonText(raw) ?? String(raw ?? "").trim();
+  if (NUMERIC_ROW_KEYS.has(key)) {
+    const num = parseLooseNumber(raw);
+    return num ?? String(raw ?? "").trim();
+  }
+  const widget = getRequirementFieldDef(key)?.widget;
+  const isList = widget === "multi_text" || widget === "multi_select";
+  const value = coerceRowValue(raw, isList);
+  // Список из одного значения строка не отличит от скаляра — тип берём из схемы поля.
+  return isList && value !== "" && !Array.isArray(value) ? [String(value)] : value;
+}
+
+/** Строки планировщика `[{ key, value }]` → объект (и исходный текст — для заметок о потерях). */
+function rowsToObject(rows: unknown, raw: Record<string, string> = {}): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const row of asArray(rows)) {
     if (!row || typeof row !== "object") continue;
     const key = String((row as { key?: unknown }).key || "").trim();
     if (!key) continue;
-    const value = coerceRowValue((row as { value?: unknown }).value);
-    // Список из одного значения строка не отличит от скаляра — тип берём из схемы поля.
-    const widget = getRequirementFieldDef(key)?.widget;
-    const isList = widget === "multi_text" || widget === "multi_select";
-    out[key] = isList && value !== "" && !Array.isArray(value) ? [String(value)] : value;
+    const value = (row as { value?: unknown }).value;
+    raw[key] = typeof value === "string" ? value : JSON.stringify(value ?? "");
+    out[key] = rowFieldValue(key, value);
   }
   return out;
 }
@@ -119,18 +248,23 @@ function mapActionItem(item: unknown): MappedAction | null {
   const rec = item as Record<string, unknown>;
   const action = String(rec.action || "").trim();
   if (!action) return null;
-  const fields = { ...rowsToObject(rec.conditions), ...rowsToObject(rec.attributes) };
+  const raw: Record<string, string> = {};
+  const fields = { ...rowsToObject(rec.conditions, raw), ...rowsToObject(rec.attributes, raw) };
   const allowed = new Set(getAllRequirementFieldKeys(action));
   const leftover = Object.keys(fields).filter((key) => !allowed.has(key));
   const split = splitActionFieldsForApi(action, fields);
-  return {
-    mapped: {
-      action,
-      requirements: coerceActionRequirements(action, split.requirements),
-      conditions: coerceActionConditions(action, split.conditions),
-    },
-    leftover,
+  const mapped: TaskAction = {
+    action,
+    requirements: coerceActionRequirements(action, split.requirements),
+    conditions: coerceActionConditions(action, split.conditions),
   };
+  // Известное поле со значением, которое не удалось разобрать, — не теряем молча, а в бриф.
+  for (const key of Object.keys(fields)) {
+    if (!allowed.has(key) || !raw[key]?.trim()) continue;
+    if (key in (mapped.requirements ?? {}) || key in (mapped.conditions ?? {})) continue;
+    leftover.push(`${key} = «${raw[key]!.trim()}» (не распознано)`);
+  }
+  return { mapped, leftover };
 }
 
 function mapActionList(items: unknown): { mapped: TaskAction[]; leftoverNotes: string[] } {

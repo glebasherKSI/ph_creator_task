@@ -9,6 +9,8 @@ import {
   mergeBackendTaskWithPlannerBrief,
   mergeDefaultDraftConditions,
   orderPlannerTasksByChain,
+  parseComparisonText,
+  parseLooseNumber,
 } from "@/lib/graphic-task-map";
 import { buildCreatePayload } from "@/lib/tasks";
 
@@ -95,9 +97,12 @@ function draftForParity(task: unknown) {
 
 describe("graphic-task-map — паритет со старой реализацией", () => {
   it("mapPlannerTaskToDraft", () => {
-    expect(draftForParity(PLANNER_TASK)).toEqual(
-      withoutBrief(legacy.mapPlannerTaskToDraft(PLANNER_TASK)),
-    );
+    const expected = withoutBrief(legacy.mapPlannerTaskToDraft(PLANNER_TASK)) as {
+      serialized_main_actions: Array<{ conditions: Record<string, unknown> }>;
+    };
+    // Сознательное отличие: старый код резал «1,5» по запятой в список ["1", "5"].
+    expected.serialized_main_actions[0]!.conditions.min_points = 1.5;
+    expect(draftForParity(PLANNER_TASK)).toEqual(expected);
   });
 
   it("mapPlannerTaskToDraft без контекста и с пустой задачей", () => {
@@ -331,5 +336,78 @@ describe("mapPhTaskToPlannerImport", () => {
       key: "games",
       value: "7, 8",
     });
+  });
+});
+
+describe("действия из графика: ставки (минимальная ставка, коэффициенты)", () => {
+  function draftActions(bet: unknown, coef: unknown) {
+    const draft = mapPlannerTaskToDraft({
+      name: "t",
+      main_actions: [
+        {
+          action: "bet",
+          conditions: [{ key: "bets_count", value: "1" }],
+          attributes: [
+            { key: "min_bet_amount", value: bet },
+            { key: "win_coefficient", value: coef },
+            { key: "game_categories", value: "slots_online, live" },
+          ],
+        },
+        {
+          action: "sport_bet",
+          conditions: [{ key: "sport_bets_count", value: "1" }],
+          attributes: [
+            { key: "min_bet_amount", value: bet },
+            { key: "odd", value: coef },
+          ],
+        },
+      ],
+    });
+    return draft as {
+      serialized_main_actions: Array<{ conditions: Record<string, unknown> }>;
+      _plannerHints?: { sections?: { actions?: Array<{ body: string[] }> } };
+    };
+  }
+
+  it.each([
+    ["50", "11", 50, { operator: ">=", value: "11" }],
+    ["1 000", "1,5", 1000, { operator: ">=", value: "1.5" }],
+    ["от 100", "от 2", 100, { operator: ">=", value: "2" }],
+    ["100 поинтов", "x2", 100, { operator: ">=", value: "2" }],
+    ["50", "не менее 1.5", 50, { operator: ">=", value: "1.5" }],
+    ["50", "== 11", 50, { operator: "=", value: "11" }],
+    ["50", "<= 3", 50, { operator: "<=", value: "3" }],
+    ["50", "operator:>=, value:1.5", 50, { operator: ">=", value: "1.5" }],
+    [50, 2, 50, { operator: ">=", value: "2" }],
+  ])("ставка %j, коэффициент %j", (bet, coef, expectedBet, expectedCoef) => {
+    const [casino, sport] = draftActions(bet, coef).serialized_main_actions;
+    expect(casino!.conditions.min_bet_amount).toBe(expectedBet);
+    expect(casino!.conditions.win_coefficient).toEqual(expectedCoef);
+    expect(casino!.conditions.game_categories).toEqual(["slots_online", "live"]);
+    expect(sport!.conditions.min_bet_amount).toBe(expectedBet);
+    expect(sport!.conditions.odd).toEqual(expectedCoef);
+  });
+
+  it("нераспознанное значение не теряется молча — попадает в бриф «Действия»", () => {
+    const draft = draftActions("50", "abc");
+    expect(draft.serialized_main_actions[0]!.conditions.win_coefficient).toBeUndefined();
+    const notes = draft._plannerHints?.sections?.actions?.flatMap((box) => box.body) ?? [];
+    expect(notes.join(" ")).toContain("win_coefficient = «abc» (не распознано)");
+    expect(notes.join(" ")).toContain("odd = «abc» (не распознано)");
+  });
+
+  it("parseLooseNumber / parseComparisonText", () => {
+    expect(parseLooseNumber("1 000")).toBe(1000);
+    expect(parseLooseNumber("от 1 до 5")).toBeUndefined();
+    expect(parseComparisonText('{"operator":"==","value":"11"}')).toEqual({
+      operator: "=",
+      value: "11",
+    });
+    expect(parseComparisonText({ type: "max", value: "3" })).toEqual({
+      operator: "<=",
+      value: "3",
+    });
+    expect(parseComparisonText("больше 2")).toEqual({ operator: ">", value: "2" });
+    expect(parseComparisonText("abc")).toBeUndefined();
   });
 });
