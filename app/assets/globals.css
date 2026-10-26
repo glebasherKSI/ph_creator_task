@@ -192,6 +192,95 @@
   animation: slide-out-right 180ms cubic-bezier(0.4, 0, 1, 1);
 }
 
+/*
+ * Боковая панель в колонке грида: ширина от 0, чтобы канва раздвигалась плавно, а не прыгала.
+ * Сама панель не сдвигается (transform у правого края выводит её за окно → полосы прокрутки
+ * и скачок вёрстки); «выезд» — у содержимого внутри, его обрезает overflow-hidden панели.
+ */
+@keyframes panel-in {
+  from {
+    width: 0;
+    opacity: 0;
+  }
+  to {
+    width: var(--panel-width);
+    opacity: 1;
+  }
+}
+
+@keyframes panel-out {
+  from {
+    width: var(--panel-width);
+    opacity: 1;
+  }
+  to {
+    width: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes panel-content-in {
+  from {
+    transform: translateX(24px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes panel-content-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(24px);
+  }
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typing-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@utility animate-panel-in {
+  animation: panel-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* forwards — панель не мигает полной шириной между концом анимации и размонтированием. */
+@utility animate-panel-out {
+  animation: panel-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@utility animate-panel-content-in {
+  animation: panel-content-in 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@utility animate-panel-content-out {
+  animation: panel-content-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@utility animate-message-in {
+  animation: message-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@utility animate-typing-dot {
+  animation: typing-dot 1s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

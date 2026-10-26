@@ -8,6 +8,7 @@ import {
   Loader2,
   Maximize2,
   MoreHorizontal,
+  MessagesSquare,
   RefreshCw,
   Save,
   Tag,
@@ -27,6 +28,7 @@ import { StatsPanel } from "@/features/stats/StatsPanel";
 import { useStatsReport } from "@/features/stats/useStatsReport";
 import { cn } from "@/lib/utils";
 
+import { AssistantPanel, useAssistantPanel } from "./AssistantPanel";
 import { useAddLabel } from "./CanvasLabels";
 import { CatalogSidebar } from "./CatalogSidebar";
 import { EdgePanel } from "./EdgePanel";
@@ -134,6 +136,9 @@ function ChainsPageInner() {
   const saving = useChainsStore((s) => s.saving);
   const saveLog = useChainsStore((s) => s.saveLog);
   const selectedEdge = useChainsStore((s) => s.selectedEdge);
+  const assistantOpen = useAssistantPanel((s) => s.open);
+  // Колонка живёт, пока панель в DOM, — иначе анимация закрытия обрежется.
+  const assistantShown = useAssistantPanel((s) => s.shown);
   const addLabel = useAddLabel();
 
   // Домен из popup/localStorage → store (сбрасывает канву и каталог); подписи — тоже.
@@ -217,7 +222,9 @@ function ChainsPageInner() {
   }
 
   return (
-    <div className="flex h-screen flex-col gap-3 p-3">
+    // overflow-hidden: страница на всю высоту окна, прокрутка — внутри областей; временное
+    // переполнение (анимации панелей) не должно давать полосы прокрутки и скачка вёрстки.
+    <div className="flex h-screen flex-col gap-3 overflow-hidden p-3">
       <header className="flex flex-col rounded-lg bg-surface">
         {/* Уровень 1: раздел и источник данных */}
         <div className="flex flex-wrap items-center gap-3 px-4 py-3">
@@ -340,6 +347,15 @@ function ChainsPageInner() {
 
             <div className="ml-auto flex items-center gap-3">
               <Button
+                variant={assistantOpen ? "secondary" : "ghost"}
+                size="sm"
+                aria-pressed={assistantOpen}
+                onClick={() => useAssistantPanel.getState().toggle()}
+                title="Вопросы по задачам на канве — ИИ отвечает только по их настройкам"
+              >
+                <MessagesSquare /> Консультант
+              </Button>
+              <Button
                 variant="primary"
                 size="sm"
                 disabled={!dirtyCount || saving}
@@ -379,7 +395,9 @@ function ChainsPageInner() {
         className={cn(
           "grid min-h-0 flex-1 gap-3",
           view !== "canvas" && "hidden",
-          selectedEdge ? "grid-cols-[22rem_minmax(0,1fr)_auto]" : "grid-cols-[22rem_minmax(0,1fr)]",
+          selectedEdge || assistantShown
+            ? "grid-cols-[22rem_minmax(0,1fr)_auto]"
+            : "grid-cols-[22rem_minmax(0,1fr)]",
         )}
       >
         <CatalogSidebar
@@ -395,7 +413,12 @@ function ChainsPageInner() {
             <SaveLog entries={saveLog} onClose={() => setLogOpen(false)} />
           ) : null}
         </div>
-        {selectedEdge ? <EdgePanel /> : null}
+        {selectedEdge || assistantShown ? (
+          <div className="flex min-h-0 gap-3 overflow-hidden">
+            {selectedEdge ? <EdgePanel /> : null}
+            <AssistantPanel onFocusNode={focusNode} />
+          </div>
+        ) : null}
       </div>
       {view === "stats" ? (
         <main className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-background p-4 ring-1 ring-border">

@@ -354,3 +354,12 @@ export async function graphicApiPost(
   );
   return response.data;
 }
+
+export async function graphicApiPut(path: string, body?: unknown): Promise<unknown> {
+  const response = await sendGraphicMessage("PH_GRAPHIC_FETCH", {
+    path,
+    method: "PUT",
+    body: body ?? null,
+  });
+  return response.data;
+}

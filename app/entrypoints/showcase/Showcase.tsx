@@ -15,6 +15,9 @@ import { StatusTabs } from "@/features/popup/StatusTabs";
 import type { DomainsState } from "@/features/popup/useDomains";
 import type { GraphicState } from "@/features/popup/useGraphic";
 import type { ReportsState } from "@/features/popup/useReports";
+import { pushMessage, useAssistantPanel } from "@/features/chains/assistant-store";
+import { AssistantMessage } from "@/features/chains/AssistantMessage";
+import { useChainsStore } from "@/features/chains/store";
 import { TaskForm } from "@/features/task-form/TaskForm";
 import type { TaskLike } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -72,6 +75,56 @@ const TASK_FIXTURES: Record<string, TaskLike> = {
 };
 
 const noop = async () => {};
+
+const CONSULTANT_SAMPLE = `Без входящих связей **2** задачи.
+
+### Без связей
+- #1454 — интерактивная, действие \`deposit\`
+  - доступна с **2026-11-01**, награда — группа \`gamification_award:FS 50\`
+- #1456 — цепочка, связи не сохранены
+
+### Что проверить
+1. #1456 ссылается на #900 — этой задачи нет на канве.
+2. Сохраните связи перед запуском.`;
+
+// Две карточки «на канве» витрины — чтобы чипы #id в ответе консультанта были кликабельными.
+useChainsStore.setState((s) => ({
+  canvas: {
+    ...s.canvas,
+    "1454": {
+      id: "1454",
+      name: String(taskInteractiveFixture.name ?? ""),
+      frontend_identifier: "",
+      conditions: [],
+      full: null,
+      x: 0,
+      y: 0,
+    },
+    "1456": {
+      id: "1456",
+      name: String(taskSequenceFixture.name ?? ""),
+      frontend_identifier: "",
+      conditions: [],
+      full: null,
+      x: 0,
+      y: 0,
+    },
+  },
+}));
+
+// Ответ лежит в сторе чата, как в панели: оценка и отзыв меняют его через patchMessage.
+pushMessage({ role: "assistant", content: CONSULTANT_SAMPLE, logId: 1, promptVersionId: null });
+
+function ConsultantSample() {
+  const messages = useAssistantPanel((s) => s.messages);
+  return (
+    <div className="flex w-96 flex-col gap-3">
+      {messages.map((message) => (
+        <AssistantMessage key={message.id} message={message} onFocusNode={() => {}} />
+      ))}
+    </div>
+  );
+}
 
 /** Моки состояния popup — карточки чистые, живут на props. */
 const POPUP_DOMAINS: DomainsState = {
@@ -386,6 +439,14 @@ export function Showcase() {
           <TaskCardMock selected />
           <TaskCardMock sequence />
         </div>
+      </Section>
+
+      <Section title="Ответ консультанта">
+        <p className="text-subhead text-muted-foreground">
+          #1454 и #1456 «лежат на канве» витрины — чипы кликабельны; #900 вне канвы. Оценка уходит в
+          Graphic — без входа откатится с ошибкой.
+        </p>
+        <ConsultantSample />
       </Section>
 
       <Section title="Popup">
