@@ -35,7 +35,9 @@ import { EdgePanel } from "./EdgePanel";
 import { AddProgressOverlay, FlowCanvas } from "./FlowCanvas";
 import { useLabelsStore } from "./labels-store";
 import { PackagesPanel } from "./PackagesPanel";
-import { SelectionToolbar } from "./SelectionToolbar";
+import { SelectionBar, SelectionToolbar } from "./SelectionToolbar";
+import { BulkEditDialog } from "./BulkEditDialog";
+import { CompareDialog } from "./CompareDialog";
 import { SendToPackageDialog } from "./SendToPackageDialog";
 import { TitlesSyncDialog } from "./TitlesSyncDialog";
 import { measuredHeights } from "./layout";
@@ -409,6 +411,7 @@ function ChainsPageInner() {
         />
         <div className="relative min-h-0">
           <FlowCanvas />
+          <SelectionBar />
           {logOpen && saveLog.length ? (
             <SaveLog entries={saveLog} onClose={() => setLogOpen(false)} />
           ) : null}
@@ -445,6 +448,8 @@ function ChainsPageInner() {
       <TaskSheet />
       <TemplatesDialogs domains={domains} />
       <SendToPackageDialog />
+      <BulkEditDialog />
+      <CompareDialog />
       <TitlesSyncDialog />
     </div>
   );

@@ -1,3 +1,4 @@
+import { renameActionKeysForApi } from "./actions-schema";
 import {
   CREATE_TASK_KEYS,
   READONLY_KEYS,
@@ -260,6 +261,19 @@ function applyCreateDefaults(payload: TaskLike): TaskLike {
   return payload;
 }
 
+/** Ключи полей действий — как их читает бэк (sport_bet: «Тип ставки» → `types`). */
+function normalizeActionKeys(payload: TaskLike): TaskLike {
+  for (const key of ["serialized_main_actions", "serialized_secondary_actions"]) {
+    const list = payload[key];
+    if (Array.isArray(list)) {
+      payload[key] = list.map((item) =>
+        item && typeof item === "object" ? renameActionKeysForApi(item as TaskLike) : item,
+      );
+    }
+  }
+  return payload;
+}
+
 /** Переопределения формы поверх исходной задачи; `__tagRaw` — сырое значение поля тега. */
 export type TaskOverrides = TaskLike & { __tagRaw?: string | null };
 
@@ -311,7 +325,7 @@ export function buildCreatePayload(
   if (tagInfo.tag) payload.tag = tagInfo.tag;
 
   stripFromCreatePayload(payload);
-  return applyCreateDefaults(payload);
+  return normalizeActionKeys(applyCreateDefaults(payload));
 }
 
 /** Тело PATCH: как create, но conditions берутся отдельно и добавляется id. */
@@ -333,6 +347,7 @@ export function buildPatchPayload(
 
   applyCreateDefaults(payload);
   stripFromCreatePayload(payload);
+  normalizeActionKeys(payload);
   payload.id = task.id;
   return { gamification_task: payload };
 }

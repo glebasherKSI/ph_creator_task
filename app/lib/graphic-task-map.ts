@@ -10,6 +10,7 @@ import {
   getRequirementFieldDef,
   isComparisonFieldKey,
   splitActionFieldsForApi,
+  uiFieldKey,
 } from "./actions-schema";
 import { getGamificationTasksCondition, parseBonusPointsFromGroupId } from "./tasks";
 import type { Condition, TaskAction, TaskLike } from "./types";
@@ -47,12 +48,13 @@ export interface PlannerBriefOverlay {
   _plannerPrerequisiteId: unknown;
 }
 
+/** В админке 0 — «Самый низкий», 4 — «Наивысший» (см. PRIORITY_LABELS). */
 const PLANNER_PRIORITY_TO_PH: Record<string, number> = {
-  highest: 0,
-  high: 1,
+  lowest: 0,
+  low: 1,
   medium: 2,
-  low: 3,
-  lowest: 4,
+  high: 3,
+  highest: 4,
 };
 
 const TASK_TYPES: ReadonlySet<string> = new Set([
@@ -249,7 +251,14 @@ function mapActionItem(item: unknown): MappedAction | null {
   const action = String(rec.action || "").trim();
   if (!action) return null;
   const raw: Record<string, string> = {};
-  const fields = { ...rowsToObject(rec.conditions, raw), ...rowsToObject(rec.attributes, raw) };
+  // Строки графика — в ключах формы; `types` (ключ API) из старых выгрузок тоже понимаем.
+  const fields = Object.fromEntries(
+    Object.entries({
+      ...rowsToObject(rec.conditions, raw),
+      ...rowsToObject(rec.attributes, raw),
+    }).map(([key, value]) => [uiFieldKey(action, key), value]),
+  );
+  for (const key of Object.keys(raw)) raw[uiFieldKey(action, key)] ??= raw[key]!;
   const allowed = new Set(getAllRequirementFieldKeys(action));
   const leftover = Object.keys(fields).filter((key) => !allowed.has(key));
   const split = splitActionFieldsForApi(action, fields);
@@ -867,7 +876,9 @@ function toPlannerAction(item: TaskAction): PlannerAction | null {
   if (!action) return null;
   const out: PlannerAction = { action, conditions: [], attributes: [] };
   const fields = { ...asObject(item.requirements), ...asObject(item.conditions) };
-  for (const [key, value] of Object.entries(fields)) {
+  for (const [apiKey, value] of Object.entries(fields)) {
+    // В график — ключи формы (там те же поля, что в форме), не ключи API.
+    const key = uiFieldKey(action, apiKey);
     const row = { key, value: rowValue(value) };
     if (!row.value) continue;
     if (getFieldRoleForAction(action, key) === "attribute") out.attributes.push(row);

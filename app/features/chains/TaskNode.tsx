@@ -398,8 +398,13 @@ export const TaskNode = memo(function TaskNode({ data, selected }: NodeProps<Tas
       onDoubleClick={() => useTaskSheet.getState().open("edit", task.id)}
       className={cn(
         "w-[280px] overflow-hidden rounded-lg border bg-surface transition-colors",
-        selected ? "border-primary" : "border-transparent",
-        localOnly && "border-dashed border-muted-foreground/50",
+        // Черновик — пунктирная рамка; выделение красит её так же, как у обычной карточки.
+        localOnly && "border-dashed",
+        selected
+          ? "border-primary"
+          : localOnly
+            ? "border-muted-foreground/50"
+            : "border-transparent",
       )}
     >
       <Handle

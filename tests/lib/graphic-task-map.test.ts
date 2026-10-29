@@ -102,6 +102,8 @@ describe("graphic-task-map — паритет со старой реализац
     };
     // Сознательное отличие: старый код резал «1,5» по запятой в список ["1", "5"].
     expected.serialized_main_actions[0]!.conditions.min_points = 1.5;
+    // Старый код переворачивал приоритет: «high» становился 1 («Низкий»).
+    (expected as { priority?: number }).priority = 3;
     expect(draftForParity(PLANNER_TASK)).toEqual(expected);
   });
 
@@ -192,13 +194,14 @@ describe("graphic-task-map — содержимое", () => {
     const draft = mapPlannerTaskToDraft(PLANNER_TASK);
     expect(withoutV3Keys(buildCreatePayload(draft))).toEqual(legacyTasks.buildCreatePayload(draft));
     const payload = buildCreatePayload(draft);
+    // «high» из графика — «Высокий» (3) в админке.
+    expect(payload.priority).toBe(3);
     // Служебные поля брифа не уходят на бэк.
     expect(payload).not.toHaveProperty("_plannerNote");
     expect(payload).not.toHaveProperty("_plannerHints");
     expect(payload).not.toHaveProperty("_plannerTag");
     expect(payload).not.toHaveProperty("_plannerRewardPoints");
     expect(payload.type).toBe("interactive");
-    expect(payload.priority).toBe(1);
     expect(payload.countries).toEqual(["RU", "KZ"]);
     expect(payload.conditions).toEqual([
       { fraud: true },
@@ -240,7 +243,7 @@ describe("mapPhTaskToPlannerImport", () => {
       frontend_identifier: "Default_sport_task8",
       name_backend: "Экспресс-вечеринка SEASON 7_v2",
       task_type: "interactive",
-      priority: "low",
+      priority: "high", // 3 — «Высокий»
       player_consent_required: true,
       cron: "0 0 1 * *",
       color: "#14b8a6",
@@ -287,7 +290,7 @@ describe("mapPhTaskToPlannerImport", () => {
         conditions: {
           odd: { operator: ">=", value: "1.5" },
           min_bet_amount: 1000,
-          sport_bet_types: ["express"],
+          types: ["express"],
         },
       },
     ]);

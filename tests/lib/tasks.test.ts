@@ -14,7 +14,7 @@ import {
 } from "@/lib/tasks";
 import type { GamificationTask } from "@/lib/types";
 
-import { withoutV3Keys } from "../helpers";
+import { withApiActionKeys, withoutV3Keys } from "../helpers";
 
 // Старая реализация — эталон поведения до конца миграции (этап 9 удалит src/).
 import * as legacy from "legacy/tasks.js";
@@ -35,7 +35,9 @@ const FIXTURE_TASKS: Array<[string, GamificationTask]> = [
 
 describe("buildCreatePayload — паритет со старой реализацией", () => {
   it.each(FIXTURE_TASKS)("%s: без overrides", (_name, task) => {
-    expect(withoutV3Keys(buildCreatePayload(task))).toEqual(legacy.buildCreatePayload(task));
+    expect(withoutV3Keys(buildCreatePayload(task))).toEqual(
+      withApiActionKeys(legacy.buildCreatePayload(task)),
+    );
   });
 
   it.each(FIXTURE_TASKS)("%s: с overrides формы", (_name, task) => {
@@ -47,7 +49,7 @@ describe("buildCreatePayload — паритет со старой реализа
       __tagRaw: JSON.stringify({ id: 777, name: "tag", settings: {} }),
     };
     expect(withoutV3Keys(buildCreatePayload(task, overrides))).toEqual(
-      legacy.buildCreatePayload(task, overrides),
+      withApiActionKeys(legacy.buildCreatePayload(task, overrides)),
     );
   });
 
@@ -106,8 +108,32 @@ describe("buildPatchPayload — паритет со старой реализа�
   it.each(FIXTURE_TASKS)("%s", (_name, task) => {
     const conditions = [{ gamification_tasks: { list: ["1"], type: "enabled", extra_type: "or" } }];
     expect(withoutV3Keys(buildPatchPayload(task, conditions).gamification_task)).toEqual(
-      legacy.buildPatchPayload(task, conditions).gamification_task,
+      withApiActionKeys(legacy.buildPatchPayload(task, conditions).gamification_task),
     );
+  });
+});
+
+describe("ключи действий в payload", () => {
+  it("«Тип ставки» sport_bet уходит на бэк как types, остальное не меняется", () => {
+    const task = {
+      ...taskWithGt,
+      serialized_main_actions: [
+        {
+          action: "sport_bet",
+          requirements: { sport_bets_count: "1" },
+          conditions: { sport_bet_types: ["single", "express"], min_bet_amount: 5000 },
+        },
+      ],
+    } as unknown as GamificationTask;
+    const expected = [
+      {
+        action: "sport_bet",
+        requirements: { sport_bets_count: "1" },
+        conditions: { types: ["single", "express"], min_bet_amount: 5000 },
+      },
+    ];
+    expect(buildCreatePayload(task).serialized_main_actions).toEqual(expected);
+    expect(buildPatchPayload(task, []).gamification_task.serialized_main_actions).toEqual(expected);
   });
 });
 

@@ -495,6 +495,50 @@ export function getFieldRoleForAction(actionType: string, key: string): FieldRol
   return null;
 }
 
+/**
+ * Поля формы, которые админка хранит под другим ключом. «Тип ставки» у sport_bet в API — `types`:
+ * так его пишет форма админки и именно его проверяет бэк. `sport_bet_types` — ключ подписи из
+ * словаря переводов (отсюда он попал в схему); бэк его не читает. Старые задачи с ним
+ * по-прежнему открываются, но на бэк уходит `types`.
+ */
+const API_FIELD_KEYS: Record<string, Record<string, string>> = {
+  sport_bet: { sport_bet_types: "types" },
+};
+
+/** Ключ поля формы → ключ в API (обычно тот же). */
+export function apiFieldKey(actionType: string, key: string): string {
+  return API_FIELD_KEYS[String(actionType || "").trim()]?.[key] ?? key;
+}
+
+/** Ключ из API → ключ поля формы (обычно тот же). */
+export function uiFieldKey(actionType: string, key: string): string {
+  const map = API_FIELD_KEYS[String(actionType || "").trim()];
+  if (!map) return key;
+  return Object.keys(map).find((uiKey) => map[uiKey] === key) ?? key;
+}
+
+/**
+ * Действие с ключами в API-формате; остальные поля не трогает. Если есть оба ключа,
+ * побеждает значение поля формы — его пользователь видел в интерфейсе.
+ */
+export function renameActionKeysForApi<
+  T extends { action?: unknown; requirements?: unknown; conditions?: unknown },
+>(item: T): T {
+  const map = API_FIELD_KEYS[String(item?.action ?? "").trim()];
+  if (!map) return item;
+  const rename = (block: unknown) => {
+    if (!isRecord(block)) return block;
+    const out: Record<string, unknown> = { ...block };
+    for (const [uiKey, apiKey] of Object.entries(map)) {
+      if (!(uiKey in out)) continue;
+      out[apiKey] = out[uiKey];
+      delete out[uiKey];
+    }
+    return out;
+  };
+  return { ...item, requirements: rename(item.requirements), conditions: rename(item.conditions) };
+}
+
 export function getAllRequirementFieldKeys(actionType: string): string[] {
   const type = String(actionType || "").trim();
   const conditionKeys = CONDITION_FIELD_KEYS_BY_ACTION[type] || [];
@@ -982,7 +1026,10 @@ export function mergeActionFieldsForUi(
     if (!role) continue;
     const primary = role === "condition" ? req : cond;
     const fallback = role === "condition" ? cond : req;
-    const val = key in primary ? primary[key] : fallback[key];
+    const apiKey = apiFieldKey(type, key);
+    const pick = (src: Record<string, unknown>) =>
+      key in src ? src[key] : apiKey in src ? src[apiKey] : undefined;
+    const val = pick(primary) ?? pick(fallback);
     if (val === undefined) continue;
     if (key === "game_categories") {
       merged[key] = normalizeGameCategoriesValue(val);
@@ -1020,15 +1067,16 @@ export function splitActionFieldsForApi(actionType: string, fields: unknown): Ac
     const role = getFieldRoleForAction(type, key);
     if (!role) continue;
     const bucket = role === "condition" ? requirements : conditions;
+    const out = apiFieldKey(type, key);
     if (key === "game_categories") {
-      bucket[key] = normalizeGameCategoriesValue(val);
+      bucket[out] = normalizeGameCategoriesValue(val);
     } else if (key === "games") {
-      bucket[key] = normalizeGamesValue(val);
+      bucket[out] = normalizeGamesValue(val);
     } else if (isComparisonFieldKey(key)) {
       const built = normalizeComparisonFieldForApi(val);
-      if (built) bucket[key] = built;
+      if (built) bucket[out] = built;
     } else {
-      bucket[key] = val;
+      bucket[out] = val;
     }
   }
 

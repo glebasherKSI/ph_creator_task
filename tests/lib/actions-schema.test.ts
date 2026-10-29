@@ -24,7 +24,13 @@ function normalize(value: unknown): unknown {
 
 describe("экспорты — паритет со старой реализацией", () => {
   it("набор имён экспортов совпадает", () => {
-    expect(Object.keys(tsModule).sort()).toEqual(Object.keys(legacyModule).sort());
+    // Новое в v3: ключи API для полей формы (sport_bet: «Тип ставки» → `types`).
+    const added = new Set(["apiFieldKey", "uiFieldKey", "renameActionKeysForApi"]);
+    expect(
+      Object.keys(tsModule)
+        .filter((name) => !added.has(name))
+        .sort(),
+    ).toEqual(Object.keys(legacyModule).sort());
   });
 
   const dataExports = Object.keys(legacyModule).filter((name) => isPlainData(legacyModule[name]));
@@ -210,6 +216,46 @@ const SAMPLES: Sample[] = [
   ["null bag", "deposit", null],
 ];
 
+/** Результат split старого кода — с ключами API, как теперь шлёт новый. */
+function withApiKeys(type: string, split: { requirements: unknown; conditions: unknown }) {
+  const { requirements, conditions } = ts.renameActionKeysForApi({ action: type, ...split });
+  return { requirements, conditions };
+}
+
+describe("«Тип ставки» у sport_bet — ключ API `types`", () => {
+  it("форма → API: sport_bet_types уходит как types", () => {
+    expect(
+      ts.splitActionFieldsForApi("sport_bet", { sport_bet_types: ["single", "express"] }),
+    ).toEqual({ requirements: {}, conditions: { types: ["single", "express"] } });
+  });
+
+  it("API → форма: types и старый sport_bet_types читаются как «Тип ставки»", () => {
+    expect(ts.mergeActionFieldsForUi("sport_bet", {}, { types: ["single"] })).toEqual({
+      sport_bet_types: ["single"],
+    });
+    expect(ts.mergeActionFieldsForUi("sport_bet", {}, { sport_bet_types: ["express"] })).toEqual({
+      sport_bet_types: ["express"],
+    });
+  });
+
+  it("переименование не трогает остальные поля и другие действия", () => {
+    expect(
+      ts.renameActionKeysForApi({
+        action: "sport_bet",
+        requirements: { sport_bets_count: 1 },
+        conditions: { sport_bet_types: ["express"], types: ["single"], sport_types: ["Football"] },
+      }),
+    ).toEqual({
+      action: "sport_bet",
+      requirements: { sport_bets_count: 1 },
+      // Видимое в форме значение побеждает.
+      conditions: { types: ["express"], sport_types: ["Football"] },
+    });
+    const bet = { action: "bet", conditions: { sport_bet_types: ["x"] } };
+    expect(ts.renameActionKeysForApi(bet)).toBe(bet);
+  });
+});
+
 describe("coerce*/split/merge — паритет на реалистичных входах", () => {
   it.each(SAMPLES)("%s", (_name, type, fields) => {
     expect(ts.coerceActionRequirements(type, fields)).toEqual(
@@ -218,16 +264,18 @@ describe("coerce*/split/merge — паритет на реалистичных �
     expect(ts.coerceActionConditions(type, fields)).toEqual(
       legacy.coerceActionConditions(type, fields),
     );
+    // Сознательное отличие: старый код слал «Тип ставки» как sport_bet_types — бэк его не читает.
     expect(ts.splitActionFieldsForApi(type, fields)).toEqual(
-      legacy.splitActionFieldsForApi(type, fields),
+      withApiKeys(type, legacy.splitActionFieldsForApi(type, fields)),
     );
     expect(ts.deriveVisibleFieldsFromRequirements(type, fields)).toEqual(
       legacy.deriveVisibleFieldsFromRequirements(type, fields),
     );
 
     const split = ts.splitActionFieldsForApi(type, fields);
+    const legacySplit = legacy.splitActionFieldsForApi(type, fields);
     expect(ts.mergeActionFieldsForUi(type, split.requirements, split.conditions)).toEqual(
-      legacy.mergeActionFieldsForUi(type, split.requirements, split.conditions),
+      legacy.mergeActionFieldsForUi(type, legacySplit.requirements, legacySplit.conditions),
     );
     // Все поля в обоих бакетах — проверяем fallback по роли.
     expect(ts.mergeActionFieldsForUi(type, fields, fields)).toEqual(
