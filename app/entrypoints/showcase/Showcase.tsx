@@ -15,8 +15,7 @@ import { StatusTabs } from "@/features/popup/StatusTabs";
 import type { DomainsState } from "@/features/popup/useDomains";
 import type { GraphicState } from "@/features/popup/useGraphic";
 import type { ReportsState } from "@/features/popup/useReports";
-import { pushMessage, useAssistantPanel } from "@/features/chains/assistant-store";
-import { AssistantMessage } from "@/features/chains/AssistantMessage";
+import { ChatMarkdown } from "@/features/chains/ChatMarkdown";
 import { useChainsStore } from "@/features/chains/store";
 import { TaskForm } from "@/features/task-form/TaskForm";
 import type { TaskLike } from "@/lib/types";
@@ -76,18 +75,20 @@ const TASK_FIXTURES: Record<string, TaskLike> = {
 
 const noop = async () => {};
 
-const CONSULTANT_SAMPLE = `Без входящих связей **2** задачи.
+const AGENT_SAMPLE = `Создано **2** черновика из 3.
 
-### Без связей
-- #1454 — интерактивная, действие \`deposit\`
-  - доступна с **2026-11-01**, награда — группа \`gamification_award:FS 50\`
-- #1456 — цепочка, связи не сохранены
+### Создано
+- #1454 — «Депозит от 20 €», группа бонусов \`gamification_award:FS 50\` по награде из брифа
+- #1456 — цепочка, связь с #1454 ушла на бэк
 
-### Что проверить
-1. #1456 ссылается на #900 — этой задачи нет на канве.
-2. Сохраните связи перед запуском.`;
+### Пропущено
+- «Ставка на спорт» — в брифе нет дат, а без них не задать available_from
 
-// Две карточки «на канве» витрины — чтобы чипы #id в ответе консультанта были кликабельными.
+### Проверить
+1. В #1454 тег выбран по названию из брифа.
+2. #900 упомянут в брифе, но его нет на канве.`;
+
+// Две карточки «на канве» витрины — чтобы чипы #id в итоге агента были кликабельными.
 useChainsStore.setState((s) => ({
   canvas: {
     ...s.canvas,
@@ -111,20 +112,6 @@ useChainsStore.setState((s) => ({
     },
   },
 }));
-
-// Ответ лежит в сторе чата, как в панели: оценка и отзыв меняют его через patchMessage.
-pushMessage({ role: "assistant", content: CONSULTANT_SAMPLE, logId: 1, promptVersionId: null });
-
-function ConsultantSample() {
-  const messages = useAssistantPanel((s) => s.messages);
-  return (
-    <div className="flex w-96 flex-col gap-3">
-      {messages.map((message) => (
-        <AssistantMessage key={message.id} message={message} onFocusNode={() => {}} />
-      ))}
-    </div>
-  );
-}
 
 /** Моки состояния popup — карточки чистые, живут на props. */
 const POPUP_DOMAINS: DomainsState = {
@@ -441,12 +428,13 @@ export function Showcase() {
         </div>
       </Section>
 
-      <Section title="Ответ консультанта">
+      <Section title="Итог агента">
         <p className="text-subhead text-muted-foreground">
-          #1454 и #1456 «лежат на канве» витрины — чипы кликабельны; #900 вне канвы. Оценка уходит в
-          Graphic — без входа откатится с ошибкой.
+          #1454 и #1456 «лежат на канве» витрины — чипы кликабельны; #900 вне канвы.
         </p>
-        <ConsultantSample />
+        <div className="w-96 rounded-lg rounded-bl-sm bg-surface-2/50 px-3 py-2.5 ring-1 ring-border">
+          <ChatMarkdown text={AGENT_SAMPLE} onFocusNode={() => {}} />
+        </div>
       </Section>
 
       <Section title="Popup">

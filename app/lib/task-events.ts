@@ -11,8 +11,11 @@ import { graphicApiPost } from "./graphic-api";
 import { getGraphicProjectForDomain } from "./storage";
 
 export type TaskEventKind = "created" | "create_failed" | "updated";
-/** package — черновик из пакета графика, draft — локальный черновик, copy — копия, edit — правка. */
-export type TaskEventSource = "package" | "draft" | "copy" | "edit";
+/**
+ * package — черновик из пакета графика, draft — локальный черновик, copy — копия, edit — правка,
+ * agent — черновик создал агент (agent_run_id и notes — для проверки человеком).
+ */
+export type TaskEventSource = "package" | "draft" | "copy" | "edit" | "agent";
 
 export interface TaskEvent {
   event: TaskEventKind;
@@ -25,6 +28,9 @@ export interface TaskEvent {
   result?: unknown;
   error?: string;
   duration_ms?: number;
+  agent_run_id?: string;
+  /** Пояснение агента для проверяющего: что заполнил и в чём не уверен. */
+  notes?: string;
 }
 
 export async function logTaskEvent(event: TaskEvent): Promise<void> {

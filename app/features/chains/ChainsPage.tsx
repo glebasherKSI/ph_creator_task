@@ -1,14 +1,15 @@
 /** Страница «Конструктор связей»: домен → каталог → канва React Flow → панель связи и форма задачи. */
+import { useQueryClient } from "@tanstack/react-query";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import {
   BookmarkPlus,
+  Bot,
   Columns3,
   Download,
   FolderOpen,
   Loader2,
   Maximize2,
   MoreHorizontal,
-  MessagesSquare,
   RefreshCw,
   Save,
   Tag,
@@ -23,12 +24,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Segmented } from "@/components/ui/segmented";
 import { SimpleSelect } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/AuthModal";
+import { ReviewPage, reviewQueryKey, usePendingReviews } from "@/features/review/ReviewPage";
 import { useDomainList } from "./useDomainList";
 import { StatsPanel } from "@/features/stats/StatsPanel";
 import { useStatsReport } from "@/features/stats/useStatsReport";
 import { cn } from "@/lib/utils";
 
-import { AssistantPanel, useAssistantPanel } from "./AssistantPanel";
+import { AgentPanel, useAgentPanel } from "./AgentPanel";
 import { useAddLabel } from "./CanvasLabels";
 import { CatalogSidebar } from "./CatalogSidebar";
 import { EdgePanel } from "./EdgePanel";
@@ -74,7 +76,7 @@ function SaveLog({ entries, onClose }: { entries: SaveLogEntry[]; onClose: () =>
   );
 }
 
-type MainView = "canvas" | "stats" | "packages";
+type MainView = "canvas" | "stats" | "packages" | "review";
 
 function catalogLoadingLabel(progress: CatalogProgress | null): string {
   if (!progress) return "Загрузить задачи";
@@ -138,10 +140,18 @@ function ChainsPageInner() {
   const saving = useChainsStore((s) => s.saving);
   const saveLog = useChainsStore((s) => s.saveLog);
   const selectedEdge = useChainsStore((s) => s.selectedEdge);
-  const assistantOpen = useAssistantPanel((s) => s.open);
+  const agentOpen = useAgentPanel((s) => s.open);
+  const agentRunning = useAgentPanel((s) => s.running);
   // Колонка живёт, пока панель в DOM, — иначе анимация закрытия обрежется.
-  const assistantShown = useAssistantPanel((s) => s.shown);
+  const agentShown = useAgentPanel((s) => s.shown);
+  const pendingReviews = usePendingReviews(domain);
+  const queryClient = useQueryClient();
   const addLabel = useAddLabel();
+
+  // Агент закончил — в очереди ревью могли появиться задачи.
+  useEffect(() => {
+    if (!agentRunning) void queryClient.invalidateQueries({ queryKey: reviewQueryKey(domain) });
+  }, [agentRunning, domain, queryClient]);
 
   // Домен из popup/localStorage → store (сбрасывает канву и каталог); подписи — тоже.
   useEffect(() => {
@@ -204,6 +214,13 @@ function ChainsPageInner() {
     window.setTimeout(() => fit(), 50);
   }
 
+  /** Из ревью: задача — на канву (если её там нет), вкладка — канва, фокус на карточке. */
+  async function openOnCanvas(id: string) {
+    setView("canvas");
+    if (!useChainsStore.getState().canvas[id]) await addToCanvas([id]);
+    window.setTimeout(() => focusNode(id), 80);
+  }
+
   function focusNode(id: string) {
     useChainsStore.getState().select(id);
     fit([id]);
@@ -245,6 +262,10 @@ function ChainsPageInner() {
               { value: "canvas", label: "Канва" },
               { value: "stats", label: "Статистика" },
               { value: "packages", label: "Пакеты" },
+              {
+                value: "review",
+                label: pendingReviews ? `Ревью (${pendingReviews})` : "Ревью",
+              },
             ]}
             aria-label="Раздел"
           />
@@ -349,13 +370,13 @@ function ChainsPageInner() {
 
             <div className="ml-auto flex items-center gap-3">
               <Button
-                variant={assistantOpen ? "secondary" : "ghost"}
+                variant={agentOpen ? "secondary" : "ghost"}
                 size="sm"
-                aria-pressed={assistantOpen}
-                onClick={() => useAssistantPanel.getState().toggle()}
-                title="Вопросы по задачам на канве — ИИ отвечает только по их настройкам"
+                aria-pressed={agentOpen}
+                onClick={() => useAgentPanel.getState().toggle()}
+                title="ИИ-агент: создаёт задачи из локальных черновиков на бэке в статусе «черновик»"
               >
-                <MessagesSquare /> Консультант
+                {agentRunning ? <Loader2 className="animate-spin" /> : <Bot />} Агент
               </Button>
               <Button
                 variant="primary"
@@ -397,7 +418,7 @@ function ChainsPageInner() {
         className={cn(
           "grid min-h-0 flex-1 gap-3",
           view !== "canvas" && "hidden",
-          selectedEdge || assistantShown
+          selectedEdge || agentShown
             ? "grid-cols-[22rem_minmax(0,1fr)_auto]"
             : "grid-cols-[22rem_minmax(0,1fr)]",
         )}
@@ -416,10 +437,10 @@ function ChainsPageInner() {
             <SaveLog entries={saveLog} onClose={() => setLogOpen(false)} />
           ) : null}
         </div>
-        {selectedEdge || assistantShown ? (
+        {selectedEdge || agentShown ? (
           <div className="flex min-h-0 gap-3 overflow-hidden">
             {selectedEdge ? <EdgePanel /> : null}
-            <AssistantPanel onFocusNode={focusNode} />
+            <AgentPanel onFocusNode={focusNode} />
           </div>
         ) : null}
       </div>
@@ -442,6 +463,12 @@ function ChainsPageInner() {
               window.setTimeout(() => fit(), 50);
             }}
           />
+        </main>
+      ) : null}
+
+      {view === "review" ? (
+        <main className="min-h-0 flex-1 overflow-hidden rounded-lg bg-background p-4 ring-1 ring-border">
+          <ReviewPage onOpenOnCanvas={(id) => void openOnCanvas(id)} />
         </main>
       ) : null}
 

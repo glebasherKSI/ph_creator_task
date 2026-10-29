@@ -286,6 +286,46 @@ export function withPrerequisiteCondition(
   return [...conditions, { gamification_tasks: block }];
 }
 
+export interface DraftPrefillRefs {
+  metaTags: MetaRef[] | null;
+  metaBonuses: MetaBonus[] | null;
+  taskOptions: ReadonlyArray<TaskOption>;
+}
+
+/**
+ * Подстановки из брифа графика, которые форма делает эффектами после загрузки справочников:
+ * тег и группы бонусов (только в пустые поля) и предшественник в gamification_tasks.
+ * Для сохранения черновика без формы (агент) — тот же результат, что увидел бы человек.
+ */
+export function prefillDraftValues(
+  values: TaskFormValues,
+  task: TaskLike,
+  { metaTags, metaBonuses, taskOptions }: DraftPrefillRefs,
+): TaskFormValues {
+  const next = { ...values };
+  if (metaTags && !next.tag) next.tag = findTagIdByName(String(task._plannerTag ?? ""), metaTags);
+  if (metaBonuses) {
+    if (!next.mainBonusGroupId) {
+      next.mainBonusGroupId = findBonusIdByPoints(
+        task._plannerRewardPoints as number | null,
+        metaBonuses,
+      );
+    }
+    if (!next.secondaryBonusGroupId) {
+      next.secondaryBonusGroupId = findBonusIdByPoints(
+        task._plannerSecondaryRewardPoints as number | null,
+        metaBonuses,
+      );
+    }
+  }
+  const prereqName = String(task._plannerPrerequisiteName ?? "");
+  if (prereqName && taskOptions.length) {
+    const conditions = withPrerequisiteCondition(next.conditions, prereqName, taskOptions);
+    if (conditions) next.conditions = conditions;
+  }
+  return next;
+}
+
 function nullableSelect(value: string, metaMode: boolean): string | number | null {
   if (metaMode) {
     const raw = String(value ?? "").trim();

@@ -24,7 +24,7 @@ import { type TaskEvent, type TaskEventSource, logTaskEvent } from "@/lib/task-e
 import type { TaskPayloadEnvelope } from "@/lib/types";
 
 import { draftBodyWithCanvasLinks } from "./graph";
-import { notifyGraphicBackendCreated } from "./packages-actions";
+import { applyDraftCreated } from "./draft-pipeline";
 import { useChainsStore } from "./store";
 
 interface TaskSheetState {
@@ -131,13 +131,10 @@ export function TaskSheet() {
         store.setStatus(msg, true);
         return response;
       }
-      store.applyCreatedTask(task, taskId);
-      void notifyGraphicBackendCreated(draftPlannerId, newId);
+      applyDraftCreated(task, taskId, draftPlannerId);
       toast.success(`Черновик сохранён на бэк как #${newId}`);
       store.setStatus(`Локальный черновик сохранён на бэк как #${newId}`);
       close();
-      const followers = useChainsStore.getState().dirtyTargets;
-      if (followers.length) void useChainsStore.getState().saveChanges(followers);
       return response;
     }
     if (mode === "edit") {
