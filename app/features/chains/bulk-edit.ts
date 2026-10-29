@@ -22,6 +22,7 @@ import { cloneJson, isSequenceType, sanitizeTag } from "@/lib/tasks";
 import type { Condition, TaskLike } from "@/lib/types";
 
 export type ListMode = "set" | "add" | "remove";
+export type DuplicatesMode = "replace" | "append";
 
 export type BulkOp =
   | { field: "hidden"; value: boolean }
@@ -31,7 +32,16 @@ export type BulkOp =
   | { field: "tag"; tag: { id: number | string; name: string } | null }
   | { field: "events"; mode: ListMode; values: string[] }
   | { field: "countries"; mode: ListMode; value: CountrySelectorValue }
-  | { field: "conditions_upsert"; conditions: Condition[]; onlyExisting: boolean }
+  | {
+      field: "conditions_upsert";
+      conditions: Condition[];
+      onlyExisting: boolean;
+      /**
+       * Повторяемые условия (группы и т. п.): replace — записи условия у задачи заменяются набором
+       * из операции целиком, append (по умолчанию) — недостающие записи добавляются к имеющимся.
+       */
+      duplicates?: DuplicatesMode;
+    }
   | { field: "conditions_remove"; names: string[] }
   | { field: "schedule"; cron: string | null }
   | { field: "available_from"; value: string | null }
@@ -317,8 +327,24 @@ const CONDITION_TEXT_LIMIT = 120;
 
 export function describeConditionValue(value: unknown): string {
   if (value === undefined) return EMPTY;
-  const text = typeof value === "boolean" ? (value ? "да" : "нет") : stableJson(value);
+  const text =
+    typeof value === "boolean"
+      ? value
+        ? "да"
+        : "нет"
+      : (listConditionText(value) ?? stableJson(value));
   return text.length > CONDITION_TEXT_LIMIT ? `${text.slice(0, CONDITION_TEXT_LIMIT - 1)}…` : text;
+}
+
+/** Условие со списком (группы, теги, связи): «Включая: a, b · все». null — другая форма. */
+export function listConditionText(value: unknown): string | null {
+  if (!isRecord(value) || !Array.isArray(value.list)) return null;
+  const head = value.type === "disabled" ? "Исключая" : "Включая";
+  const items = value.list.map(String);
+  const parts = [`${head}: ${items.length ? items.join(", ") : "—"}`];
+  if (items.length > 1) parts.push(value.extra_type === "and" ? "все" : "любое");
+  if (value.only_completed === true) parts.push("только выполненные");
+  return parts.join(" · ");
 }
 
 // ---------------------------------------------------------------------------
@@ -361,13 +387,39 @@ function upsertConditions(
   onlyExisting: boolean,
   duplicable: ReadonlySet<string> | null | undefined,
   notes: string[],
+  duplicates: DuplicatesMode = "append",
 ): Condition[] {
   let next = conditions.map((entry) => ({ ...entry }));
-  for (const addition of withoutLinks(additions)) {
+  const list = withoutLinks(additions);
+  const replacedSets = new Set<string>();
+  for (const addition of list) {
     const name = conditionName(addition)!;
     const value = cloneJson(addition[name]);
     const existing = next.filter((entry) => conditionName(entry) === name);
     const label = conditionLabel(name);
+
+    if (duplicable?.has(name) && duplicates === "replace") {
+      // Набор целиком: все записи условия из операции встают на место первой имеющейся.
+      if (replacedSets.has(name)) continue;
+      replacedSets.add(name);
+      const entries = list
+        .filter((entry) => conditionName(entry) === name)
+        .map((entry) => ({ [name]: cloneJson(entry[name]) }));
+      if (!existing.length) {
+        if (onlyExisting) notes.push(`нет условия «${label}» — не добавлено`);
+        else next.push(...entries);
+        continue;
+      }
+      let placed = false;
+      next = next.flatMap((entry) => {
+        if (conditionName(entry) !== name) return [entry];
+        if (placed) return [];
+        placed = true;
+        return entries;
+      });
+      continue;
+    }
+
     if (!existing.length) {
       if (onlyExisting) notes.push(`нет условия «${label}» — не добавлено`);
       else next.push({ [name]: value });
@@ -396,34 +448,33 @@ export interface ConditionSummary {
   label: string;
   /** Во скольких задачах есть условие. */
   count: number;
-  /** Разных значений среди этих задач. */
+  /** Разных наборов записей среди этих задач (у повторяемого условия записей может быть несколько). */
   variants: number;
-  /** Самое частое значение — им заполняется редактор при «Изменить». */
-  common: unknown;
+  /** Самый частый набор записей — им заполняется редактор при «взять за основу». */
+  common: unknown[];
 }
 
 /** Какие условия есть у задач выделения (без связей), по убыванию частоты. */
 export function summarizeConditions(tasks: ReadonlyArray<TaskLike>): ConditionSummary[] {
   const byName = new Map<
     string,
-    { count: number; values: Map<string, { value: unknown; n: number }> }
+    { count: number; sets: Map<string, { values: unknown[]; n: number }> }
   >();
   for (const task of tasks) {
     for (const [name, values] of conditionValues(withoutLinks(conditionList(task)))) {
-      const entry = byName.get(name) ?? { count: 0, values: new Map() };
+      const entry = byName.get(name) ?? { count: 0, sets: new Map() };
       entry.count += 1;
-      for (const value of values) {
-        const key = stableJson(value);
-        const seen = entry.values.get(key);
-        entry.values.set(key, { value, n: (seen?.n ?? 0) + 1 });
-      }
+      // Порядок записей не важен: [A, B] и [B, A] — один набор.
+      const key = JSON.stringify(values.map(stableJson).sort());
+      const seen = entry.sets.get(key);
+      entry.sets.set(key, { values: seen?.values ?? values, n: (seen?.n ?? 0) + 1 });
       byName.set(name, entry);
     }
   }
   return [...byName]
-    .map(([name, { count, values }]) => {
-      const common = [...values.values()].sort((a, b) => b.n - a.n)[0]?.value;
-      return { name, label: conditionLabel(name), count, variants: values.size, common };
+    .map(([name, { count, sets }]) => {
+      const common = [...sets.values()].sort((a, b) => b.n - a.n)[0]?.values ?? [];
+      return { name, label: conditionLabel(name), count, variants: sets.size, common };
     })
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "ru"));
 }
@@ -645,6 +696,7 @@ function applyOne(task: TaskLike, op: BulkOp, ctx: BulkContext, notes: string[])
           op.onlyExisting,
           ctx.duplicable,
           notes,
+          op.duplicates,
         ),
       };
     case "conditions_remove": {

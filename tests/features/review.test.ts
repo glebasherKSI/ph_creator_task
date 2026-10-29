@@ -16,6 +16,7 @@ const {
   agentTaskOf,
   briefOf,
   buildReviewRows,
+  isTargetingRow,
   lessonDraft,
   reviewDiff,
   reviewSections,
@@ -118,6 +119,47 @@ describe("строки ревью", () => {
         agent: "10 pts",
         human: "50 pts",
       }),
+    ]);
+  });
+
+  it("таргетинг: false — «нет», отсутствие — «не задано», списки и связи текстом", () => {
+    const withTargeting = {
+      ...AGENT_TASK,
+      conditions: [
+        { no_bonus: false },
+        { groups: { type: "enabled", list: ["ph_low", "vip"], extra_type: "or" } },
+        {
+          gamification_tasks: {
+            list: ["1450"],
+            type: "enabled",
+            extra_type: "or",
+            only_completed: true,
+          },
+        },
+      ],
+    };
+    const current = { ...withTargeting, conditions: [{ no_bonus: false }] };
+    const rows = buildReviewRows(withTargeting, current, ctx);
+    const pick = (key: string) => rows.find((r) => r.key === key)!;
+    expect(pick("condition:no_bonus")).toMatchObject({
+      agent: "нет",
+      current: "нет",
+      changed: false,
+    });
+    expect(pick("condition:groups")).toMatchObject({
+      agent: "Включая: ph_low, vip · любое",
+      current: "не задано",
+      changed: true,
+    });
+    expect(pick("gamification_tasks")).toMatchObject({
+      section: "targeting",
+      agent: "Включая: #1450 · только выполненные",
+      current: "не задано",
+    });
+    expect(rows.filter(isTargetingRow).map((r) => r.key)).toEqual([
+      "condition:groups",
+      "condition:no_bonus",
+      "gamification_tasks",
     ]);
   });
 

@@ -2,7 +2,7 @@
  * Ревью задачи агента (чистая логика): что стоит в задаче сейчас против того, что сделал агент,
  * по секциям формы рядом с брифом из графика; правки человека — уроки для агента.
  */
-import type { BulkContext } from "@/features/chains/bulk-edit";
+import { type BulkContext, LINKS_CONDITION, listConditionText } from "@/features/chains/bulk-edit";
 import { buildCompareRows } from "@/features/chains/compare";
 import {
   SECTION_IDS,
@@ -57,6 +57,24 @@ function localeOf(task: TaskLike, code: string): string {
   return text(locales?.[code]);
 }
 
+/** Связи задачи (gamification_tasks) текстом: «Включая: #1450, #1451 · любое · только выполненные». */
+function linksOf(task: TaskLike): string | null {
+  const conditions = Array.isArray(task.conditions) ? task.conditions : [];
+  for (const entry of conditions) {
+    const value = (entry as Record<string, unknown> | null)?.[LINKS_CONDITION] as
+      { list?: unknown[] } | undefined;
+    if (!value) continue;
+    const list = Array.isArray(value.list) ? value.list.map((id) => `#${String(id)}`) : [];
+    return listConditionText({ ...value, list });
+  }
+  return null;
+}
+
+/** Строки таргетинга фильтр «Скрыть пустые» не прячет: «нет» и «не задано» там — тоже настройка. */
+export function isTargetingRow(row: ReviewRow): boolean {
+  return row.section === "targeting";
+}
+
 export function buildReviewRows(
   agentTask: TaskLike,
   current: TaskLike | null,
@@ -102,6 +120,17 @@ export function buildReviewRows(
         compare.section,
         compare.label,
         compare.cells.map((c) => c.text),
+      ),
+    );
+  }
+  // Связи сравнение не показывает (их правят стрелками), а в ревью они нужны для полной картины.
+  if (tasks.some((t) => linksOf(t))) {
+    rows.push(
+      row(
+        LINKS_CONDITION,
+        "targeting",
+        "Связи: полученные задания",
+        tasks.map((t) => linksOf(t) ?? "не задано"),
       ),
     );
   }

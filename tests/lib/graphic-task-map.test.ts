@@ -13,6 +13,7 @@ import {
   parseLooseNumber,
 } from "@/lib/graphic-task-map";
 import { buildCreatePayload } from "@/lib/tasks";
+import type { Condition } from "@/lib/types";
 
 import * as legacy from "legacy/graphic-task-map.js";
 import * as legacyTasks from "legacy/tasks.js";
@@ -261,7 +262,7 @@ describe("mapPhTaskToPlannerImport", () => {
         duration_minutes: 44640,
         infinite: false,
       },
-      targeting: { groups: ["2396"], extra: "" },
+      targeting: { groups: ["2396"], groups_type: "enabled", groups_extra_type: "or", extra: "" },
     });
     expect(item.name_frontend.ru).toBe("Экспресс-вечеринка");
     expect(item.ph_snapshot).toEqual(task);
@@ -296,19 +297,50 @@ describe("mapPhTaskToPlannerImport", () => {
     ]);
   });
 
+  it("группы: включая/исключая и логика списка — туда и обратно", () => {
+    const item = mapPhTaskToPlannerImport({
+      id: 1,
+      conditions: [{ groups: { list: ["5", 7, "5"], type: "disabled", extra_type: "and" } }],
+    });
+    expect(item.targeting).toEqual({
+      groups: ["5", "7"],
+      groups_type: "disabled",
+      groups_extra_type: "and",
+      extra: "",
+    });
+    const draft = mapPlannerTaskToDraft({ targeting: item.targeting });
+    expect(draft.conditions).toContainEqual({
+      groups: { type: "disabled", extra_type: "and", list: ["5", "7"] },
+    });
+  });
+
+  it("группы графика не перезаписывают условие groups, уже заданное в conditions", () => {
+    const own = { groups: { type: "enabled", extra_type: "or", list: ["1"] } };
+    const draft = mapPlannerTaskToDraft({
+      conditions: [own],
+      targeting: { groups: ["2"], groups_type: "disabled" },
+    });
+    expect((draft.conditions as Condition[]).filter((entry) => "groups" in entry)).toEqual([own]);
+    // без групп в таргетинге условия нет
+    const empty = mapPlannerTaskToDraft({ targeting: { groups: [] } });
+    expect((empty.conditions as Condition[]).some((entry) => "groups" in entry)).toBe(false);
+  });
+
   it("прочий таргетинг уходит текстом в extra, флаги по умолчанию — нет", () => {
     const item = mapPhTaskToPlannerImport({
       id: 1,
       conditions: [
         { fraud: false },
         { no_bonus: true },
-        { groups: { list: ["5"], type: "disabled", extra_type: "or" } },
+        { groups: { list: [], type: "enabled", extra_type: "or" } },
         { gamification_tasks: { list: ["9"], type: "disabled", extra_type: "or" } },
       ],
     });
     expect(item.targeting).toEqual({
       groups: [],
-      extra: 'no_bonus: true\ngroups: {"list":["5"],"type":"disabled","extra_type":"or"}',
+      groups_type: "enabled",
+      groups_extra_type: "or",
+      extra: "no_bonus: true",
     });
     expect(item.prerequisite_ph_ids).toEqual([]);
   });

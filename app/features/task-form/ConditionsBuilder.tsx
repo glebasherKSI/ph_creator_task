@@ -925,21 +925,29 @@ export function ConditionsBuilder({
   };
 
   const pickerConditions = filterPickerConditions(schema, pickerQuery);
+  // Статистика схемы человеку не нужна — только загрузка и ошибка, когда схемы нет совсем.
+  const showStatus = schemaLoading || !schema;
   const statusText = schemaStatusText(schema, duplicable, schemaLoading, schemaError);
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div
-          role="status"
-          className={cn(
-            "flex items-center gap-2 text-caption",
-            schemaError ? "text-destructive" : "text-muted-foreground",
-          )}
-        >
-          {schemaLoading ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
-          <span>{statusText}</span>
-        </div>
+        {showStatus ? (
+          <div
+            role="status"
+            className={cn(
+              "flex items-center gap-2 text-caption",
+              schemaError ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {schemaLoading ? (
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+            ) : null}
+            <span>{statusText}</span>
+          </div>
+        ) : (
+          <span />
+        )}
 
         <Popover
           open={pickerOpen}

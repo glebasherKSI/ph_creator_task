@@ -27,6 +27,8 @@ export const DEFAULT_DOMAIN = "admin.crimson.lex.prd.maxbit.private";
 export const DEFAULT_MAX_REQUESTS = 500;
 export const PAGE_SIZE = 50;
 export const LAYOUT_KEY_PREFIX = "ph_chains_layout_";
+/** Последний отправленный в Promo Graphic список групп админки (см. graphic-groups.ts). */
+export const GRAPHIC_GROUPS_KEY_PREFIX = "ph_graphic_groups_";
 
 /** Статусы задач, показываемые в каталоге канвы. */
 export const VISIBLE_TASK_STATES: ReadonlySet<string> = new Set(["active", "draft"]);

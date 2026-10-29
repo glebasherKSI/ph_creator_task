@@ -40,7 +40,8 @@ export interface CompareRow {
 }
 
 const EMPTY = "—";
-const ABSENT = "нет";
+/** Условия нет у задачи — не путать со значением «нет» (false). */
+const ABSENT = "не задано";
 
 /** Поля задачи по секциям формы и операция массовой правки для каждого. */
 const FIELD_ROWS: ReadonlyArray<{ key: DisplayKey; section: SectionId; field: BulkFieldId }> = [
@@ -191,11 +192,13 @@ export function buildCompareRows(
       if (!list.length) return { text: ABSENT, fix: { field: "conditions_remove", names: [name] } };
       return {
         text: list.map(describeConditionValue).join(" | "),
-        // Повторяемое условие с несколькими записями массово не выровнять одним значением.
-        fix:
-          list.length === 1
-            ? { field: "conditions_upsert", conditions: [{ [name]: list[0] }], onlyExisting: false }
-            : null,
+        // Все записи задачи целиком: у повторяемого условия (группы) их может быть несколько.
+        fix: {
+          field: "conditions_upsert",
+          conditions: list.map((value) => ({ [name]: value })),
+          onlyExisting: false,
+          duplicates: "replace",
+        },
       };
     });
     rows.push(makeRow(`condition:${name}`, "targeting", conditionLabel(name), cells));

@@ -180,6 +180,35 @@ describe("массовая правка: таргетинг", () => {
     expect((applyBulkOps(once, [op], ctx).task.conditions as unknown[]).length).toBe(4);
   });
 
+  it("повторяемое условие в режиме replace: набор записей заменяется целиком на месте первой", () => {
+    const ctx = { duplicable: new Set(["groups"]) };
+    const two = task({
+      conditions: [
+        { groups: { type: "enabled", list: ["ph_low"] } },
+        { fraud: true },
+        { groups: { type: "enabled", list: ["AB_354_VAR1"] } },
+      ],
+    });
+    const op: BulkOp = {
+      field: "conditions_upsert",
+      onlyExisting: false,
+      duplicates: "replace",
+      conditions: [
+        { groups: { type: "enabled", list: ["ph_mid"] } },
+        { groups: { type: "enabled", list: ["AB_354_VAR1"] } },
+      ],
+    };
+    expect(applyBulkOps(two, [op], ctx).task.conditions).toEqual([
+      { groups: { type: "enabled", list: ["ph_mid"] } },
+      { groups: { type: "enabled", list: ["AB_354_VAR1"] } },
+      { fraud: true },
+    ]);
+    // Без условия у задачи — весь набор добавляется; «только изменить» — не добавляется.
+    const none = task({ conditions: [] });
+    expect(applyBulkOps(none, [op], ctx).task.conditions).toHaveLength(2);
+    expect(applyBulkOps(none, [{ ...op, onlyExisting: true }], ctx).task.conditions).toEqual([]);
+  });
+
   it("удалить условия по имени, кроме связей", () => {
     const result = applyBulkOps(task(), [
       { field: "conditions_remove", names: ["groups", "gamification_tasks"] },
@@ -197,6 +226,18 @@ describe("массовая правка: таргетинг", () => {
     ]);
     expect(summary[0]).toMatchObject({ name: "groups", count: 2, variants: 2 });
     expect(summary.map((s) => s.name)).not.toContain("gamification_tasks");
+  });
+
+  it("сводка повторяемого условия — набор записей целиком, порядок не важен", () => {
+    const a = { groups: { type: "enabled", list: ["ph_low"] } };
+    const b = { groups: { type: "enabled", list: ["AB_354_VAR1"] } };
+    const summary = summarizeConditions([
+      task({ conditions: [a, b] }),
+      task({ conditions: [b, a] }),
+      task({ conditions: [a] }),
+    ]);
+    expect(summary[0]).toMatchObject({ name: "groups", count: 3, variants: 2 });
+    expect(summary[0]!.common).toEqual([a.groups, b.groups]);
   });
 });
 

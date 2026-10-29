@@ -18,6 +18,7 @@ import { scheduleFromCron, scheduleToCron } from "@/features/task-form/repeat-sc
 import { datetimeLocalToIso, isoToDatetimeLocal } from "@/lib/format";
 import {
   categoryLabel,
+  conditionLabel,
   eventLabel,
   notificationEventLabel,
   priorityLabel,
@@ -232,6 +233,62 @@ function ShiftDatesEditor({
   );
 }
 
+/**
+ * Повторяемые условия в операции (группы и т. п.): заменить набор записей у задач целиком
+ * или добавить недостающие записи к имеющимся. Без выбора человек не видит, что станет с остальными.
+ */
+function DuplicatesModeEditor({
+  op,
+  onChange,
+  summary,
+  refs,
+}: {
+  op: Extract<BulkOp, { field: "conditions_upsert" }>;
+  onChange: (op: BulkOp) => void;
+  summary: ReadonlyArray<{ name: string; label: string; variants: number; count: number }>;
+  refs: BulkRefs;
+}) {
+  const names = [
+    ...new Set(
+      op.conditions
+        .flatMap((entry) => Object.keys(entry))
+        .filter((name) => name !== LINKS_CONDITION && refs.schema.duplicable?.has(name)),
+    ),
+  ];
+  if (!names.length) return null;
+  const mode = op.duplicates ?? "append";
+  const labels = names.map((name) => `«${conditionLabel(name)}»`).join(", ");
+  const mixed = summary.filter((c) => names.includes(c.name) && c.variants > 1);
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md bg-surface-2/50 p-3">
+      <span className="text-caption text-muted-foreground">
+        Повторяемые условия {labels} — у задачи их может быть несколько записей:
+      </span>
+      <Segmented
+        size="sm"
+        value={mode}
+        onValueChange={(v) => onChange({ ...op, duplicates: v })}
+        options={[
+          { value: "replace", label: "Заменить все записи этим набором" },
+          { value: "append", label: "Добавить к имеющимся" },
+        ]}
+        aria-label="Что делать с повторяемыми условиями"
+      />
+      <Hint>
+        {mode === "replace"
+          ? "У каждой задачи записи этих условий станут ровно такими, как здесь."
+          : "Имеющиеся записи останутся; записи отсюда добавятся, если такой ещё нет."}
+      </Hint>
+      {mode === "replace" && mixed.length ? (
+        <Hint tone="warn">
+          У задач разные наборы {mixed.map((c) => `«${c.label}»`).join(", ")} — после правки у всех
+          будет один и тот же. Разницу видно в «Сравнить».
+        </Hint>
+      ) : null}
+    </div>
+  );
+}
+
 export function BulkOpEditor({
   op,
   onChange,
@@ -353,6 +410,7 @@ export function BulkOpEditor({
                 {conditionSummary.map((c) => {
                   const differs = c.variants > 1 || c.count < tasks.length;
                   const active = op.conditions.some((entry) => c.name in entry);
+                  const repeated = schema.duplicable?.has(c.name) ?? false;
                   return (
                     <button
                       key={c.name}
@@ -367,7 +425,7 @@ export function BulkOpEditor({
                         c.count < tasks.length
                           ? `Есть у ${c.count} из ${tasks.length} задач`
                           : c.variants > 1
-                            ? `${c.variants} разных значения — подставится самое частое`
+                            ? `${c.variants} разных ${repeated ? "набора" : "значения"} — подставится самый частый`
                             : "Одинаково у всех задач"
                       }
                       onClick={() =>
@@ -375,12 +433,17 @@ export function BulkOpEditor({
                           ...op,
                           conditions: [
                             ...op.conditions.filter((entry) => !(c.name in entry)),
-                            { [c.name]: c.common },
+                            ...c.common.map((value) => ({ [c.name]: value })),
                           ],
+                          // Взяли все записи задачи — правка должна заменить их, а не дописать ещё.
+                          ...(repeated ? { duplicates: "replace" as const } : {}),
                         })
                       }
                     >
                       {c.label}
+                      {c.common.length > 1 ? (
+                        <span className="opacity-70">×{c.common.length}</span>
+                      ) : null}
                       <span className="tabular-nums opacity-70">
                         {c.count}/{tasks.length}
                       </span>
@@ -399,6 +462,12 @@ export function BulkOpEditor({
             duplicable={schema.duplicable}
             taskOptions={[]}
             countries={{ data: countries.data, loading: countries.loading }}
+          />
+          <DuplicatesModeEditor
+            op={op}
+            onChange={onChange}
+            summary={conditionSummary}
+            refs={refs}
           />
           {op.conditions.some((entry) => LINKS_CONDITION in entry) ? (
             <Hint tone="warn">

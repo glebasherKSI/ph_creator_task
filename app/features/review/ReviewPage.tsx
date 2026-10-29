@@ -52,6 +52,7 @@ import {
   agentTaskOf,
   briefOf,
   buildReviewRows,
+  isTargetingRow,
   lessonDraft,
   reviewDiff,
   reviewSections,
@@ -153,7 +154,11 @@ function Queue({
 function SectionCard({ section, hideEmpty }: { section: ReviewSection; hideEmpty: boolean }) {
   const rows = hideEmpty
     ? section.rows.filter(
-        (r) => r.changed || !EMPTY_VALUES.has(r.current ?? r.agent) || !EMPTY_VALUES.has(r.agent),
+        (r) =>
+          isTargetingRow(r) ||
+          r.changed ||
+          !EMPTY_VALUES.has(r.current ?? r.agent) ||
+          !EMPTY_VALUES.has(r.agent),
       )
     : section.rows;
   const changed = section.rows.filter((r) => r.changed).length;
@@ -711,8 +716,10 @@ export function ReviewPage({ onOpenOnCanvas }: { onOpenOnCanvas: (id: string) =>
         <p className="text-subhead text-muted-foreground">Выберите домен админки.</p>
       ) : list.isError ? (
         <p className="flex items-center gap-1.5 text-subhead text-destructive">
-          <AlertTriangle className="size-4" /> {errorMessage(list.error)} — нужен вход в Promo
-          Graphic в окне расширения.
+          <AlertTriangle className="size-4 shrink-0" /> {errorMessage(list.error)}
+          {/HTTP 40[13]/.test(errorMessage(list.error))
+            ? " — нужен вход в Promo Graphic в окне расширения."
+            : ""}
         </p>
       ) : list.isLoading ? (
         <p className="flex items-center gap-1.5 text-subhead text-muted-foreground">

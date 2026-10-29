@@ -41,19 +41,31 @@ describe("сравнение задач", () => {
     expect(applyBulkOps(tasks[0]!, [fix]).task.priority).toBe(3);
   });
 
-  it("таргетинг: строка на условие, «нет» у задач без него; связи не сравниваются", () => {
+  it("таргетинг: строка на условие, «не задано» у задач без него; связи не сравниваются", () => {
     const tasks = [task(), task({ conditions: [{ fraud: true }, { no_bonus: true }] })];
     const rows = buildCompareRows(tasks);
     expect(rows.some((r) => r.key === "condition:gamification_tasks")).toBe(false);
     const noBonus = row(rows, "condition:no_bonus");
-    expect(noBonus.cells.map((c) => c.text)).toEqual(["нет", "да"]);
-    // «нет» — удалить условие у всех, «да» — добавить всем.
+    expect(noBonus.cells.map((c) => c.text)).toEqual(["не задано", "да"]);
+    // «не задано» — удалить условие у всех, «да» — добавить всем.
     expect(applyBulkOps(tasks[1]!, [noBonus.cells[0]!.fix!]).task.conditions).toEqual([
       { fraud: true },
     ]);
     expect(applyBulkOps(tasks[0]!, [noBonus.cells[1]!.fix!]).task.conditions).toContainEqual({
       no_bonus: true,
     });
+  });
+
+  it("повторяемое условие: ячейка с двумя записями выравнивает набор целиком", () => {
+    const a = { groups: { type: "enabled", list: ["ph_low"] } };
+    const b = { groups: { type: "enabled", list: ["AB_354_VAR1"] } };
+    const tasks = [task({ conditions: [a, b] }), task({ conditions: [a] })];
+    const groups = row(buildCompareRows(tasks), "condition:groups");
+    const fix = groups.cells[0]!.fix!;
+    expect(fix).toMatchObject({ field: "conditions_upsert", duplicates: "replace" });
+    const ctx = { duplicable: new Set(["groups"]) };
+    expect(applyBulkOps(tasks[1]!, [fix], ctx).task.conditions).toEqual([a, b]);
+    expect(applyBulkOps(tasks[0]!, [groups.cells[1]!.fix!], ctx).task.conditions).toEqual([a]);
   });
 
   it("тип, локали и целевые действия только для просмотра", () => {
@@ -81,7 +93,7 @@ describe("сравнение задач", () => {
     const sum = rows.find((r) => r.label === "Депозит · Сумма платежей")!;
     expect(sum.cells.map((c) => c.text)).toEqual(["1 €", "15 €"]);
     const count = rows.find((r) => r.label === "Депозит · Количество платежей")!;
-    expect(count.cells.map((c) => c.text)).toEqual(["нет", "2"]);
+    expect(count.cells.map((c) => c.text)).toEqual(["не задано", "2"]);
     expect(sum.cells[0]!.fix).toBeNull();
   });
 

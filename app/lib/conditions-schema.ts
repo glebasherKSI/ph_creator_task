@@ -1,10 +1,12 @@
 /**
  * Схема условий таргетинга: GET /admin/api/filters/conditions с кэшем и
- * откатом на фикстуру public/test_primer/conditions.json.
+ * откатом на фикстуру public/test_primer/conditions.json. Группы из схемы с бэка
+ * синхронизируются в Promo Graphic (graphic-groups.ts).
  */
 import { browser } from "wxt/browser";
 
 import { apiFetch, resolveAdminTab } from "./api";
+import { syncGraphicGroups } from "./graphic-groups";
 
 export const CACHE_TTL_MS = 10 * 60 * 1000;
 export const CONDITIONS_API_PATH = "/admin/api/filters/conditions?locale=ru";
@@ -146,13 +148,18 @@ export async function loadConditionsSchema(domain: string): Promise<ParsedCondit
   if (!key) return loadConditionsFixture();
 
   const cached = cache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  if (cached && cached.expiresAt > Date.now()) {
+    // И из кэша: проект для домена мог смениться; без изменений запроса в график не будет.
+    void syncGraphicGroups(key, cached.data.byName.get("groups")?.collection);
+    return cached.data;
+  }
 
   try {
     const adminContext = await resolveAdminTab(key);
     const raw = await apiFetch(adminContext, CONDITIONS_API_PATH);
     const data = parseConditionsSchema(raw, "api");
     cache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+    void syncGraphicGroups(key, data.byName.get("groups")?.collection);
     return data;
   } catch (err) {
     const fixture = await loadConditionsFixture();

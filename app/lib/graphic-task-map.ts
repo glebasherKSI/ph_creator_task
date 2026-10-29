@@ -448,6 +448,8 @@ const KNOWN_TARGETING_KEYS: ReadonlySet<string> = new Set([
   "prerequisite_task_id",
   "exclude_tags",
   "groups",
+  "groups_type",
+  "groups_extra_type",
 ]);
 
 function isPresent(value: unknown): boolean {
@@ -743,6 +745,39 @@ function rewardPoints(value: unknown): number | null {
   return Number.isFinite(points) ? points : null;
 }
 
+/** Условие «Группы» PromoHub ↔ поля таргетинга графика (groups, groups_type, groups_extra_type). */
+interface PlannerGroupsTargeting {
+  groups: string[];
+  groups_type: "enabled" | "disabled";
+  groups_extra_type: "or" | "and";
+}
+
+/** Без типа и логики — «включая» и «или», как по умолчанию в PromoHub. */
+function plannerGroups(list: unknown, type: unknown, extraType: unknown): PlannerGroupsTargeting {
+  return {
+    groups: asArray(list)
+      .map((id) => String(id ?? "").trim())
+      .filter((id, index, all) => id && all.indexOf(id) === index),
+    groups_type: type === "disabled" ? "disabled" : "enabled",
+    groups_extra_type: extraType === "and" ? "and" : "or",
+  };
+}
+
+/** Группы из таргетинга графика → условие groups, если в conditions его ещё нет. */
+function withPlannerGroupsCondition(
+  conditions: unknown,
+  targeting: Record<string, unknown>,
+): unknown[] {
+  const list = asArray(conditions);
+  const { groups, groups_type, groups_extra_type } = plannerGroups(
+    targeting.groups,
+    targeting.groups_type,
+    targeting.groups_extra_type,
+  );
+  if (!groups.length || list.some((entry) => "groups" in asObject(entry))) return list;
+  return [...list, { groups: { type: groups_type, extra_type: groups_extra_type, list: groups } }];
+}
+
 /** Планировщик → тело локального черновика для формы и buildCreatePayload. */
 export function mapPlannerTaskToDraft(task: unknown): TaskLike {
   const source = asObject(task) as PlannerTask;
@@ -771,7 +806,9 @@ export function mapPlannerTaskToDraft(task: unknown): TaskLike {
     secondary_actions_sequential: false,
     main_bonus_group_id: null,
     secondary_bonus_group_id: null,
-    conditions: mergeDefaultDraftConditions(source.conditions),
+    conditions: mergeDefaultDraftConditions(
+      withPlannerGroupsCondition(source.conditions, asObject(source.targeting)),
+    ),
     hidden: false,
     state: "draft",
     filter_id: null,
@@ -843,7 +880,7 @@ export interface PlannerImportItem {
     duration_minutes: number | null;
     infinite: boolean;
   };
-  targeting: { groups: string[]; extra: string };
+  targeting: PlannerGroupsTargeting & { extra: string };
   main_actions: PlannerAction[];
   secondary_actions: PlannerAction[];
 }
@@ -898,19 +935,20 @@ const DEFAULT_FLAG_KEYS: ReadonlySet<string> = new Set(
 );
 
 /**
- * Таргетинг PromoHub → поля графика. Включённые группы ложатся в groups, остальное,
- * кроме связей и выключенных флагов по умолчанию, — текстом в extra.
+ * Таргетинг PromoHub → поля графика. Условие «Группы» — в groups (включая/исключая, И/Или),
+ * остальное, кроме связей и выключенных флагов по умолчанию, — текстом в extra.
  */
-function toPlannerTargeting(task: TaskLike): { groups: string[]; extra: string } {
-  const groups: string[] = [];
+function toPlannerTargeting(task: TaskLike): PlannerGroupsTargeting & { extra: string } {
+  let groups = plannerGroups([], null, null);
   const extra: string[] = [];
   for (const entry of asArray(task.conditions)) {
     for (const [key, value] of Object.entries(asObject(entry))) {
       if (key === "gamification_tasks") continue;
       if (DEFAULT_FLAG_KEYS.has(key) && value === false) continue;
-      const block = asObject(value);
-      if (key === "groups" && block.type !== "disabled" && Array.isArray(block.list)) {
-        groups.push(...block.list.map(String));
+      if (key === "groups") {
+        const raw = asObject(value);
+        const block = plannerGroups(raw.list, raw.type, raw.extra_type);
+        if (block.groups.length) groups = block;
         continue;
       }
       extra.push(`${key}: ${JSON.stringify(value)}`);
@@ -919,7 +957,7 @@ function toPlannerTargeting(task: TaskLike): { groups: string[]; extra: string }
   if (asArray(task.countries_lists).length) {
     extra.push(`countries_lists: ${JSON.stringify(task.countries_lists)}`);
   }
-  return { groups, extra: extra.join("\n") };
+  return { ...groups, extra: extra.join("\n") };
 }
 
 function textOrNull(value: unknown): string | null {
